@@ -9,6 +9,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var store: AppStore
+    @Binding var showingSearch: Bool
     @State private var category: HomeCategory = .recommend
     @State private var videos: [Video] = []
     @State private var isLoading = false
@@ -109,11 +110,13 @@ struct HomeView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        // refresh
-                        loadVideos()
+                        showingSearch = true
                     } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(.secondary)
+                        Image(systemName: "magnifyingglass")
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .padding(8)
+                            .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
                     }
                 }
             }

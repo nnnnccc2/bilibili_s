@@ -9,12 +9,19 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var store: AppStore
+    @Binding var showingSearch: Bool
     @State private var showingLogin = false
     @State private var showingSettings = false
     @State private var showingHistory = false
     @State private var selectedVideo: Video?
     @State private var showingLogoutAlert = false
     @State private var showingAbout = false
+    @State private var remoteHistory: [HistoryItem] = []
+    @State private var isLoadingHistory = false
+
+    private var displayHistory: [HistoryItem] {
+        store.currentUser != nil ? remoteHistory : store.history
+    }
 
     var body: some View {
         NavigationStack {
@@ -44,6 +51,17 @@ struct ProfileView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        showingSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .padding(8)
+                            .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
                         showingSettings = true
                     } label: {
                         Image(systemName: "gearshape")
@@ -63,12 +81,34 @@ struct ProfileView: View {
                 Button("取消", role: .cancel) {}
                 Button("退出", role: .destructive) {
                     store.logout()
+                    remoteHistory.removeAll()
                 }
             } message: {
                 Text("确定要退出当前账号吗？")
             }
             .sheet(isPresented: $showingAbout) {
                 SettingsView()
+            }
+        }
+        .onAppear {
+            refreshProfile()
+        }
+        .onChange(of: store.currentUser) { _, _ in
+            refreshProfile()
+        }
+    }
+
+    private func refreshProfile() {
+        guard store.currentUser != nil else { return }
+        loadRemoteHistory()
+    }
+
+    private func loadRemoteHistory() {
+        isLoadingHistory = true
+        BiliAPI.shared.fetchHistory { items in
+            DispatchQueue.main.async {
+                remoteHistory = items
+                isLoadingHistory = false
             }
         }
     }
@@ -176,7 +216,7 @@ struct ProfileView: View {
     private var statsRow: some View {
         HStack(spacing: 0) {
             statCard(label: "累计净化", value: "\(store.settings.stats.totalBlocked)", icon: "shield.lefthalf.filled", color: .green)
-            statCard(label: "观看历史", value: "\(store.history.count)", icon: "clock.arrow.circlepath", color: .blue)
+            statCard(label: "观看历史", value: "\(displayHistory.count)", icon: "clock.arrow.circlepath", color: .blue)
             statCard(label: "屏蔽词库", value: "\(store.settings.customBlockedWords.count + (store.settings.builtInWordsEnabled ? FilterSettings.builtInInsultWords.count : 0))", icon: "hand.raised.fill", color: .red)
         }
         .padding(12)
@@ -209,9 +249,13 @@ struct ProfileView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
                 Spacer()
-                if !store.history.isEmpty {
+                if !displayHistory.isEmpty {
                     Button {
-                        store.clearHistory()
+                        if store.currentUser != nil {
+                            remoteHistory.removeAll()
+                        } else {
+                            store.clearHistory()
+                        }
                     } label: {
                         Text("清空")
                             .font(.subheadline)
@@ -222,7 +266,11 @@ struct ProfileView: View {
                 }
             }
 
-            if store.history.isEmpty {
+            if isLoadingHistory {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
+            } else if displayHistory.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "clock")
                         .font(.largeTitle)
@@ -235,7 +283,7 @@ struct ProfileView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(store.history.prefix(10)) { item in
+                        ForEach(displayHistory.prefix(10)) { item in
                             historyCard(item: item)
                         }
                     }
@@ -269,8 +317,16 @@ struct ProfileView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if let video = MockVideos.allVideos.first(where: { $0.id == item.videoId }) {
-                selectedVideo = video
+            playHistoryItem(item)
+        }
+    }
+
+    private func playHistoryItem(_ item: HistoryItem) {
+        BiliAPI.shared.fetchVideoDetail(bvid: item.videoId) { video in
+            DispatchQueue.main.async {
+                if let video = video {
+                    selectedVideo = video
+                }
             }
         }
     }

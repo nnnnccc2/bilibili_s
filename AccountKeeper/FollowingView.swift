@@ -9,6 +9,7 @@ import SwiftUI
 
 struct FollowingView: View {
     @EnvironmentObject var store: AppStore
+    @Binding var showingSearch: Bool
     @State private var selectedTab: FollowTab = .all
     @State private var videos: [Video] = []
     @State private var isLoading = false
@@ -84,6 +85,17 @@ struct FollowingView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Text("关注")
                         .font(.title3).fontWeight(.bold)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .padding(8)
+                            .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
+                    }
                 }
             }
             .sheet(item: $selectedVideo) { video in

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CategoryView: View {
     @EnvironmentObject var store: AppStore
+    @Binding var showingSearch: Bool
     @State private var selectedPartition: Partition?
     @State private var partitionVideos: [Video] = []
     @State private var isLoading = false
@@ -76,6 +77,17 @@ struct CategoryView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Text(selectedPartition?.rawValue ?? "分区")
                         .font(.title3).fontWeight(.bold)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .padding(8)
+                            .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
+                    }
                 }
             }
             .sheet(item: $selectedVideo) { video in

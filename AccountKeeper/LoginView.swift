@@ -2,32 +2,24 @@
 //  LoginView.swift
 //  BiliBili
 //
-//  Login page: phone + SMS code, and account/password
+//  QR code login using Bilibili passport API
 //
 
 import SwiftUI
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 struct LoginView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var loginMode: LoginMode = .sms
-    @State private var phone: String = ""
-    @State private var code: String = ""
-    @State private var username: String = ""
-    @State private var password: String = ""
-    @State private var countdown: Int = 0
-    @State private var showError: String? = nil
+    @State private var qrCodeURL: String?
+    @State private var qrKey: String?
+    @State private var status: QRCodePollResult = .waiting
+    @State private var errorMessage: String?
+    @State private var isPolling = false
 
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    enum LoginMode {
-        case sms, password
-    }
-
-    private var isValidPhone: Bool {
-        phone.count == 11 && phone.allSatisfy { $0.isNumber }
-    }
+    private let pollTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
@@ -46,31 +38,60 @@ struct LoginView: View {
                         Text("BiliBili")
                             .font(.title)
                             .fontWeight(.bold)
-                        Text("纯净观影，自动净化低质内容")
+                        Text("使用哔哩哔哩 App 扫码登录")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.top, 40)
 
-                    // Mode toggle
-                    Picker("登录方式", selection: $loginMode) {
-                        Text("验证码登录").tag(LoginMode.sms)
-                        Text("密码登录").tag(LoginMode.password)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
+                    // QR code
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white)
+                            .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
+                            .frame(width: 240, height: 240)
 
-                    if loginMode == .sms {
-                        smsLoginSection
-                    } else {
-                        passwordLoginSection
+                        if status == .expired {
+                            VStack(spacing: 12) {
+                                Image(systemName: "qrcode.viewfinder")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.secondary)
+                                Text("二维码已过期")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Button("点击刷新") {
+                                    generateQR()
+                                }
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 8)
+                                .background(Color.pink)
+                                .clipShape(Capsule())
+                            }
+                        } else if let qr = qrCodeURL, let image = generateQRImage(from: qr) {
+                            Image(uiImage: image)
+                                .interpolation(.none)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 220, height: 220)
+                        } else {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                        }
                     }
+                    .frame(width: 240, height: 240)
 
-                    if let error = showError {
+                    // Status text
+                    statusText
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    if let error = errorMessage {
                         Text(error)
                             .font(.caption)
                             .foregroundStyle(.red)
-                            .padding(.horizontal)
                     }
 
                     Spacer(minLength: 20)
@@ -83,132 +104,94 @@ struct LoginView: View {
                     Button("取消") { dismiss() }
                 }
             }
-            .onReceive(timer) { _ in
-                if countdown > 0 {
-                    countdown -= 1
+            .onAppear {
+                generateQR()
+            }
+            .onReceive(pollTimer) { _ in
+                guard isPolling, let key = qrKey else { return }
+                poll(key: key)
+            }
+        }
+    }
+
+    // MARK: - Status
+
+    @ViewBuilder
+    private var statusText: some View {
+        switch status {
+        case .waiting:
+            Text("请打开哔哩哔哩 App 扫描二维码")
+        case .scanned:
+            Text("扫描成功，请在手机上确认登录")
+                .foregroundStyle(.green)
+        case .expired:
+            Text("二维码已过期，请刷新重试")
+                .foregroundStyle(.red)
+        case .error:
+            Text("登录出错，请重试")
+                .foregroundStyle(.red)
+        case .success:
+            Text("登录成功")
+                .foregroundStyle(.green)
+        }
+    }
+
+    // MARK: - QR generation & polling
+
+    private func generateQR() {
+        errorMessage = nil
+        status = .waiting
+        qrCodeURL = nil
+        isPolling = false
+        BiliAPI.shared.generateQRCode { result in
+            DispatchQueue.main.async {
+                guard let result = result else {
+                    self.errorMessage = "获取二维码失败，请检查网络"
+                    return
+                }
+                self.qrCodeURL = result.url
+                self.qrKey = result.key
+                self.isPolling = true
+            }
+        }
+    }
+
+    private func poll(key: String) {
+        BiliAPI.shared.pollQRCode(key: key) { result in
+            DispatchQueue.main.async {
+                self.status = result
+                switch result {
+                case .success:
+                    self.isPolling = false
+                    self.store.loginAfterQRSuccess { ok in
+                        DispatchQueue.main.async {
+                            if ok {
+                                dismiss()
+                            } else {
+                                self.errorMessage = "登录成功但获取用户信息失败，请重试"
+                            }
+                        }
+                    }
+                case .expired, .error:
+                    self.isPolling = false
+                case .waiting, .scanned:
+                    break
                 }
             }
         }
     }
 
-    // MARK: - SMS login
+    // MARK: - QR image generator
 
-    private var smsLoginSection: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Text("+86")
-                    .foregroundStyle(.secondary)
-                Divider()
-                    .frame(height: 24)
-                TextField("请输入手机号", text: $phone)
-                    .keyboardType(.numberPad)
-                    .onChange(of: phone) { _, newValue in
-                        phone = String(newValue.filter { $0.isNumber }.prefix(11))
-                    }
-            }
-            .padding()
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .padding(.horizontal)
-
-            HStack {
-                TextField("请输入验证码", text: $code)
-                    .keyboardType(.numberPad)
-                    .onChange(of: code) { _, newValue in
-                        code = String(newValue.filter { $0.isNumber }.prefix(6))
-                    }
-
-                Button {
-                    sendCode()
-                } label: {
-                    Text(countdown > 0 ? "\(countdown)s 后重发" : "获取验证码")
-                        .fontWeight(.medium)
-                        .foregroundStyle(countdown > 0 ? .secondary : (isValidPhone ? Color.pink : .secondary))
-                }
-                .disabled(countdown > 0 || !isValidPhone)
-            }
-            .padding()
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .padding(.horizontal)
-
-            Button {
-                doSmsLogin()
-            } label: {
-                Text("登录")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(isValidPhone && code.count == 6 ? Color.pink : Color.pink.opacity(0.4))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .disabled(!isValidPhone || code.count != 6)
-            .padding(.horizontal)
-        }
-    }
-
-    // MARK: - Password login
-
-    private var passwordLoginSection: some View {
-        VStack(spacing: 16) {
-            TextField("账号 / 手机号", text: $username)
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .padding(.horizontal)
-
-            SecureField("密码", text: $password)
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .padding(.horizontal)
-
-            Button {
-                doPasswordLogin()
-            } label: {
-                Text("登录")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(!username.isEmpty && !password.isEmpty ? Color.pink : Color.pink.opacity(0.4))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .disabled(username.isEmpty || password.isEmpty)
-            .padding(.horizontal)
-        }
-    }
-
-    // MARK: - Actions
-
-    private func sendCode() {
-        guard isValidPhone else {
-            showError = "请输入正确的手机号"
-            return
-        }
-        showError = nil
-        // Simulate sending SMS code
-        countdown = 60
-    }
-
-    private func doSmsLogin() {
-        guard isValidPhone else {
-            showError = "请输入正确的手机号"
-            return
-        }
-        guard code.count == 6 else {
-            showError = "请输入 6 位验证码"
-            return
-        }
-        store.login(phone: phone, code: code)
-        dismiss()
-    }
-
-    private func doPasswordLogin() {
-        guard !username.isEmpty, !password.isEmpty else { return }
-        store.login(username: username, password: password)
-        dismiss()
+    private func generateQRImage(from string: String) -> UIImage? {
+        let context = CIContext()
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(string.utf8)
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage else { return nil }
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+        guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
 

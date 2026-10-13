@@ -108,24 +108,27 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func login(phone: String, code: String) {
-        let user = User(name: "纯净观影官", level: 6, isVip: true, coins: 233, phone: phone)
-        currentUser = user
-        if let encoded = try? JSONEncoder().encode(user) {
-            UserDefaults.standard.set(encoded, forKey: userKey)
-        }
-    }
-
-    func login(username: String, password: String) {
-        let user = User(name: username.isEmpty ? "纯净观影官" : username, level: 6, isVip: true, coins: 233)
-        currentUser = user
-        if let encoded = try? JSONEncoder().encode(user) {
-            UserDefaults.standard.set(encoded, forKey: userKey)
+    /// Called after QR code login succeeds (cookies already stored in BiliAPI).
+    /// Fetches the logged-in user's profile and persists it.
+    func loginAfterQRSuccess(completion: @escaping (Bool) -> Void) {
+        BiliAPI.shared.fetchUserInfo { [weak self] user in
+            DispatchQueue.main.async {
+                guard let self = self, let user = user else {
+                    completion(false)
+                    return
+                }
+                self.currentUser = user
+                if let encoded = try? JSONEncoder().encode(user) {
+                    UserDefaults.standard.set(encoded, forKey: self.userKey)
+                }
+                completion(true)
+            }
         }
     }
 
     func logout() {
         currentUser = nil
+        BiliAPI.shared.clearCookies()
         UserDefaults.standard.removeObject(forKey: userKey)
     }
 

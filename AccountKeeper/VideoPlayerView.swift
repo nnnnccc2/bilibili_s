@@ -206,8 +206,17 @@ struct VideoPlayerView: View {
     }
 
     private func setupPlayer() {
-        if let url = BiliAPI.shared.streamURL(for: video) {
-            player = AVPlayer(url: url)
+        BiliAPI.shared.streamURL(for: video) { url in
+            DispatchQueue.main.async {
+                guard let url = url else { return }
+                let headers = [
+                    "Referer": "https://www.bilibili.com/",
+                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+                ]
+                let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+                let item = AVPlayerItem(asset: asset)
+                self.player = AVPlayer(playerItem: item)
+            }
         }
     }
 

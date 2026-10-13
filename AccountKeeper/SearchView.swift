@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SearchView: View {
     @EnvironmentObject var store: AppStore
+    @Environment(\.dismiss) private var dismiss
     @State private var keyword: String = ""
     @State private var searchType: SearchType = .video
     @State private var results: [Video] = []
@@ -182,6 +183,9 @@ struct SearchView: View {
                     Text("搜索")
                         .font(.title3)
                         .fontWeight(.bold)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("取消") { dismiss() }
                 }
             }
             .sheet(item: $selectedVideo) { video in

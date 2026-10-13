@@ -10,48 +10,42 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var store: AppStore
     @State private var selectedTab = 0
+    @State private var showingSearch = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView()
+            HomeView(showingSearch: $showingSearch)
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("首页")
                 }
                 .tag(0)
 
-            FollowingView()
+            FollowingView(showingSearch: $showingSearch)
                 .tabItem {
                     Image(systemName: "heart.fill")
                     Text("关注")
                 }
                 .tag(1)
 
-            CategoryView()
+            CategoryView(showingSearch: $showingSearch)
                 .tabItem {
                     Image(systemName: "square.grid.2x2.fill")
                     Text("分区")
                 }
                 .tag(2)
 
-            SearchView()
-                .tabItem {
-                    // Prominent circular, slightly dark translucent search button
-                    Image(systemName: "magnifyingglass")
-                        .font(.title3)
-                        .padding(8)
-                        .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
-                }
-                .tag(3)
-
-            ProfileView()
+            ProfileView(showingSearch: $showingSearch)
                 .tabItem {
                     Image(systemName: "person.fill")
                     Text("我的")
                 }
-                .tag(4)
+                .tag(3)
         }
         .tint(.pink)
+        .sheet(isPresented: $showingSearch) {
+            SearchView().environmentObject(store)
+        }
         .onAppear {
             // Style the tab bar
             let appearance = UITabBarAppearance()
