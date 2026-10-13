@@ -70,17 +70,41 @@ final class BiliAPI {
         didSet { saveCookies() }
     }
 
+    /// Visitor cookies (buvid3, buvid4, b_nut) fetched on launch; not persisted.
+    private var visitorCookies: [String: String] = [:]
+
     init() {
         let config = URLSessionConfiguration.default
         config.httpCookieStorage = nil
         self.session = URLSession(configuration: config)
         loadCookies()
+        fetchBuvid3()
     }
 
     // MARK: - Cookie helpers
 
     var cookieHeader: String {
-        cookies.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
+        var all = visitorCookies
+        for (k, v) in cookies { all[k] = v }
+        return all.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
+    }
+
+    /// Fetch buvid3/buvid4 visitor IDs required by anti-bot checks (e.g. search API).
+    private func fetchBuvid3() {
+        guard let url = URL(string: "https://api.bilibili.com/x/frontend/finger/spi") else { return }
+        var req = URLRequest(url: url)
+        for (k, v) in baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
+        session.dataTask(with: req) { [weak self] data, _, _ in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let d = json["data"] as? [String: Any] else { return }
+            if let b3 = d["b_3"] as? String {
+                self?.visitorCookies["buvid3"] = b3
+            }
+            if let b4 = d["b_4"] as? String {
+                self?.visitorCookies["buvid4"] = b4
+            }
+        }.resume()
     }
 
     private func loadCookies() {
