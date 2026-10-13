@@ -157,6 +157,7 @@ struct UPSpaceView: View {
 
     // MARK: - Video grid
 
+    @ViewBuilder
     private var videoGridSection: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             ForEach(videos) { video in

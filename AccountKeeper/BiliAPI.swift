@@ -991,9 +991,8 @@ private extension BiliAPI {
         guard let json = parseJSON(data),
               let d = json["data"] as? [String: Any] else { return nil }
         let stat = d["stat"] as? [String: Any]
-        return Video(
+        var video = Video(
             id: d["bvid"] as? String ?? bvid,
-            aid: d["aid"] as? Int ?? 0,
             title: d["title"] as? String ?? "",
             cover: BiliAPI.coverURL(d["pic"] as? String ?? ""),
             duration: d["duration"] as? Int ?? 0,
@@ -1011,6 +1010,8 @@ private extension BiliAPI {
             shares: stat?["share"] as? Int ?? 0,
             cid: d["cid"] as? Int ?? 0
         )
+        video.aid = d["aid"] as? Int ?? 0
+        return video
     }
 
     func parseUPSpaceInfo(_ data: Data?) -> UPSpaceInfo? {
@@ -1232,8 +1233,8 @@ extension Video {
     init(id: String, title: String, cover: String, duration: Int, upName: String,
          upAvatar: String, views: Int, danmaku: Int, publishTime: String,
          category: String, desc: String, likes: Int, coins: Int,
-         favorites: Int, shares: Int, cid: Int, aid: Int = 0, upMid: Int = 0) {
-        self.init(id: id, aid: aid, title: title, cover: cover, duration: duration,
+         favorites: Int, shares: Int, cid: Int, upMid: Int = 0) {
+        self.init(id: id, title: title, cover: cover, duration: duration,
                   upName: upName, upMid: upMid, upAvatar: upAvatar, views: views, danmaku: danmaku,
                   publishTime: publishTime, category: category, desc: desc,
                   likes: likes, coins: coins, favorites: favorites, shares: shares)
