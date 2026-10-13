@@ -1231,9 +1231,9 @@ extension Video {
         set { Video.cidStore[id] = newValue }
     }
     init(id: String, title: String, cover: String, duration: Int, upName: String,
-         upAvatar: String, views: Int, danmaku: Int, publishTime: String,
+         upMid: Int, upAvatar: String, views: Int, danmaku: Int, publishTime: String,
          category: String, desc: String, likes: Int, coins: Int,
-         favorites: Int, shares: Int, cid: Int, upMid: Int = 0) {
+         favorites: Int, shares: Int, cid: Int) {
         self.init(id: id, title: title, cover: cover, duration: duration,
                   upName: upName, upMid: upMid, upAvatar: upAvatar, views: views, danmaku: danmaku,
                   publishTime: publishTime, category: category, desc: desc,
