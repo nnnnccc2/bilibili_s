@@ -98,33 +98,41 @@ jobs:
           path: BiliBili.ipa
           retention-days: 30
 
-      - name: Publish IPA to GitHub Release
+      - name: Publish IPA to GitHub Release (force refresh)
         if: github.ref == 'refs/heads/main'
-        continue-on-error: true
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: BiliBili Latest Build
-          body: |
-            # BiliBili iOS 18 - 第三方哔哩哔哩客户端
-            
-            | 项目 | 值 |
-            |------|-----|
-            | 架构 | arm64 |
-            | 部署目标 | iOS 18.0 |
-            | 编译时间 | ${{ steps.compile_time.outputs.compile_time }} |
-            | 签名方式 | ad-hoc |
-            
-            ## 功能
-            - 全站垃圾视频自动过滤（标题党、日语标题、日语UP主、短视频、侮辱贬低词）
-            - 搜索结果按时长过滤
-            - 纯净无弹幕视频播放
-            - 观看历史管理
-            - 账号登录
-            
-            ## 安装
-            使用 Sideloadly 或 AltStore 配合 Apple ID 重签名后安装。
-          files: BiliBili.ipa
-          overwrite_files: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMPILE_TIME: ${{ steps.compile_time.outputs.compile_time }}
+        run: |
+          set -e
+          echo "Deleting old 'latest' release if it exists..."
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || echo "No existing release to delete"
+          sleep 2
+          echo "Writing release notes..."
+          cat > RELEASE_NOTES.md <<'NOTES_EOF'
+          # BiliBili iOS 18 - 第三方哔哩哔哩客户端
+
+          | 项目 | 值 |
+          |------|-----|
+          | 架构 | arm64 |
+          | 部署目标 | iOS 18.0 |
+          | 编译时间 | __COMPILE_TIME__ |
+          | 签名方式 | ad-hoc |
+
+          ## 功能
+          - 全站垃圾视频自动过滤（标题党、日语标题、日语UP主、短视频、侮辱贬低词）
+          - 搜索结果按时长过滤
+          - 纯净无弹幕视频播放
+          - 观看历史管理
+          - 二维码 / 短信验证码登录
+
+          ## 安装
+          使用 Sideloadly 或 AltStore 配合 Apple ID 重签名后安装。
+          NOTES_EOF
+          sed -i '' "s/__COMPILE_TIME__/$COMPILE_TIME/g" RELEASE_NOTES.md
+          echo "Creating new 'latest' release with fresh IPA..."
+          gh release create latest BiliBili.ipa \
+            --title "BiliBili Latest Build" \
+            --notes-file RELEASE_NOTES.md
+          echo "Release created successfully"
+          gh release view latest --json assets --jq '.assets[].name'

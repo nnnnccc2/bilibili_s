@@ -45,7 +45,8 @@ struct FilterSettings: Codable, Hashable {
     // Duration filtering (global, applies to home/feed/category/dynamic)
     // Multi-select: videos whose duration is <= ANY selected threshold are blocked.
     // If empty, no duration filtering.
-    var blockedDurationSeconds: Set<Int> = []
+    // Default: 10s / 28s / 30s pre-selected to filter out ultra-short content.
+    var blockedDurationSeconds: Set<Int> = [10, 28, 30]
 
     // Search-specific duration filter (min duration for search results)
     var searchMinDurationSeconds: Int? = nil

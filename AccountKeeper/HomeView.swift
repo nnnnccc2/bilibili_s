@@ -153,10 +153,14 @@ struct HomeView: View {
     @Sendable
     private func loadVideosAsync(force: Bool = false) async {
         await withCheckedContinuation { continuation in
-            loadVideos(force: force)
-            // Give the refreshable a moment; completion handled via main queue
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                continuation.resume()
+            BiliAPI.shared.fetchHome(category: category) { raw in
+                let filtered = store.applyFilter(raw)
+                DispatchQueue.main.async {
+                    videos = filtered
+                    isLoading = false
+                    lastRefreshDate = Date()
+                    continuation.resume()
+                }
             }
         }
     }

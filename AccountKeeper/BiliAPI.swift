@@ -73,6 +73,9 @@ final class BiliAPI {
     /// Visitor cookies (buvid3, buvid4, b_nut) fetched on launch; not persisted.
     private var visitorCookies: [String: String] = [:]
 
+    /// Cache of resolved stream URLs keyed by bvid, to make playback near-instant on tap.
+    private var streamURLCache: [String: URL] = [:]
+
     init() {
         let config = URLSessionConfiguration.default
         config.httpCookieStorage = nil
@@ -322,25 +325,56 @@ final class BiliAPI {
 
     /// Get a playable video stream URL using the Bilibili player API.
     /// Prefers a progressive mp4 (durl) with muxed audio+video so AVPlayer can play directly.
+    /// Uses the cached cid (from feed APIs) when available to skip a redundant detail request.
     func streamURL(for video: Video, completion: @escaping (URL?) -> Void) {
+        // Return cached URL immediately if available
+        if let cached = streamURLCache[video.id] {
+            DispatchQueue.main.async { completion(cached) }
+            return
+        }
+        let cachedCid = video.cid
+        if cachedCid > 0 {
+            // Fast path: cid already known from feed, go straight to playurl
+            requestPlayURL(bvid: video.id, cid: cachedCid) { [weak self] url in
+                if let url = url { self?.streamURLCache[video.id] = url }
+                completion(url)
+            }
+            return
+        }
+        // Slow path: fetch detail to get cid first
         fetchVideoDetail(bvid: video.id) { [weak self] detail in
             guard let cid = detail?.cid, cid > 0 else {
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
-            // fnval=0 requests progressive durl (single muxed file, AVPlayer-friendly).
-            let params: [String: String] = [
-                "bvid": video.id,
-                "cid": String(cid),
-                "qn": "80",
-                "fnval": "0",
-                "fnver": "0",
-                "fourk": "1"
-            ]
-            self?.request("https://api.bilibili.com/x/player/playurl", params: params) { data, _, _ in
-                let url = self?.parsePlayURL(data)
-                DispatchQueue.main.async { completion(url) }
+            self?.requestPlayURL(bvid: video.id, cid: cid) { url in
+                if let url = url { self?.streamURLCache[video.id] = url }
+                completion(url)
             }
+        }
+    }
+
+    /// Prefetch the stream URL for a video (called when a card appears on screen).
+    /// Only prefetches when cid is already known to avoid extra requests.
+    func prefetchStreamURL(for video: Video) {
+        guard streamURLCache[video.id] == nil, video.cid > 0 else { return }
+        requestPlayURL(bvid: video.id, cid: video.cid) { [weak self] url in
+            if let url = url { self?.streamURLCache[video.id] = url }
+        }
+    }
+
+    private func requestPlayURL(bvid: String, cid: Int, completion: @escaping (URL?) -> Void) {
+        let params: [String: String] = [
+            "bvid": bvid,
+            "cid": String(cid),
+            "qn": "80",
+            "fnval": "0",
+            "fnver": "0",
+            "fourk": "1"
+        ]
+        request("https://api.bilibili.com/x/player/playurl", params: params) { [weak self] data, _, _ in
+            let url = self?.parsePlayURL(data)
+            DispatchQueue.main.async { completion(url) }
         }
     }
 
@@ -547,7 +581,8 @@ private extension BiliAPI {
                 publishTime: formatTime(item["pubdate"] as? Int ?? 0),
                 category: "",
                 desc: "",
-                likes: 0, coins: 0, favorites: 0, shares: 0
+                likes: 0, coins: 0, favorites: 0, shares: 0,
+                cid: item["cid"] as? Int ?? 0
             )
         }
     }
@@ -575,7 +610,8 @@ private extension BiliAPI {
                 likes: stat?["like"] as? Int ?? 0,
                 coins: stat?["coin"] as? Int ?? 0,
                 favorites: stat?["favorite"] as? Int ?? 0,
-                shares: stat?["share"] as? Int ?? 0
+                shares: stat?["share"] as? Int ?? 0,
+                cid: item["cid"] as? Int ?? 0
             )
         }
     }
@@ -620,7 +656,8 @@ private extension BiliAPI {
                     publishTime: formatTime(item["pubdate"] as? Int ?? 0),
                     category: "",
                     desc: item["description"] as? String ?? "",
-                    likes: 0, coins: 0, favorites: 0, shares: 0
+                    likes: 0, coins: 0, favorites: 0, shares: 0,
+                    cid: item["cid"] as? Int ?? 0
                 )
             }
         }
@@ -649,7 +686,8 @@ private extension BiliAPI {
                 likes: stat?["like"] as? Int ?? 0,
                 coins: stat?["coin"] as? Int ?? 0,
                 favorites: stat?["favorite"] as? Int ?? 0,
-                shares: stat?["share"] as? Int ?? 0
+                shares: stat?["share"] as? Int ?? 0,
+                cid: item["cid"] as? Int ?? 0
             )
         }
     }
@@ -679,7 +717,8 @@ private extension BiliAPI {
                 publishTime: "",
                 category: "",
                 desc: archive["desc"] as? String ?? "",
-                likes: 0, coins: 0, favorites: 0, shares: 0
+                likes: 0, coins: 0, favorites: 0, shares: 0,
+                cid: archive["cid"] as? Int ?? 0
             )
         }
     }

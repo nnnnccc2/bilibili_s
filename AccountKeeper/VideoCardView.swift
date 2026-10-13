@@ -115,5 +115,9 @@ struct VideoCardView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
         )
+        .onAppear {
+            // Prefetch stream URL when card becomes visible so playback starts instantly on tap
+            BiliAPI.shared.prefetchStreamURL(for: video)
+        }
     }
 }
