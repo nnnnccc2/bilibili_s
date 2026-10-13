@@ -1,0 +1,99 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Build HelloWorld IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using Xcode at: $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+          xcrun --show-sdk-version
+
+      - name: Install ldid (for ad-hoc code signing)
+        run: |
+          brew install ldid
+          ldid --version || true
+
+      - name: Build for iOS Device (arm64)
+        run: |
+          cd HelloWorld
+          xcodebuild build \
+            -project HelloWorld.xcodeproj \
+            -scheme HelloWorld \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            ARCHS="arm64" \
+            VALID_ARCHS="arm64"
+
+      - name: Locate built .app
+        id: find_app
+        run: |
+          APP_PATH=$(find HelloWorld/build -name "HelloWorld.app" -path "*Release-iphoneos*" | head -1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find HelloWorld/build -name "HelloWorld.app" -path "*iphoneos*" | head -1)
+          fi
+          echo "Found app at: $APP_PATH"
+          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+          ls -la "$APP_PATH"
+
+      - name: Ad-hoc sign the app with ldid
+        run: |
+          APP_PATH="${{ steps.find_app.outputs.app_path }}"
+          echo "Ad-hoc signing: $APP_PATH"
+          # Create entitlements plist
+          cat > /tmp/entitlements.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>application-identifier</key>
+              <string>com.example.HelloWorld</string>
+              <key>get-task-allow</key>
+              <false/>
+          </dict>
+          </plist>
+          PLIST
+          ldid -S/tmp/entitlements.plist "$APP_PATH/HelloWorld"
+          echo "Signing complete"
+
+      - name: Package into IPA
+        run: |
+          APP_PATH="${{ steps.find_app.outputs.app_path }}"
+          # Create IPA structure
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/HelloWorld.app
+          # Remove any existing _CodeSignature (we used ldid)
+          rm -rf Payload/HelloWorld.app/_CodeSignature
+          # Create the IPA
+          zip -r HelloWorld.ipa Payload/ -x "*.DS_Store"
+          echo "IPA created: HelloWorld.ipa"
+          ls -la HelloWorld.ipa
+          echo "=== IPA contents ==="
+          unzip -l HelloWorld.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HelloWorld-iOS18-ipa
+          path: HelloWorld.ipa
+          retention-days: 30

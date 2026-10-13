@@ -1,0 +1,15 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Build output
+Payload/
+*.ipa
+*.xcarchive
+export/
+
+# macOS
+.DS_Store
