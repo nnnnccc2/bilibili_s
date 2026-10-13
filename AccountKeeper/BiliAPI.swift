@@ -103,20 +103,24 @@ final class BiliAPI {
     private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
         let build: (Bool) -> Void = { [weak self] hasKeys in
             guard let self = self else { return }
-            var queryItems: [URLQueryItem] = params.map { URLQueryItem(name: $0.key, value: $0.value) }
+            var url: URL?
             if useWBI {
+                // WBI-signed query string is already correctly percent-encoded;
+                // set it directly to avoid double-encoding via URLQueryItem.
                 let signed = WBISigner.shared.sign(params: params)
-                var comps = URLComponents()
-                comps.query = signed
-                queryItems = comps.queryItems ?? []
+                var comps = URLComponents(string: urlString)
+                comps?.percentEncodedQuery = signed
+                url = comps?.url
+            } else {
+                var comps = URLComponents(string: urlString)
+                comps?.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
+                url = comps?.url
             }
-            var comps = URLComponents(string: urlString)
-            comps?.queryItems = queryItems
-            guard let url = comps?.url else {
+            guard let finalURL = url else {
                 completion(nil, nil, NSError(domain: "BiliAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
                 return
             }
-            var req = URLRequest(url: url)
+            var req = URLRequest(url: finalURL)
             for (k, v) in self.baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
             if !self.cookieHeader.isEmpty {
                 req.setValue(self.cookieHeader, forHTTPHeaderField: "Cookie")
@@ -139,6 +143,14 @@ final class BiliAPI {
             return nil
         }
         return json
+    }
+
+    /// Normalize a cover URL to an https:// URL that iOS can load under ATS.
+    private static func coverURL(_ raw: String) -> String {
+        if raw.hasPrefix("https://") { return raw }
+        if raw.hasPrefix("http://") { return raw.replacingOccurrences(of: "http://", with: "https://") }
+        if raw.hasPrefix("//") { return "https:" + raw }
+        return raw
     }
 
     // MARK: - Home feed
@@ -376,7 +388,7 @@ final class BiliAPI {
             let user = User(
                 id: "\(d["mid"] as? Int ?? 0)",
                 name: d["uname"] as? String ?? "用户",
-                avatar: d["face"] as? String ?? "",
+                avatar: BiliAPI.coverURL(d["face"] as? String ?? ""),
                 level: (d["level_info"] as? [String: Any])?["current_level"] as? Int ?? 0,
                 isVip: ((d["vipStatus"] as? Int) ?? 0) == 1,
                 coins: d["coins"] as? Int ?? 0
@@ -407,10 +419,10 @@ private extension BiliAPI {
             return Video(
                 id: id,
                 title: title,
-                cover: item["pic"] as? String ?? "",
+                cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                 duration: item["duration"] as? Int ?? 0,
                 upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
-                upAvatar: (item["owner"] as? [String: Any])?["face"] as? String ?? "",
+                upAvatar: BiliAPI.coverURL((item["owner"] as? [String: Any])?["face"] as? String ?? ""),
                 views: item["play"] as? Int ?? 0,
                 danmaku: item["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["pubdate"] as? Int ?? 0),
@@ -432,10 +444,10 @@ private extension BiliAPI {
             return Video(
                 id: id,
                 title: title,
-                cover: item["pic"] as? String ?? "",
+                cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                 duration: item["duration"] as? Int ?? 0,
                 upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
-                upAvatar: (item["owner"] as? [String: Any])?["face"] as? String ?? "",
+                upAvatar: BiliAPI.coverURL((item["owner"] as? [String: Any])?["face"] as? String ?? ""),
                 views: stat?["view"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["pubdate"] as? Int ?? 0),
@@ -460,10 +472,10 @@ private extension BiliAPI {
                 return Video(
                     id: "\(item["mid"] as? Int ?? 0)",
                     title: uname,
-                    cover: item["upic"] as? String ?? "",
+                    cover: BiliAPI.coverURL(item["upic"] as? String ?? ""),
                     duration: 0,
                     upName: uname,
-                    upAvatar: item["upic"] as? String ?? "",
+                    upAvatar: BiliAPI.coverURL(item["upic"] as? String ?? ""),
                     views: item["fans"] as? Int ?? 0,
                     danmaku: 0,
                     publishTime: "",
@@ -480,7 +492,7 @@ private extension BiliAPI {
                 return Video(
                     id: id,
                     title: cleanTitle,
-                    cover: "https:" + (item["pic"] as? String ?? ""),
+                    cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                     duration: parseDuration(item["duration"] as? String ?? "0"),
                     upName: item["author"] as? String ?? "",
                     upAvatar: "",
@@ -506,10 +518,10 @@ private extension BiliAPI {
             return Video(
                 id: id,
                 title: title,
-                cover: item["pic"] as? String ?? "",
+                cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                 duration: item["duration"] as? Int ?? 0,
                 upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
-                upAvatar: (item["owner"] as? [String: Any])?["face"] as? String ?? "",
+                upAvatar: BiliAPI.coverURL((item["owner"] as? [String: Any])?["face"] as? String ?? ""),
                 views: stat?["view"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["pubdate"] as? Int ?? 0),
@@ -539,10 +551,10 @@ private extension BiliAPI {
             return Video(
                 id: bvid,
                 title: title,
-                cover: archive["cover"] as? String ?? "",
+                cover: BiliAPI.coverURL(archive["cover"] as? String ?? ""),
                 duration: archive["duration"] as? Int ?? 0,
                 upName: moduleAuthor["name"] as? String ?? "",
-                upAvatar: moduleAuthor["face"] as? String ?? "",
+                upAvatar: BiliAPI.coverURL(moduleAuthor["face"] as? String ?? ""),
                 views: stat?["play"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
                 publishTime: "",
@@ -560,10 +572,10 @@ private extension BiliAPI {
         return Video(
             id: d["bvid"] as? String ?? bvid,
             title: d["title"] as? String ?? "",
-            cover: d["pic"] as? String ?? "",
+            cover: BiliAPI.coverURL(d["pic"] as? String ?? ""),
             duration: d["duration"] as? Int ?? 0,
             upName: (d["owner"] as? [String: Any])?["name"] as? String ?? "",
-            upAvatar: (d["owner"] as? [String: Any])?["face"] as? String ?? "",
+            upAvatar: BiliAPI.coverURL((d["owner"] as? [String: Any])?["face"] as? String ?? ""),
             views: stat?["view"] as? Int ?? 0,
             danmaku: stat?["danmaku"] as? Int ?? 0,
             publishTime: formatTime(d["pubdate"] as? Int ?? 0),
@@ -613,7 +625,7 @@ private extension BiliAPI {
                   let uname = member["uname"] as? String else { return nil }
             return Comment(
                 user: uname,
-                avatar: member["avatar"] as? String ?? "",
+                avatar: BiliAPI.coverURL(member["avatar"] as? String ?? ""),
                 content: msg,
                 likes: reply["like"] as? Int ?? 0,
                 time: formatTime(reply["ctime"] as? Int ?? 0)
@@ -631,7 +643,7 @@ private extension BiliAPI {
             return HistoryItem(
                 videoId: bvid,
                 title: title,
-                cover: history["cover"] as? String ?? "",
+                cover: BiliAPI.coverURL(history["cover"] as? String ?? ""),
                 upName: (item["author_name"] as? String) ?? "",
                 duration: 0,
                 progress: 0,
@@ -649,10 +661,10 @@ private extension BiliAPI {
             return Video(
                 id: "\(item["roomid"] as? Int ?? 0)",
                 title: title,
-                cover: item["cover"] as? String ?? "",
+                cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
                 duration: 0,
                 upName: item["uname"] as? String ?? "",
-                upAvatar: item["face"] as? String ?? "",
+                upAvatar: BiliAPI.coverURL(item["face"] as? String ?? ""),
                 views: item["online"] as? Int ?? 0,
                 danmaku: 0,
                 publishTime: "直播中",
@@ -672,7 +684,7 @@ private extension BiliAPI {
             return Video(
                 id: "\(item["season_id"] as? Int ?? 0)",
                 title: title,
-                cover: item["cover"] as? String ?? "",
+                cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
                 duration: 0,
                 upName: "",
                 upAvatar: "",
