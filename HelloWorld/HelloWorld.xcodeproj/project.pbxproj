@@ -70,7 +70,7 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		00E356ED21338773007A3DCE /* HelloWorld */ = {
+		00E356F121338773007A3DCE /* HelloWorld */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 00E3570621338776007A3DCE /* Build configuration list for PBXNativeTarget "HelloWorld" */;
 			buildPhases = (
@@ -97,7 +97,7 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
-					00E356ED21338773007A3DCE = {
+					00E356F121338773007A3DCE = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -115,7 +115,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				00E356ED21338773007A3DCE /* HelloWorld */,
+				00E356F121338773007A3DCE /* HelloWorld */,
 			);
 		};
 /* End PBXProject section */
