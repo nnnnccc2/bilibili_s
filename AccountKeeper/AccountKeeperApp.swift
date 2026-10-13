@@ -1,15 +1,15 @@
 //
 //  AccountKeeperApp.swift
-//  AccountKeeper
+//  BiliBili
 //
-//  A simple account keeper app - remember which apps/sites you have accounts for
+//  App entry point for the BiliBili third-party client
 //
 
 import SwiftUI
 
 @main
-struct AccountKeeperApp: App {
-    @StateObject private var store = AccountStore()
+struct BiliBiliApp: App {
+    @StateObject private var store = AppStore()
 
     var body: some Scene {
         WindowGroup {

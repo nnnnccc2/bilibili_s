@@ -1,15 +1,13 @@
 //
 //  SettingsView.swift
-//  AccountKeeper
+//  BiliBili
 //
-//  App settings and build info
+//  About page
 //
 
 import SwiftUI
-import UIKit
 
 struct SettingsView: View {
-    @EnvironmentObject var store: AccountStore
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -19,7 +17,7 @@ struct SettingsView: View {
                     HStack {
                         Text("应用名称")
                         Spacer()
-                        Text("账号管家")
+                        Text("BiliBili")
                             .foregroundStyle(.secondary)
                     }
                     HStack {
@@ -47,27 +45,13 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("数据") {
-                    HStack {
-                        Text("已记录账号数")
-                        Spacer()
-                        Text("\(store.accounts.count)")
-                            .foregroundStyle(.secondary)
-                    }
-                    Button {
-                        exportData()
-                    } label: {
-                        Label("导出账号数据", systemImage: "square.and.arrow.up")
-                    }
-                }
-
                 Section("说明") {
-                    Text("本应用专注于记录你在哪些应用和网站注册了账号，密码为可选项。数据仅保存在本地设备，不会上传。")
+                    Text("极简风格的第三方哔哩哔哩客户端，主打内容净化与纯净播放体验。具备全站维度的垃圾视频与低质内容自动过滤机制，提供真实无弹幕干扰的视频流播放。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("设置")
+            .navigationTitle("关于")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -76,17 +60,8 @@ struct SettingsView: View {
             }
         }
     }
-
-    private func exportData() {
-        // Simple export - copy to clipboard for now
-        let text = store.accounts.map { account in
-            "📱 \(account.name)\n账号: \(account.username)\n网址: \(account.url)\n备注: \(account.note)\n"
-        }.joined(separator: "\n---\n")
-        UIPasteboard.general.string = text
-    }
 }
 
 #Preview {
     SettingsView()
-        .environmentObject(AccountStore())
 }
