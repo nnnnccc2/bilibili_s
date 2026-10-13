@@ -2,7 +2,7 @@
 //  CredentialProviderViewController.swift
 //  CredentialProvider
 //
-//  AutoFill Credential Provider Extension
+//  AutoFill Credential Provider Extension (traditional API, iOS 12+)
 //  Called by iOS when user taps the key icon in password fields
 //
 
@@ -10,15 +10,13 @@ import AuthenticationServices
 import UIKit
 import SwiftUI
 
-class CredentialProviderViewController: ASExtensionViewController {
+class CredentialProviderViewController: ASCredentialProviderViewController {
 
     private let sharedStore = SharedAccountStore()
     private var hostingController: UIHostingController<CredentialProviderView>?
 
-    override func prepareInterfaceForExtensionRequest(_ request: ASExtensionRequest) {
-        super.prepareInterfaceForExtensionRequest(request)
-
-        let serviceIdentifiers = request.serviceIdentifiers
+    override func prepareCredentialList(for serviceIdentifiers: [ASCredentialServiceIdentifier]) {
+        // Called when user taps the key icon in a password field
         let serviceIdentifier = serviceIdentifiers.first?.identifier ?? ""
 
         let view = CredentialProviderView(
@@ -32,7 +30,7 @@ class CredentialProviderViewController: ASExtensionViewController {
                 self?.provideCredential(account: account)
             },
             onCancel: { [weak self] in
-                self?.extensionContext?.cancelRequest(withError: NSError(
+                self?.extensionContext.cancelRequest(withError: NSError(
                     domain: ASExtensionErrorDomain,
                     code: ASExtensionError.userCanceled.rawValue
                 ))
@@ -48,11 +46,25 @@ class CredentialProviderViewController: ASExtensionViewController {
         hostingController.didMove(toParent: self)
     }
 
+    override func provideCredentialWithoutUserInteraction(for credentialIdentity: ASPasswordCredentialIdentity) {
+        // Called when iOS has a matching credential identity stored
+        // We don't use the identity store, so cancel to show our UI
+        extensionContext.cancelRequest(withError: NSError(
+            domain: ASExtensionErrorDomain,
+            code: ASExtensionError.userInteractionRequired.rawValue
+        ))
+    }
+
+    override func prepareInterfaceToProvideCredential(for credentialIdentity: ASPasswordCredentialIdentity) {
+        // Fallback: show our UI
+        prepareCredentialList(for: [])
+    }
+
     private func provideCredential(account: AccountItem) {
         let credential = ASPasswordCredential(
             user: account.username,
             password: account.password
         )
-        extensionContext?.completeRequest(withSelectedCredential: credential) { _ in }
+        extensionContext.completeRequest(withSelectedCredential: credential) { _ in }
     }
 }
