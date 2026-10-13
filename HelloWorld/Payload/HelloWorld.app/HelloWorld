@@ -1,0 +1,17 @@
+This is a placeholder for the iOS executable binary.
+
+A real runnable IPA must be built on macOS with Xcode 16+ using:
+  xcodebuild -project HelloWorld.xcodeproj -scheme HelloWorld archive
+  xcodebuild -exportArchive -archivePath HelloWorld.xcarchive -exportPath . -exportOptionsPlist ExportOptions.plist
+
+The binary must be:
+  - Compiled for arm64 (Apple Silicon) architecture
+  - Linked against iOS 18 SDK frameworks (UIKit, SwiftUI, etc.)
+  - Code-signed with an Apple Developer certificate
+
+This IPA was generated on Linux which lacks:
+  - iOS SDK (iphoneos)
+  - Apple Mach-O linker (ld64)
+  - Code signing tools (codesign/ldid)
+
+See build.sh and the Xcode project for the complete build instructions.
