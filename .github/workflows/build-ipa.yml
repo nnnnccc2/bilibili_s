@@ -1,4 +1,4 @@
-name: Build AccountKeeper IPA
+name: Build BiliBili IPA
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-ipa:
-    name: Build AccountKeeper IPA
+    name: Build BiliBili IPA
     runs-on: macos-14
 
     steps:
@@ -48,16 +48,14 @@ jobs:
       - name: Locate built .app
         id: find_app
         run: |
-          APP_PATH=$(find build -name "AccountKeeper.app" -path "*Release-iphoneos*" | head -1)
+          APP_PATH=$(find build -name "BiliBili.app" -path "*Release-iphoneos*" | head -1)
           if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find build -name "AccountKeeper.app" -path "*iphoneos*" | head -1)
+            APP_PATH=$(find build -name "BiliBili.app" -path "*iphoneos*" | head -1)
           fi
           echo "Found app at: $APP_PATH"
           echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
           echo "=== App contents ==="
           ls -la "$APP_PATH"
-          echo "=== PlugIns (extensions) ==="
-          ls -la "$APP_PATH/PlugIns" 2>/dev/null || echo "No PlugIns"
 
       - name: Inject compile time into Info.plist
         run: |
@@ -69,47 +67,33 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :BuildCompileTime '$COMPILE_TIME'" "$INFO_PLIST"
           /usr/libexec/PlistBuddy -c "Print :BuildCompileTime" "$INFO_PLIST"
 
-      - name: Ad-hoc sign app and extension with entitlements
+      - name: Ad-hoc sign app
         run: |
           APP_PATH="${{ steps.find_app.outputs.app_path }}"
-          # Sign extension with its entitlements (App Group + AutoFill)
-          for APPEX in "$APP_PATH/PlugIns"/*.appex; do
-            if [ -d "$APPEX" ]; then
-              echo "Signing extension: $APPEX"
-              codesign --force --sign - \
-                --entitlements CredentialProvider/CredentialProvider.entitlements \
-                "$APPEX" 2>&1 || true
-            fi
-          done
-          # Sign main app with its entitlements (App Group)
           echo "Signing app: $APP_PATH"
           codesign --force --sign - \
             --entitlements AccountKeeper/AccountKeeper.entitlements \
-            "$APP_PATH/AccountKeeper"
+            "$APP_PATH/BiliBili"
           echo "=== Verify app entitlements ==="
-          codesign -d --entitlements - "$APP_PATH/AccountKeeper" 2>/dev/null | head -20
-          echo "=== Verify extension entitlements ==="
-          for APPEX in "$APP_PATH/PlugIns"/*.appex; do
-            codesign -d --entitlements - "$APPEX" 2>/dev/null | head -20
-          done
+          codesign -d --entitlements - "$APP_PATH/BiliBili" 2>/dev/null | head -20
           echo "Signing complete"
 
       - name: Package into IPA
         run: |
           APP_PATH="${{ steps.find_app.outputs.app_path }}"
           mkdir -p Payload
-          cp -R "$APP_PATH" Payload/AccountKeeper.app
-          zip -r AccountKeeper.ipa Payload/ -x "*.DS_Store"
-          echo "IPA created: AccountKeeper.ipa"
-          ls -la AccountKeeper.ipa
+          cp -R "$APP_PATH" Payload/BiliBili.app
+          zip -r BiliBili.ipa Payload/ -x "*.DS_Store"
+          echo "IPA created: BiliBili.ipa"
+          ls -la BiliBili.ipa
           echo "=== IPA contents ==="
-          unzip -l AccountKeeper.ipa
+          unzip -l BiliBili.ipa
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AccountKeeper-iOS18-ipa
-          path: AccountKeeper.ipa
+          name: BiliBili-iOS18-ipa
+          path: BiliBili.ipa
           retention-days: 30
 
       - name: Publish IPA to GitHub Release
@@ -117,9 +101,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: AccountKeeper Latest Build
+          name: BiliBili Latest Build
           body: |
-            # AccountKeeper iOS 18 - 账号管家
+            # BiliBili iOS 18 - 第三方哔哩哔哩客户端
             
             | 项目 | 值 |
             |------|-----|
@@ -129,13 +113,15 @@ jobs:
             | 签名方式 | ad-hoc |
             
             ## 功能
-            - 账号记录与分类管理
-            - AutoFill Credential Provider Extension（密码自动填充）
-            - App Group 数据共享
+            - 全站垃圾视频自动过滤（标题党、日语标题、日语UP主、短视频、侮辱贬低词）
+            - 搜索结果按时长过滤
+            - 纯净无弹幕视频播放
+            - 观看历史管理
+            - 账号登录
             
             ## 安装
             使用 Sideloadly 或 AltStore 配合 Apple ID 重签名后安装。
-          files: AccountKeeper.ipa
+          files: BiliBili.ipa
           overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

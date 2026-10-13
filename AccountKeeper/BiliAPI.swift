@@ -1,0 +1,749 @@
+//
+//  BiliAPI.swift
+//  BiliBili
+//
+//  Real Bilibili API integration with WBI signing
+//
+
+import Foundation
+
+// MARK: - Shared enums
+
+enum HomeCategory: String, CaseIterable, Identifiable {
+    case recommend = "推荐"
+    case hot = "热门"
+    case live = "直播"
+    case cinema = "影视"
+    var id: String { rawValue }
+}
+
+enum Partition: String, CaseIterable, Identifiable {
+    case anime = "动画"
+    case music = "音乐"
+    case dance = "舞蹈"
+    case game = "游戏"
+    case knowledge = "知识"
+    case tech = "科技"
+    case life = "生活"
+    case guichu = "鬼畜"
+    case fashion = "时尚"
+    case news = "资讯"
+    var id: String { rawValue }
+    var icon: String {
+        switch self {
+        case .anime: return "tv"
+        case .music: return "music.note"
+        case .dance: return "figure.dance"
+        case .game: return "gamecontroller"
+        case .knowledge: return "book"
+        case .tech: return "cpu"
+        case .life: return "cup.and.saucer"
+        case .guichu: return "wand.and.stars"
+        case .fashion: return "tshirt"
+        case .news: return "newspaper"
+        }
+    }
+}
+
+enum SearchType: String, CaseIterable, Identifiable {
+    case video = "视频"
+    case bangumi = "番剧"
+    case cinema = "影视"
+    case user = "用户"
+    case live = "直播"
+    case article = "专栏"
+    var id: String { rawValue }
+}
+
+/// Bilibili API endpoints and networking
+final class BiliAPI {
+    static let shared = BiliAPI()
+
+    private let session: URLSession
+    private let baseHeaders: [String: String] = [
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+        "Referer": "https://www.bilibili.com/"
+    ]
+
+    /// Cookies after login (SESSDATA, bili_jct, DedeUserID, etc.)
+    var cookies: [String: String] = [:] {
+        didSet { saveCookies() }
+    }
+
+    init() {
+        let config = URLSessionConfiguration.default
+        config.httpCookieStorage = nil
+        self.session = URLSession(configuration: config)
+        loadCookies()
+    }
+
+    // MARK: - Cookie helpers
+
+    var cookieHeader: String {
+        cookies.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
+    }
+
+    private func loadCookies() {
+        if let stored = UserDefaults.standard.dictionary(forKey: "BiliBili.cookies") as? [String: String] {
+            cookies = stored
+        }
+    }
+
+    private func saveCookies() {
+        UserDefaults.standard.set(cookies, forKey: "BiliBili.cookies")
+    }
+
+    func clearCookies() {
+        cookies.removeAll()
+        UserDefaults.standard.removeObject(forKey: "BiliBili.cookies")
+    }
+
+    // MARK: - Generic request
+
+    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        let build: (Bool) -> Void = { [weak self] hasKeys in
+            guard let self = self else { return }
+            var queryItems: [URLQueryItem] = params.map { URLQueryItem(name: $0.key, value: $0.value) }
+            if useWBI {
+                let signed = WBISigner.shared.sign(params: params)
+                var comps = URLComponents()
+                comps.query = signed
+                queryItems = comps.queryItems ?? []
+            }
+            var comps = URLComponents(string: urlString)
+            comps?.queryItems = queryItems
+            guard let url = comps?.url else {
+                completion(nil, nil, NSError(domain: "BiliAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
+                return
+            }
+            var req = URLRequest(url: url)
+            for (k, v) in self.baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
+            if !self.cookieHeader.isEmpty {
+                req.setValue(self.cookieHeader, forHTTPHeaderField: "Cookie")
+            }
+            self.session.dataTask(with: req) { data, response, error in
+                completion(data, response, error)
+            }.resume()
+        }
+
+        if useWBI {
+            WBISigner.shared.refreshKeysIfNeeded { _ in build(true) }
+        } else {
+            build(false)
+        }
+    }
+
+    private func parseJSON(_ data: Data?) -> [String: Any]? {
+        guard let data = data,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json
+    }
+
+    // MARK: - Home feed
+
+    func fetchHome(category: HomeCategory, completion: @escaping ([Video]) -> Void) {
+        switch category {
+        case .recommend:
+            // Recommendation feed (WBI signed)
+            let params: [String: String] = [
+                "fresh_type": "4",
+                "feed_version": "V8",
+                "ps": "20"
+            ]
+            request("https://api.bilibili.com/x/web-interface/wbi/index/top/feed/rcmd", params: params, useWBI: true) { [weak self] data, _, _ in
+                let videos = self?.parseRecommend(data) ?? []
+                DispatchQueue.main.async { completion(videos) }
+            }
+        case .hot:
+            let params: [String: String] = ["ps": "20", "pn": "1"]
+            request("https://api.bilibili.com/x/web-interface/popular", params: params) { [weak self] data, _, _ in
+                let videos = self?.parseVideoList(data) ?? []
+                DispatchQueue.main.async { completion(videos) }
+            }
+        case .live:
+            // Live rooms
+            request("https://api.live.bilibili.com/xlive/web-interface/v1/second/getList?platform=web&parent_area_id=0&area_id=0&page=1") { [weak self] data, _, _ in
+                let videos = self?.parseLive(data) ?? []
+                DispatchQueue.main.async { completion(videos) }
+            }
+        case .cinema:
+            let params: [String: String] = ["ps": "20", "pn": "1", "type": "1"]
+            request("https://api.bilibili.com/pgc/web/rank/list?season_type=1", params: params) { [weak self] data, _, _ in
+                let videos = self?.parseCinema(data) ?? []
+                DispatchQueue.main.async { completion(videos) }
+            }
+        }
+    }
+
+    // MARK: - Search
+
+    func search(keyword: String, type: SearchType, completion: @escaping ([Video]) -> Void) {
+        guard !keyword.trimmingCharacters(in: .whitespaces).isEmpty else {
+            completion([])
+            return
+        }
+        let searchType: String
+        switch type {
+        case .video: searchType = "video"
+        case .bangumi: searchType = "media_bangumi"
+        case .cinema: searchType = "media_ft"
+        case .user: searchType = "bili_user"
+        case .live: searchType = "live"
+        case .article: searchType = "article"
+        }
+        let params: [String: String] = [
+            "search_type": searchType,
+            "keyword": keyword,
+            "page": "1"
+        ]
+        request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: true) { [weak self] data, _, _ in
+            let videos = self?.parseSearch(data, type: type) ?? []
+            DispatchQueue.main.async { completion(videos) }
+        }
+    }
+
+    // MARK: - Partition
+
+    func fetchPartition(_ partition: Partition, completion: @escaping ([Video]) -> Void) {
+        // Map partitions to Bilibili rid
+        let ridMap: [Partition: Int] = [
+            .anime: 1, .music: 3, .dance: 129, .game: 4, .knowledge: 36,
+            .tech: 188, .life: 160, .guichu: 119, .fashion: 155, .news: 202
+        ]
+        let rid = ridMap[partition] ?? 1
+        let params: [String: String] = [
+            "rid": String(rid),
+            "ps": "20",
+            "pn": "1"
+        ]
+        request("https://api.bilibili.com/x/web-interface/dynamic/region", params: params) { [weak self] data, _, _ in
+            let videos = self?.parseRegion(data) ?? []
+            DispatchQueue.main.async { completion(videos) }
+        }
+    }
+
+    // MARK: - Following
+
+    func fetchFollowing(completion: @escaping ([Video]) -> Void) {
+        let params: [String: String] = ["type": "8", "ps": "20", "pn": "1"]
+        request("https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all", params: params, useWBI: true) { [weak self] data, _, _ in
+            let videos = self?.parseDynamic(data) ?? []
+            DispatchQueue.main.async { completion(videos) }
+        }
+    }
+
+    // MARK: - Video detail & stream
+
+    func fetchVideoDetail(bvid: String, completion: @escaping (Video?) -> Void) {
+        request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid]) { [weak self] data, _, _ in
+            let video = self?.parseVideoDetail(data, bvid: bvid)
+            DispatchQueue.main.async { completion(video) }
+        }
+    }
+
+    /// Get a playable video stream URL using the Bilibili player API.
+    /// Prefers a progressive mp4 (durl) with muxed audio+video so AVPlayer can play directly.
+    func streamURL(for video: Video, completion: @escaping (URL?) -> Void) {
+        fetchVideoDetail(bvid: video.id) { [weak self] detail in
+            guard let cid = detail?.cid, cid > 0 else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            // fnval=0 requests progressive durl (single muxed file, AVPlayer-friendly).
+            let params: [String: String] = [
+                "bvid": video.id,
+                "cid": String(cid),
+                "qn": "80",
+                "fnval": "0",
+                "fnver": "0",
+                "fourk": "1"
+            ]
+            self?.request("https://api.bilibili.com/x/player/playurl", params: params) { data, _, _ in
+                let url = self?.parsePlayURL(data)
+                DispatchQueue.main.async { completion(url) }
+            }
+        }
+    }
+
+    // MARK: - Comments
+
+    func fetchComments(bvid: String, completion: @escaping ([Comment]) -> Void) {
+        // aid from bvid
+        request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid]) { [weak self] data, _, _ in
+            let aid = (self?.parseAid(data)) ?? 0
+            guard aid > 0 else {
+                DispatchQueue.main.async { completion([]) }
+                return
+            }
+            let params: [String: String] = [
+                "type": "1",
+                "oid": String(aid),
+                "ps": "20",
+                "pn": "1"
+            ]
+            self?.request("https://api.bilibili.com/x/v2/reply", params: params) { data, _, _ in
+                let comments = self?.parseComments(data) ?? []
+                DispatchQueue.main.async { completion(comments) }
+            }
+        }
+    }
+
+    // MARK: - Login (QR code)
+
+    func generateQRCode(completion: @escaping (QRCodeResult?) -> Void) {
+        request("https://passport.bilibili.com/x/passport-login/web/qrcode/generate") { data, _, _ in
+            guard let json = self.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let url = d["url"] as? String,
+                  let key = d["qrcode_key"] as? String else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            DispatchQueue.main.async { completion(QRCodeResult(url: url, key: key)) }
+        }
+    }
+
+    func pollQRCode(key: String, completion: @escaping (QRCodePollResult) -> Void) {
+        request("https://passport.bilibili.com/x/passport-login/web/qrcode/poll", params: ["qrcode_key": key]) { [weak self] data, response, _ in
+            guard let json = self?.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let code = d["code"] as? Int else {
+                DispatchQueue.main.async { completion(.error) }
+                return
+            }
+            switch code {
+            case 0:
+                // Success - extract cookies from Set-Cookie headers using HTTPCookie parser
+                if let httpResponse = response as? HTTPURLResponse, let url = httpResponse.url {
+                    var fields: [String: String] = [:]
+                    for (key, value) in httpResponse.allHeaderFields {
+                        if let k = key as? String, let v = value as? String {
+                            fields[k] = v
+                        }
+                    }
+                    for c in HTTPCookie.cookies(withResponseHeaderFields: fields, for: url) {
+                        self?.cookies[c.name] = c.value
+                    }
+                }
+                // Also parse cookie from url field if present
+                if let cookieUrl = d["url"] as? String, cookieUrl.contains("SESSDATA") {
+                    self?.extractCookies(from: cookieUrl)
+                }
+                DispatchQueue.main.async { completion(.success) }
+            case 86038:
+                DispatchQueue.main.async { completion(.expired) }
+            case 86090:
+                DispatchQueue.main.async { completion(.scanned) }
+            default:
+                DispatchQueue.main.async { completion(.waiting) }
+            }
+        }
+    }
+
+    private func saveSetCookies(_ header: String) {
+        let parts = header.components(separatedBy: ",")
+        for part in parts {
+            let cookiePart = part.components(separatedBy: ";").first ?? part
+            let kv = cookiePart.components(separatedBy: "=")
+            if kv.count >= 2 {
+                cookies[kv[0].trimmingCharacters(in: .whitespaces)] = kv[1]
+            }
+        }
+    }
+
+    private func extractCookies(from urlString: String) {
+        guard let comps = URLComponents(string: urlString),
+              let queryItems = comps.queryItems else { return }
+        for item in queryItems {
+            if let value = item.value, !value.isEmpty {
+                cookies[item.name] = value
+            }
+        }
+    }
+
+    // MARK: - User info & history
+
+    func fetchUserInfo(completion: @escaping (User?) -> Void) {
+        request("https://api.bilibili.com/x/web-interface/nav") { [weak self] data, _, _ in
+            guard let json = self?.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let isLogin = d["isLogin"] as? Bool, isLogin else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            let user = User(
+                id: "\(d["mid"] as? Int ?? 0)",
+                name: d["uname"] as? String ?? "用户",
+                avatar: d["face"] as? String ?? "",
+                level: (d["level_info"] as? [String: Any])?["current_level"] as? Int ?? 0,
+                isVip: ((d["vipStatus"] as? Int) ?? 0) == 1,
+                coins: d["coins"] as? Int ?? 0
+            )
+            DispatchQueue.main.async { completion(user) }
+        }
+    }
+
+    func fetchHistory(completion: @escaping ([HistoryItem]) -> Void) {
+        let params: [String: String] = ["ps": "20", "pn": "1"]
+        request("https://api.bilibili.com/x/v2/history", params: params) { [weak self] data, _, _ in
+            let items = self?.parseHistory(data) ?? []
+            DispatchQueue.main.async { completion(items) }
+        }
+    }
+}
+
+// MARK: - Response parsing
+
+private extension BiliAPI {
+    func parseRecommend(_ data: Data?) -> [Video] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let items = d["item"] as? [[String: Any]] else { return [] }
+        return items.compactMap { item in
+            guard let id = item["bvid"] as? String,
+                  let title = item["title"] as? String else { return nil }
+            return Video(
+                id: id,
+                title: title,
+                cover: item["pic"] as? String ?? "",
+                duration: item["duration"] as? Int ?? 0,
+                upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
+                upAvatar: (item["owner"] as? [String: Any])?["face"] as? String ?? "",
+                views: item["play"] as? Int ?? 0,
+                danmaku: item["danmaku"] as? Int ?? 0,
+                publishTime: formatTime(item["pubdate"] as? Int ?? 0),
+                category: "",
+                desc: "",
+                likes: 0, coins: 0, favorites: 0, shares: 0
+            )
+        }
+    }
+
+    func parseVideoList(_ data: Data?) -> [Video] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let list = d["list"] as? [[String: Any]] else { return [] }
+        return list.compactMap { item in
+            guard let id = item["bvid"] as? String,
+                  let title = item["title"] as? String else { return nil }
+            let stat = item["stat"] as? [String: Any]
+            return Video(
+                id: id,
+                title: title,
+                cover: item["pic"] as? String ?? "",
+                duration: item["duration"] as? Int ?? 0,
+                upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
+                upAvatar: (item["owner"] as? [String: Any])?["face"] as? String ?? "",
+                views: stat?["view"] as? Int ?? 0,
+                danmaku: stat?["danmaku"] as? Int ?? 0,
+                publishTime: formatTime(item["pubdate"] as? Int ?? 0),
+                category: "",
+                desc: item["desc"] as? String ?? "",
+                likes: stat?["like"] as? Int ?? 0,
+                coins: stat?["coin"] as? Int ?? 0,
+                favorites: stat?["favorite"] as? Int ?? 0,
+                shares: stat?["share"] as? Int ?? 0
+            )
+        }
+    }
+
+    func parseSearch(_ data: Data?, type: SearchType) -> [Video] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let result = d["result"] as? [[String: Any]] else { return [] }
+        switch type {
+        case .user:
+            return result.compactMap { item in
+                guard let uname = item["uname"] as? String else { return nil }
+                return Video(
+                    id: "\(item["mid"] as? Int ?? 0)",
+                    title: uname,
+                    cover: item["upic"] as? String ?? "",
+                    duration: 0,
+                    upName: uname,
+                    upAvatar: item["upic"] as? String ?? "",
+                    views: item["fans"] as? Int ?? 0,
+                    danmaku: 0,
+                    publishTime: "",
+                    category: "用户",
+                    desc: item["usign"] as? String ?? "",
+                    likes: 0, coins: 0, favorites: 0, shares: 0
+                )
+            }
+        default:
+            return result.compactMap { item in
+                guard let id = item["bvid"] as? String,
+                      let title = item["title"] as? String else { return nil }
+                let cleanTitle = title.replacingOccurrences(of: "<em class=\"keyword\">", with: "").replacingOccurrences(of: "</em>", with: "")
+                return Video(
+                    id: id,
+                    title: cleanTitle,
+                    cover: "https:" + (item["pic"] as? String ?? ""),
+                    duration: parseDuration(item["duration"] as? String ?? "0"),
+                    upName: item["author"] as? String ?? "",
+                    upAvatar: "",
+                    views: item["play"] as? Int ?? 0,
+                    danmaku: item["video_review"] as? Int ?? 0,
+                    publishTime: formatTime(item["pubdate"] as? Int ?? 0),
+                    category: "",
+                    desc: item["description"] as? String ?? "",
+                    likes: 0, coins: 0, favorites: 0, shares: 0
+                )
+            }
+        }
+    }
+
+    func parseRegion(_ data: Data?) -> [Video] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let archives = d["archives"] as? [[String: Any]] else { return [] }
+        return archives.compactMap { item in
+            guard let id = item["bvid"] as? String,
+                  let title = item["title"] as? String else { return nil }
+            let stat = item["stat"] as? [String: Any]
+            return Video(
+                id: id,
+                title: title,
+                cover: item["pic"] as? String ?? "",
+                duration: item["duration"] as? Int ?? 0,
+                upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
+                upAvatar: (item["owner"] as? [String: Any])?["face"] as? String ?? "",
+                views: stat?["view"] as? Int ?? 0,
+                danmaku: stat?["danmaku"] as? Int ?? 0,
+                publishTime: formatTime(item["pubdate"] as? Int ?? 0),
+                category: "",
+                desc: "",
+                likes: stat?["like"] as? Int ?? 0,
+                coins: stat?["coin"] as? Int ?? 0,
+                favorites: stat?["favorite"] as? Int ?? 0,
+                shares: stat?["share"] as? Int ?? 0
+            )
+        }
+    }
+
+    func parseDynamic(_ data: Data?) -> [Video] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let items = d["items"] as? [[String: Any]] else { return [] }
+        return items.compactMap { item in
+            guard let modules = item["modules"] as? [String: Any],
+                  let moduleAuthor = modules["module_author"] as? [String: Any],
+                  let moduleDynamic = modules["module_dynamic"] as? [String: Any],
+                  let major = moduleDynamic["major"] as? [String: Any],
+                  let archive = major["archive"] as? [String: Any],
+                  let bvid = archive["bvid"] as? String,
+                  let title = archive["title"] as? String else { return nil }
+            let stat = archive["stat"] as? [String: Any]
+            return Video(
+                id: bvid,
+                title: title,
+                cover: archive["cover"] as? String ?? "",
+                duration: archive["duration"] as? Int ?? 0,
+                upName: moduleAuthor["name"] as? String ?? "",
+                upAvatar: moduleAuthor["face"] as? String ?? "",
+                views: stat?["play"] as? Int ?? 0,
+                danmaku: stat?["danmaku"] as? Int ?? 0,
+                publishTime: "",
+                category: "",
+                desc: archive["desc"] as? String ?? "",
+                likes: 0, coins: 0, favorites: 0, shares: 0
+            )
+        }
+    }
+
+    func parseVideoDetail(_ data: Data?, bvid: String) -> Video? {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any] else { return nil }
+        let stat = d["stat"] as? [String: Any]
+        return Video(
+            id: d["bvid"] as? String ?? bvid,
+            title: d["title"] as? String ?? "",
+            cover: d["pic"] as? String ?? "",
+            duration: d["duration"] as? Int ?? 0,
+            upName: (d["owner"] as? [String: Any])?["name"] as? String ?? "",
+            upAvatar: (d["owner"] as? [String: Any])?["face"] as? String ?? "",
+            views: stat?["view"] as? Int ?? 0,
+            danmaku: stat?["danmaku"] as? Int ?? 0,
+            publishTime: formatTime(d["pubdate"] as? Int ?? 0),
+            category: "",
+            desc: d["desc"] as? String ?? "",
+            likes: stat?["like"] as? Int ?? 0,
+            coins: stat?["coin"] as? Int ?? 0,
+            favorites: stat?["favorite"] as? Int ?? 0,
+            shares: stat?["share"] as? Int ?? 0,
+            cid: d["cid"] as? Int ?? 0
+        )
+    }
+
+    func parsePlayURL(_ data: Data?) -> URL? {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any] else { return nil }
+        // Prefer durl: progressive mp4/flv with muxed audio+video (AVPlayer-friendly)
+        if let durl = d["durl"] as? [[String: Any]],
+           let first = durl.first,
+           let url = first["url"] as? String {
+            return URL(string: url)
+        }
+        // Fallback: DASH (video only, no separate audio muxing in AVPlayer)
+        if let dash = d["dash"] as? [String: Any],
+           let videoArr = dash["video"] as? [[String: Any]],
+           let video = videoArr.first,
+           let url = video["baseUrl"] as? String {
+            return URL(string: url)
+        }
+        return nil
+    }
+
+    func parseAid(_ data: Data?) -> Int {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any] else { return 0 }
+        return d["aid"] as? Int ?? 0
+    }
+
+    func parseComments(_ data: Data?) -> [Comment] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let replies = d["replies"] as? [[String: Any]] else { return [] }
+        return replies.compactMap { reply in
+            guard let content = reply["content"] as? [String: Any],
+                  let msg = content["message"] as? String,
+                  let member = reply["member"] as? [String: Any],
+                  let uname = member["uname"] as? String else { return nil }
+            return Comment(
+                user: uname,
+                avatar: member["avatar"] as? String ?? "",
+                content: msg,
+                likes: reply["like"] as? Int ?? 0,
+                time: formatTime(reply["ctime"] as? Int ?? 0)
+            )
+        }
+    }
+
+    func parseHistory(_ data: Data?) -> [HistoryItem] {
+        guard let json = parseJSON(data),
+              let list = json["data"] as? [[String: Any]] else { return [] }
+        return list.compactMap { item in
+            guard let history = item["history"] as? [String: Any],
+                  let bvid = history["bvid"] as? String,
+                  let title = history["title"] as? String else { return nil }
+            return HistoryItem(
+                videoId: bvid,
+                title: title,
+                cover: history["cover"] as? String ?? "",
+                upName: (item["author_name"] as? String) ?? "",
+                duration: 0,
+                progress: 0,
+                watchedAt: Date(timeIntervalSince1970: TimeInterval(history["viewed_at"] as? Int ?? 0))
+            )
+        }
+    }
+
+    func parseLive(_ data: Data?) -> [Video] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let list = d["list"] as? [[String: Any]] else { return [] }
+        return list.compactMap { item in
+            guard let title = item["title"] as? String else { return nil }
+            return Video(
+                id: "\(item["roomid"] as? Int ?? 0)",
+                title: title,
+                cover: item["cover"] as? String ?? "",
+                duration: 0,
+                upName: item["uname"] as? String ?? "",
+                upAvatar: item["face"] as? String ?? "",
+                views: item["online"] as? Int ?? 0,
+                danmaku: 0,
+                publishTime: "直播中",
+                category: "直播",
+                desc: "",
+                likes: 0, coins: 0, favorites: 0, shares: 0
+            )
+        }
+    }
+
+    func parseCinema(_ data: Data?) -> [Video] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let list = d["list"] as? [[String: Any]] else { return [] }
+        return list.compactMap { item in
+            guard let title = item["title"] as? String else { return nil }
+            return Video(
+                id: "\(item["season_id"] as? Int ?? 0)",
+                title: title,
+                cover: item["cover"] as? String ?? "",
+                duration: 0,
+                upName: "",
+                upAvatar: "",
+                views: (item["stat"] as? [String: Any])?["views"] as? Int ?? 0,
+                danmaku: 0,
+                publishTime: "",
+                category: "影视",
+                desc: item["evaluate"] as? String ?? "",
+                likes: 0, coins: 0, favorites: 0, shares: 0
+            )
+        }
+    }
+
+    // MARK: - Time formatting
+
+    func formatTime(_ timestamp: Int) -> String {
+        guard timestamp > 0 else { return "" }
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let interval = Date().timeIntervalSince(date)
+        if interval < 60 { return "刚刚" }
+        if interval < 3600 { return "\(Int(interval/60))分钟前" }
+        if interval < 86400 { return "\(Int(interval/3600))小时前" }
+        if interval < 604800 { return "\(Int(interval/86400))天前" }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.string(from: date)
+    }
+
+    func parseDuration(_ s: String) -> Int {
+        let parts = s.split(separator: ":").map { Int($0) ?? 0 }
+        if parts.count == 3 { return parts[0]*3600 + parts[1]*60 + parts[2] }
+        if parts.count == 2 { return parts[0]*60 + parts[1] }
+        return parts.first ?? 0
+    }
+}
+
+// MARK: - Models
+
+struct QRCodeResult {
+    let url: String
+    let key: String
+}
+
+enum QRCodePollResult {
+    case success, waiting, scanned, expired, error
+}
+
+struct Comment: Identifiable, Hashable {
+    let id: String = UUID().uuidString
+    let user: String
+    let avatar: String
+    let content: String
+    let likes: Int
+    let time: String
+}
+
+/// Add cid to Video for playurl API
+extension Video {
+    private static var cidStore: [String: Int] = [:]
+    var cid: Int {
+        get { Video.cidStore[id] ?? 0 }
+        set { Video.cidStore[id] = newValue }
+    }
+    init(id: String, title: String, cover: String, duration: Int, upName: String,
+         upAvatar: String, views: Int, danmaku: Int, publishTime: String,
+         category: String, desc: String, likes: Int, coins: Int,
+         favorites: Int, shares: Int, cid: Int) {
+        self.init(id: id, title: title, cover: cover, duration: duration,
+                  upName: upName, upAvatar: upAvatar, views: views, danmaku: danmaku,
+                  publishTime: publishTime, category: category, desc: desc,
+                  likes: likes, coins: coins, favorites: favorites, shares: shares)
+        self.cid = cid
+    }
+}

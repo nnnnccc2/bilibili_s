@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A1B2C3D4E5F60041007A0001"
-               BuildableName = "AccountKeeper.app"
+               BuildableName = "BiliBili.app"
                BlueprintName = "AccountKeeper"
                ReferencedContainer = "container:AccountKeeper.xcodeproj">
             </BuildableReference>
@@ -44,7 +44,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1B2C3D4E5F60041007A0001"
-            BuildableName = "AccountKeeper.app"
+            BuildableName = "BiliBili.app"
             BlueprintName = "AccountKeeper"
             ReferencedContainer = "container:AccountKeeper.xcodeproj">
          </BuildableReference>
@@ -61,7 +61,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1B2C3D4E5F60041007A0001"
-            BuildableName = "AccountKeeper.app"
+            BuildableName = "BiliBili.app"
             BlueprintName = "AccountKeeper"
             ReferencedContainer = "container:AccountKeeper.xcodeproj">
          </BuildableReference>
