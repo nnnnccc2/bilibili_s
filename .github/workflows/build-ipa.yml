@@ -111,3 +111,31 @@ jobs:
           name: AccountKeeper-iOS18-ipa
           path: AccountKeeper.ipa
           retention-days: 30
+
+      - name: Publish IPA to GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: AccountKeeper Latest Build
+          body: |
+            # AccountKeeper iOS 18 - 账号管家
+            
+            | 项目 | 值 |
+            |------|-----|
+            | 架构 | arm64 |
+            | 部署目标 | iOS 18.0 |
+            | 编译时间 | ${{ steps.compile_time.outputs.compile_time }} |
+            | 签名方式 | ad-hoc |
+            
+            ## 功能
+            - 账号记录与分类管理
+            - AutoFill Credential Provider Extension（密码自动填充）
+            - App Group 数据共享
+            
+            ## 安装
+            使用 Sideloadly 或 AltStore 配合 Apple ID 重签名后安装。
+          files: AccountKeeper.ipa
+          overwrite: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
