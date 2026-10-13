@@ -2,7 +2,7 @@
 //  VideoCardView.swift
 //  BiliBili
 //
-//  Reusable two-column video card
+//  Reusable video card matching reference design
 //
 
 import SwiftUI
@@ -11,8 +11,8 @@ struct VideoCardView: View {
     let video: Video
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Cover with duration badge
+        VStack(alignment: .leading, spacing: 8) {
+            // Cover (16:9) with duration badge
             ZStack(alignment: .bottomTrailing) {
                 AsyncImage(url: URL(string: video.cover)) { phase in
                     switch phase {
@@ -30,75 +30,90 @@ struct VideoCardView: View {
                     case .empty:
                         Rectangle()
                             .fill(Color.gray.opacity(0.15))
-                            .overlay(ProgressView())
+                            .overlay(ProgressView().scaleEffect(0.8))
                     @unknown default:
                         Rectangle().fill(Color.gray.opacity(0.15))
                     }
                 }
-                .frame(height: 110)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .aspectRatio(16.0/9.0, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .clipped()
 
                 if video.duration > 0 {
                     Text(video.durationText)
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .fontWeight(.medium)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
+                        .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.black.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .padding(4)
-                } else {
-                    // Live indicator
+                        .background(Color(red: 0.06, green: 0.09, blue: 0.16).opacity(0.9))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .padding(8)
+                } else if video.category == "直播" {
                     HStack(spacing: 3) {
                         Circle()
                             .fill(.red)
                             .frame(width: 5, height: 5)
                         Text("直播中")
-                            .font(.caption2)
+                            .font(.system(size: 10))
                             .fontWeight(.medium)
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(.black.opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .padding(4)
+                    .background(Color.black.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .padding(8)
                 }
             }
 
             // Title (2 lines)
             Text(video.title)
-                .font(.subheadline)
+                .font(.system(size: 13))
                 .fontWeight(.medium)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color(red: 0.06, green: 0.09, blue: 0.16))
                 .lineLimit(2)
+                .lineSpacing(2)
                 .multilineTextAlignment(.leading)
 
-            // UP主 & stats
-            HStack(spacing: 4) {
-                Image(systemName: "play.circle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Text(video.viewsText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-            }
+            // UP主 avatar + name + views + danmaku + date
+            HStack(spacing: 6) {
+                if !video.upAvatar.isEmpty {
+                    AsyncImage(url: URL(string: video.upAvatar)) { phase in
+                        switch phase {
+                        case .success(let img):
+                            img.resizable().aspectRatio(contentMode: .fill)
+                        default:
+                            Circle().fill(Color.gray.opacity(0.3))
+                        }
+                    }
+                    .frame(width: 14, height: 14)
+                    .clipShape(Circle())
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
 
-            HStack(spacing: 4) {
-                Image(systemName: "person.crop.circle")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                 Text(video.upName)
-                    .font(.caption2)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Spacer(minLength: 0)
+
+                Spacer(minLength: 4)
+
+                Text(video.viewsText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding(8)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
+        )
     }
 }
