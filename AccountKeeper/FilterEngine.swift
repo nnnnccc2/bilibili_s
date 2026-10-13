@@ -57,8 +57,8 @@ final class FilterEngine {
             }
         }
 
-        // 5. Duration block (global): videos shorter than or equal to threshold
-        if let threshold = settings.durationThresholdSeconds, video.duration <= threshold {
+        // 5. Duration block (global): videos shorter than or equal to the max selected threshold
+        if let threshold = settings.effectiveDurationThreshold, video.duration > 0, video.duration <= threshold {
             return .duration
         }
 

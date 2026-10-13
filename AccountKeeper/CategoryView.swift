@@ -19,47 +19,50 @@ struct CategoryView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                if selectedPartition == nil {
-                    // Partition grid
-                    LazyVGrid(columns: columns, spacing: 20) {
-                        ForEach(Partition.allCases) { p in
-                            Button {
-                                selectedPartition = p
-                                loadPartition(p)
-                            } label: {
-                                VStack(spacing: 6) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.pink.opacity(0.12))
-                                            .frame(width: 50, height: 50)
-                                        Image(systemName: p.icon)
-                                            .font(.title2)
-                                            .foregroundStyle(Color.pink)
+            ZStack {
+                biliBackgroundGradient.ignoresSafeArea()
+                ScrollView {
+                    if selectedPartition == nil {
+                        // Partition grid
+                        LazyVGrid(columns: columns, spacing: 20) {
+                            ForEach(Partition.allCases) { p in
+                                Button {
+                                    selectedPartition = p
+                                    loadPartition(p)
+                                } label: {
+                                    VStack(spacing: 6) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color.biliBlue.opacity(0.12))
+                                                .frame(width: 50, height: 50)
+                                            Image(systemName: p.icon)
+                                                .font(.title2)
+                                                .foregroundStyle(Color.biliBlue)
+                                        }
+                                        Text(p.rawValue)
+                                            .font(.caption)
+                                            .foregroundStyle(.primary)
                                     }
-                                    Text(p.rawValue)
-                                        .font(.caption)
-                                        .foregroundStyle(.primary)
                                 }
                             }
                         }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 16)
-                } else {
-                    // Partition video list
-                    if isLoading {
-                        ProgressView().padding(.top, 40)
+                        .padding(.horizontal)
+                        .padding(.top, 16)
                     } else {
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            ForEach(partitionVideos) { video in
-                                VideoCardView(video: video)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { selectedVideo = video }
+                        // Partition video list
+                        if isLoading {
+                            ProgressView().padding(.top, 40)
+                        } else {
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(partitionVideos) { video in
+                                    VideoCardView(video: video)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture { selectedVideo = video }
+                                }
                             }
+                            .padding(.horizontal, 8)
+                            .padding(.top, 8)
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.top, 8)
                     }
                 }
             }
@@ -71,6 +74,7 @@ struct CategoryView: View {
                             selectedPartition = nil
                         } label: {
                             Image(systemName: "chevron.left")
+                                .foregroundStyle(.biliBlue)
                         }
                     }
                 }
@@ -84,7 +88,7 @@ struct CategoryView: View {
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.body)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.biliBlue)
                             .padding(8)
                             .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
                     }

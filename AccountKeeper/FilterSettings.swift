@@ -43,8 +43,9 @@ struct FilterSettings: Codable, Hashable {
     var customBlockedWords: [String] = []
 
     // Duration filtering (global, applies to home/feed/category/dynamic)
-    // When set, videos with duration <= threshold are blocked
-    var durationThresholdSeconds: Int? = nil
+    // Multi-select: videos whose duration is <= ANY selected threshold are blocked.
+    // If empty, no duration filtering.
+    var blockedDurationSeconds: Set<Int> = []
 
     // Search-specific duration filter (min duration for search results)
     var searchMinDurationSeconds: Int? = nil
@@ -72,12 +73,10 @@ extension FilterSettings {
 
     /// Insulting / derogatory word list (built-in core 32 words)
     static let builtInInsultWords: [String] = [
-        "脑残", "傻逼", "弱智", "废物", "垃圾人", "人渣",
-        "败类", "蠢货", "白痴", "智障", "脑残粉", "黑子",
-        "喷子", "杠精", "键盘侠", "恶臭", "恶心", "龌龊",
-        "卑鄙", "无耻", "下流", "肮脏", "下贱", "不要脸",
-        "狗东西", "兔崽子", "王八蛋", "混蛋", "混账", "该死",
-        "去死", "滚蛋", "滚犊子", "废物点心"
+        "弱智", "脑残", "煞笔", "傻逼", "沙雕", "蠢货", "低能", "白痴",
+        "贱人", "nt", "sb", "nc", "孤儿", "死全家", "没妈", "狗都不看",
+        "垃圾UP", "小丑", "下头", "恶心", "晦气", "滚出", "闭嘴", "智障",
+        "废物", "无脑", "狗屎", "装逼", "骗子", "恰烂饭", "黑料", "翻车塌房"
     ]
 
     /// All currently active blocked words (built-in insult words if enabled + custom words)
@@ -94,26 +93,31 @@ extension FilterSettings {
 // MARK: - Duration options
 
 extension FilterSettings {
-    /// Global duration-block options (settings page)
-    static let durationBlockOptions: [(label: String, seconds: Int?)] = [
-        ("不限制", nil),
-        ("10 秒", 10),
-        ("28 秒", 28),
-        ("30 秒", 30),
-        ("1 分钟", 60),
-        ("2 分钟", 120),
-        ("3 分钟", 180),
-        ("4 分钟", 240),
-        ("5 分钟", 300),
-        ("6 分钟", 360),
-        ("7 分钟", 420),
-        ("8 分钟", 480),
-        ("9 分钟", 540),
-        ("10 分钟", 600),
-        ("12 分钟", 720),
-        ("14 分钟", 840),
-        ("15 分钟", 900)
+    /// Global duration-block options (settings page) — multi-select
+    static let durationBlockOptions: [(label: String, seconds: Int)] = [
+        ("10秒", 10),
+        ("28秒", 28),
+        ("30秒", 30),
+        ("1分钟", 60),
+        ("2分钟", 120),
+        ("3分钟", 180),
+        ("4分钟", 240),
+        ("5分钟", 300),
+        ("6分钟", 360),
+        ("7分钟", 420),
+        ("8分钟", 480),
+        ("9分钟", 540),
+        ("10分钟", 600),
+        ("12分钟", 720),
+        ("14分钟", 840),
+        ("15分钟", 900)
     ]
+
+    /// Effective global duration block threshold = max of all selected durations.
+    /// A video with duration <= this value is blocked. nil means no duration filter.
+    var effectiveDurationThreshold: Int? {
+        blockedDurationSeconds.max()
+    }
 
     /// Search duration filter options (search result page)
     static let searchDurationOptions: [(label: String, seconds: Int?)] = [
