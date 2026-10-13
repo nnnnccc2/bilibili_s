@@ -24,6 +24,12 @@ struct VideoPlayerView: View {
     @State private var selectedTab: Int = 0 // 0 = 简介, 1 = 评论
     @State private var isBuffering = false
     @State private var showDescFull = false
+    @State private var isFollowing = false
+    @State private var isFollowBusy = false
+    @State private var showingUPSpace = false
+    @State private var toast: String?
+    @State private var aid: Int = 0
+    @State private var isSendingComment = false
 
     var body: some View {
         NavigationStack {
@@ -69,10 +75,37 @@ struct VideoPlayerView: View {
         .onAppear {
             setupPlayer()
             loadComments()
+            if store.currentUser != nil, video.upMid > 0 {
+                BiliAPI.shared.checkRelation(mid: video.upMid) { following in
+                    DispatchQueue.main.async { isFollowing = following }
+                }
+            }
         }
         .fullScreenCover(isPresented: $showFullScreen) {
             if let player = player {
                 FullScreenPlayer(player: player)
+            }
+        }
+        .sheet(isPresented: $showingUPSpace) {
+            if video.upMid > 0 {
+                UPSpaceView(mid: video.upMid, initialName: video.upName)
+                    .environmentObject(store)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let toast = toast {
+                Text(toast)
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.75))
+                    .clipShape(Capsule())
+                    .padding(.bottom, 20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { self.toast = nil }
+                    }
             }
         }
     }
@@ -174,39 +207,54 @@ struct VideoPlayerView: View {
 
             Divider().padding(.horizontal)
 
-            // UP主 info
+            // UP主 info (tap to open space)
             HStack(spacing: 10) {
-                AsyncImage(url: URL(string: video.upAvatar)) { phase in
-                    if let img = phase.image {
-                        img.resizable().scaledToFill()
-                    } else {
-                        Circle().fill(Color.gray.opacity(0.3))
-                    }
-                }
-                .frame(width: 40, height: 40)
-                .clipShape(Circle())
+                Button {
+                    if video.upMid > 0 { showingUPSpace = true }
+                } label: {
+                    HStack(spacing: 10) {
+                        AsyncImage(url: URL(string: video.upAvatar)) { phase in
+                            if let img = phase.image {
+                                img.resizable().scaledToFill()
+                            } else {
+                                Circle().fill(Color.gray.opacity(0.3))
+                            }
+                        }
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(video.upName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Text("\(video.viewsText) 粉丝")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(video.upName)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+                            Text("\(video.viewsText) 粉丝")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 Spacer()
                 Button {
-                    // follow action (mock)
+                    toggleFollow()
                 } label: {
-                    Text("已关注")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                        .background(Color(.systemGray5))
-                        .clipShape(Capsule())
+                    HStack(spacing: 4) {
+                        if isFollowBusy {
+                            ProgressView().tint(isFollowing ? .secondary : .white).scaleEffect(0.8)
+                        } else {
+                            Image(systemName: isFollowing ? "checkmark" : "plus")
+                        }
+                        Text(isFollowing ? "已关注" : "关注")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(isFollowing ? Color.secondary : .white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(isFollowing ? Color(.systemGray5) : Color.biliBlue)
+                    .clipShape(Capsule())
                 }
+                .disabled(isFollowBusy)
             }
             .padding(.horizontal)
 
@@ -239,14 +287,14 @@ struct VideoPlayerView: View {
                 interactionButton(icon: isLiked ? "hand.thumbsup.fill" : "hand.thumbsup",
                                   count: video.likes + (isLiked ? 1 : 0),
                                   label: isLiked ? "已赞" : "点赞",
-                                  active: isLiked) { isLiked.toggle() }
+                                  active: isLiked) { doLike() }
                 interactionButton(icon: "hand.thumbsdown", count: nil, label: "不喜欢", active: false) {}
-                interactionButton(icon: "dollarsign.circle", count: video.coins, label: "投币", active: false) {}
+                interactionButton(icon: "dollarsign.circle", count: video.coins, label: "投币", active: false) { doCoin() }
                 interactionButton(icon: isFavorited ? "star.fill" : "star",
                                   count: video.favorites + (isFavorited ? 1 : 0),
                                   label: isFavorited ? "已藏" : "收藏",
-                                  active: isFavorited) { isFavorited.toggle() }
-                interactionButton(icon: "arrowshape.turn.up.right.fill", count: video.shares, label: "分享", active: false) {}
+                                  active: isFavorited) { doFavorite() }
+                interactionButton(icon: "arrowshape.turn.up.right.fill", count: video.shares, label: "分享", active: false) { doShare() }
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
@@ -283,15 +331,23 @@ struct VideoPlayerView: View {
                 Button {
                     sendComment()
                 } label: {
-                    Text("发送")
-                        .fontWeight(.medium)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.biliBlue)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    if isSendingComment {
+                        ProgressView().tint(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.biliBlue)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Text("发送")
+                            .fontWeight(.medium)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.biliBlue)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
                 }
-                .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSendingComment)
             }
             .padding(.horizontal)
             .padding(.vertical, 12)
@@ -348,19 +404,119 @@ struct VideoPlayerView: View {
     // MARK: - Comments
 
     private func loadComments() {
-        BiliAPI.shared.fetchComments(bvid: video.id) { c in
-            DispatchQueue.main.async { comments = c }
+        BiliAPI.shared.fetchComments(bvid: video.id) { c, aid in
+            DispatchQueue.main.async {
+                comments = c
+                self.aid = aid
+            }
         }
     }
 
     private func sendComment() {
         let text = commentText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
-        let new = Comment(user: store.currentUser?.name ?? "我",
-                          avatar: store.currentUser?.avatar ?? "https://i.pravatar.cc/100?img=99",
-                          content: text, likes: 0, time: "刚刚")
-        comments.insert(new, at: 0)
-        commentText = ""
+        guard store.currentUser != nil else {
+            toast = "请先登录"
+            return
+        }
+        guard aid > 0 else {
+            toast = "评论加载中，请稍候"
+            return
+        }
+        isSendingComment = true
+        BiliAPI.shared.postComment(aid: aid, message: text) { success, msg in
+            DispatchQueue.main.async {
+                isSendingComment = false
+                if success {
+                    let new = Comment(user: store.currentUser?.name ?? "我",
+                                      avatar: store.currentUser?.avatar ?? "",
+                                      content: text, likes: 0, time: "刚刚")
+                    comments.insert(new, at: 0)
+                    commentText = ""
+                    toast = "评论成功"
+                } else {
+                    toast = msg ?? "评论失败"
+                }
+            }
+        }
+    }
+
+    // MARK: - Real actions (follow / like / coin / favorite)
+
+    private func toggleFollow() {
+        guard store.currentUser != nil else {
+            toast = "请先登录后再关注"
+            return
+        }
+        guard video.upMid > 0 else { return }
+        isFollowBusy = true
+        let action = isFollowing ? 2 : 1
+        BiliAPI.shared.modifyRelation(mid: video.upMid, action: action) { success, msg in
+            DispatchQueue.main.async {
+                isFollowBusy = false
+                if success {
+                    isFollowing.toggle()
+                    toast = isFollowing ? "关注成功" : "已取消关注"
+                } else {
+                    toast = msg ?? "操作失败"
+                }
+            }
+        }
+    }
+
+    private func doLike() {
+        guard store.currentUser != nil else {
+            toast = "请先登录"
+            return
+        }
+        BiliAPI.shared.likeVideo(bvid: video.id, like: !isLiked) { success, msg in
+            DispatchQueue.main.async {
+                if success {
+                    isLiked.toggle()
+                    toast = isLiked ? "点赞成功" : "已取消点赞"
+                } else {
+                    toast = msg ?? "点赞失败"
+                }
+            }
+        }
+    }
+
+    private func doCoin() {
+        guard store.currentUser != nil else {
+            toast = "请先登录"
+            return
+        }
+        BiliAPI.shared.coinVideo(bvid: video.id) { success, msg in
+            DispatchQueue.main.async {
+                toast = success ? "投币成功" : (msg ?? "投币失败")
+            }
+        }
+    }
+
+    private func doFavorite() {
+        guard store.currentUser != nil else {
+            toast = "请先登录"
+            return
+        }
+        BiliAPI.shared.favoriteVideo(bvid: video.id) { success, msg in
+            DispatchQueue.main.async {
+                if success {
+                    isFavorited = true
+                    toast = "收藏成功"
+                } else {
+                    toast = msg ?? "收藏失败"
+                }
+            }
+        }
+    }
+
+    private func doShare() {
+        let url = URL(string: "https://www.bilibili.com/video/\(video.id)")!
+        let activityVC = UIActivityViewController(activityItems: [video.title, url], applicationActivities: nil)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            rootVC.present(activityVC, animated: true)
+        }
     }
 
     // MARK: - Helpers

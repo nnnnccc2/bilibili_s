@@ -76,6 +76,9 @@ final class BiliAPI {
     /// Cache of resolved stream URLs keyed by bvid, to make playback near-instant on tap.
     private var streamURLCache: [String: URL] = [:]
 
+    /// CSRF token (bili_jct) required for POST actions like follow/like/coin.
+    var csrf: String { cookies["bili_jct"] ?? "" }
+
     init() {
         let config = URLSessionConfiguration.default
         config.httpCookieStorage = nil
@@ -223,33 +226,34 @@ final class BiliAPI {
 
     // MARK: - Home feed
 
-    func fetchHome(category: HomeCategory, completion: @escaping ([Video]) -> Void) {
+    func fetchHome(category: HomeCategory, page: Int = 1, completion: @escaping ([Video]) -> Void) {
         switch category {
         case .recommend:
-            // Recommendation feed (WBI signed)
+            // Recommendation feed (WBI signed) — fresh_idx increments for pagination
             let params: [String: String] = [
                 "fresh_type": "4",
                 "feed_version": "V8",
-                "ps": "20"
+                "ps": "20",
+                "fresh_idx": String(page)
             ]
             request("https://api.bilibili.com/x/web-interface/wbi/index/top/feed/rcmd", params: params, useWBI: true) { [weak self] data, _, _ in
                 let videos = self?.parseRecommend(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
             }
         case .hot:
-            let params: [String: String] = ["ps": "20", "pn": "1"]
+            let params: [String: String] = ["ps": "20", "pn": String(page)]
             request("https://api.bilibili.com/x/web-interface/popular", params: params) { [weak self] data, _, _ in
                 let videos = self?.parseVideoList(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
             }
         case .live:
             // Live rooms
-            request("https://api.live.bilibili.com/xlive/web-interface/v1/second/getList?platform=web&parent_area_id=0&area_id=0&page=1") { [weak self] data, _, _ in
+            request("https://api.live.bilibili.com/xlive/web-interface/v1/second/getList?platform=web&parent_area_id=0&area_id=0&page=\(page)") { [weak self] data, _, _ in
                 let videos = self?.parseLive(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
             }
         case .cinema:
-            let params: [String: String] = ["ps": "20", "pn": "1", "type": "1"]
+            let params: [String: String] = ["ps": "20", "pn": String(page), "type": "1"]
             request("https://api.bilibili.com/pgc/web/rank/list?season_type=1", params: params) { [weak self] data, _, _ in
                 let videos = self?.parseCinema(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
@@ -259,7 +263,7 @@ final class BiliAPI {
 
     // MARK: - Search
 
-    func search(keyword: String, type: SearchType, completion: @escaping ([Video]) -> Void) {
+    func search(keyword: String, type: SearchType, page: Int = 1, completion: @escaping ([Video]) -> Void) {
         guard !keyword.trimmingCharacters(in: .whitespaces).isEmpty else {
             completion([])
             return
@@ -276,7 +280,7 @@ final class BiliAPI {
         let params: [String: String] = [
             "search_type": searchType,
             "keyword": keyword,
-            "page": "1"
+            "page": String(page)
         ]
         request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: true) { [weak self] data, _, _ in
             let videos = self?.parseSearch(data, type: type) ?? []
@@ -380,12 +384,12 @@ final class BiliAPI {
 
     // MARK: - Comments
 
-    func fetchComments(bvid: String, completion: @escaping ([Comment]) -> Void) {
+    func fetchComments(bvid: String, completion: @escaping ([Comment], Int) -> Void) {
         // aid from bvid
         request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid]) { [weak self] data, _, _ in
             let aid = (self?.parseAid(data)) ?? 0
             guard aid > 0 else {
-                DispatchQueue.main.async { completion([]) }
+                DispatchQueue.main.async { completion([], 0) }
                 return
             }
             let params: [String: String] = [
@@ -396,7 +400,7 @@ final class BiliAPI {
             ]
             self?.request("https://api.bilibili.com/x/v2/reply", params: params) { data, _, _ in
                 let comments = self?.parseComments(data) ?? []
-                DispatchQueue.main.async { completion(comments) }
+                DispatchQueue.main.async { completion(comments, aid) }
             }
         }
     }
@@ -507,6 +511,261 @@ final class BiliAPI {
         }
     }
 
+    // MARK: - UP主 space & relation
+
+    /// Fetch a UP主's profile info (name, avatar, bio, follower/following counts).
+    func fetchUPSpaceInfo(mid: Int, completion: @escaping (UPSpaceInfo?) -> Void) {
+        let params: [String: String] = ["mid": String(mid)]
+        request("https://api.bilibili.com/x/space/wbi/acc/info", params: params, useWBI: true) { [weak self] data, _, _ in
+            let info = self?.parseUPSpaceInfo(data)
+            DispatchQueue.main.async { completion(info) }
+        }
+    }
+
+    /// Fetch a UP主's video list (paginated).
+    func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
+        let params: [String: String] = [
+            "mid": String(mid),
+            "ps": String(pageSize),
+            "pn": String(page),
+            "order": "pubdate",
+            "platform": "web"
+        ]
+        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true) { [weak self] data, _, _ in
+            let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
+            DispatchQueue.main.async { completion(videos, total) }
+        }
+    }
+
+    /// Check the follow relation between current user and a UP主.
+    /// Returns true if currently following.
+    func checkRelation(mid: Int, completion: @escaping (Bool) -> Void) {
+        request("https://api.bilibili.com/x/relation", params: ["fid": String(mid)]) { data, _, _ in
+            guard let json = self.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let attribute = d["attribute"] as? Int else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            // attribute: 1 = following, 2 = followed back, 6 = mutual, 0 = none
+            DispatchQueue.main.async { completion(attribute == 1 || attribute == 2 || attribute == 6) }
+        }
+    }
+
+    /// Follow or unfollow a UP主. action: 1 = follow, 2 = unfollow.
+    func modifyRelation(mid: Int, action: Int, completion: @escaping (Bool, String?) -> Void) {
+        guard !csrf.isEmpty else {
+            DispatchQueue.main.async { completion(false, "请先登录") }
+            return
+        }
+        let form: [String: String] = [
+            "fid": String(mid),
+            "act": String(action),
+            "re_src": "11",
+            "csrf": csrf
+        ]
+        postRequest("https://api.bilibili.com/x/relation/modify", form: form) { data, _, _ in
+            guard let json = self.parseJSON(data) else {
+                DispatchQueue.main.async { completion(false, "网络错误") }
+                return
+            }
+            let code = json["code"] as? Int ?? -1
+            let msg = json["message"] as? String
+            DispatchQueue.main.async { completion(code == 0, msg) }
+        }
+    }
+
+    // MARK: - Video interactions (like / coin / favorite)
+
+    /// Like or unlike a video. like: true = like, false = unlike.
+    func likeVideo(bvid: String, like: Bool, completion: @escaping (Bool, String?) -> Void) {
+        guard !csrf.isEmpty else {
+            DispatchQueue.main.async { completion(false, "请先登录") }
+            return
+        }
+        let form: [String: String] = [
+            "bvid": bvid,
+            "like": like ? "1" : "2",
+            "csrf": csrf
+        ]
+        postRequest("https://api.bilibili.com/x/web-interface/archive/like", form: form) { data, _, _ in
+            guard let json = self.parseJSON(data) else {
+                DispatchQueue.main.async { completion(false, "网络错误") }
+                return
+            }
+            let code = json["code"] as? Int ?? -1
+            let msg = json["message"] as? String
+            DispatchQueue.main.async { completion(code == 0, msg) }
+        }
+    }
+
+    ///投币 to a video (1 or 2 coins).
+    func coinVideo(bvid: String, multiply: Int = 1, completion: @escaping (Bool, String?) -> Void) {
+        guard !csrf.isEmpty else {
+            DispatchQueue.main.async { completion(false, "请先登录") }
+            return
+        }
+        let form: [String: String] = [
+            "bvid": bvid,
+            "multiply": String(multiply),
+            "select_like": "1",
+            "csrf": csrf
+        ]
+        postRequest("https://api.bilibili.com/x/web-interface/coin/add", form: form) { data, _, _ in
+            guard let json = self.parseJSON(data) else {
+                DispatchQueue.main.async { completion(false, "网络错误") }
+                return
+            }
+            let code = json["code"] as? Int ?? -1
+            let msg = json["message"] as? String
+            DispatchQueue.main.async { completion(code == 0, msg) }
+        }
+    }
+
+    /// Favorite a video (adds to default favorites folder).
+    func favoriteVideo(bvid: String, completion: @escaping (Bool, String?) -> Void) {
+        guard !csrf.isEmpty else {
+            DispatchQueue.main.async { completion(false, "请先登录") }
+            return
+        }
+        // Add to default favorites folder (media_id of default folder)
+        // First get the user's favorite folders, then add
+        request("https://api.bilibili.com/x/v3/fav/folder/created/list-all", params: ["up_mid": cookies["DedeUserID"] ?? ""]) { [weak self] data, _, _ in
+            guard let self = self,
+                  let json = self.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let list = d["list"] as? [[String: Any]],
+                  let defaultFolder = list.first(where: { ($0["fav_state"] as? Int ?? 0) == 0 }) ?? list.first,
+                  let mediaId = defaultFolder["id"] as? Int else {
+                DispatchQueue.main.async { completion(false, "获取收藏夹失败") }
+                return
+            }
+            let form: [String: String] = [
+                "rid": bvid,
+                "type": "2",
+                "add_media_ids": String(mediaId),
+                "csrf": self.csrf
+            ]
+            self.postRequest("https://api.bilibili.com/x/v3/fav/resource/deal", form: form) { data, _, _ in
+                guard let json = self.parseJSON(data) else {
+                    DispatchQueue.main.async { completion(false, "网络错误") }
+                    return
+                }
+                let code = json["code"] as? Int ?? -1
+                let msg = json["message"] as? String
+                DispatchQueue.main.async { completion(code == 0, msg) }
+            }
+        }
+    }
+
+    /// Fetch total number of favorited videos across all the user's folders.
+    func fetchFavoriteCount(completion: @escaping (Int) -> Void) {
+        let mid = cookies["DedeUserID"] ?? ""
+        guard !mid.isEmpty else {
+            DispatchQueue.main.async { completion(0) }
+            return
+        }
+        request("https://api.bilibili.com/x/v3/fav/folder/created/list-all", params: ["up_mid": mid]) { data, _, _ in
+            guard let json = self.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let list = d["list"] as? [[String: Any]] else {
+                DispatchQueue.main.async { completion(0) }
+                return
+            }
+            let total = list.reduce(0) { $0 + ($1["media_count"] as? Int ?? 0) }
+            DispatchQueue.main.async { completion(total) }
+        }
+    }
+
+    /// Fetch the user's favorite folders (id + name + media count).
+    func fetchFavoriteFolders(completion: @escaping ([FavoriteFolder]) -> Void) {
+        let mid = cookies["DedeUserID"] ?? ""
+        guard !mid.isEmpty else {
+            DispatchQueue.main.async { completion([]) }
+            return
+        }
+        request("https://api.bilibili.com/x/v3/fav/folder/created/list-all", params: ["up_mid": mid]) { data, _, _ in
+            guard let json = self.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let list = d["list"] as? [[String: Any]] else {
+                DispatchQueue.main.async { completion([]) }
+                return
+            }
+            let folders = list.compactMap { item -> FavoriteFolder? in
+                guard let id = item["id"] as? Int,
+                      let title = item["title"] as? String else { return nil }
+                return FavoriteFolder(id: id, title: title, count: item["media_count"] as? Int ?? 0)
+            }
+            DispatchQueue.main.async { completion(folders) }
+        }
+    }
+
+    /// Fetch videos inside a favorite folder (paginated).
+    func fetchFavoriteVideos(mediaId: Int, page: Int = 1, completion: @escaping ([Video], Int) -> Void) {
+        let params: [String: String] = [
+            "media_id": String(mediaId),
+            "pn": String(page),
+            "ps": "20",
+            "platform": "web"
+        ]
+        request("https://api.bilibili.com/x/v3/fav/resource/list", params: params) { [weak self] data, _, _ in
+            guard let self = self,
+                  let json = self.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let medias = d["medias"] as? [[String: Any]] else {
+                DispatchQueue.main.async { completion([], 0) }
+                return
+            }
+            let total = d["total"] as? Int ?? medias.count
+            let videos = medias.compactMap { item -> Video? in
+                guard let bvid = item["bvid"] as? String,
+                      let title = item["title"] as? String else { return nil }
+                let upper = item["upper"] as? [String: Any]
+                let cnt = item["cnt_info"] as? [String: Any]
+                return Video(
+                    id: bvid,
+                    title: title,
+                    cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
+                    duration: item["duration"] as? Int ?? 0,
+                    upName: upper?["name"] as? String ?? "",
+                    upMid: upper?["mid"] as? Int ?? 0,
+                    upAvatar: BiliAPI.coverURL(upper?["face"] as? String ?? ""),
+                    views: cnt?["play"] as? Int ?? 0,
+                    danmaku: cnt?["danmaku"] as? Int ?? 0,
+                    publishTime: self.formatTime(item["pubtime"] as? Int ?? 0),
+                    category: "",
+                    desc: item["intro"] as? String ?? "",
+                    likes: 0, coins: 0, favorites: 0, shares: 0,
+                    cid: 0
+                )
+            }
+            DispatchQueue.main.async { completion(videos, total) }
+        }
+    }
+
+    /// Post a comment to a video. type=1 (video), oid=aid.
+    func postComment(aid: Int, message: String, completion: @escaping (Bool, String?) -> Void) {
+        guard !csrf.isEmpty else {
+            DispatchQueue.main.async { completion(false, "请先登录") }
+            return
+        }
+        let form: [String: String] = [
+            "type": "1",
+            "oid": String(aid),
+            "message": message,
+            "csrf": csrf
+        ]
+        postRequest("https://api.bilibili.com/x/v2/reply/add", form: form) { data, _, _ in
+            guard let json = self.parseJSON(data) else {
+                DispatchQueue.main.async { completion(false, "网络错误") }
+                return
+            }
+            let code = json["code"] as? Int ?? -1
+            let msg = json["message"] as? String
+            DispatchQueue.main.async { completion(code == 0, msg) }
+        }
+    }
+
     private func saveSetCookies(_ header: String) {
         let parts = header.components(separatedBy: ",")
         for part in parts {
@@ -575,6 +834,7 @@ private extension BiliAPI {
                 cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                 duration: item["duration"] as? Int ?? 0,
                 upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
+                upMid: (item["owner"] as? [String: Any])?["mid"] as? Int ?? 0,
                 upAvatar: BiliAPI.coverURL((item["owner"] as? [String: Any])?["face"] as? String ?? ""),
                 views: item["play"] as? Int ?? 0,
                 danmaku: item["danmaku"] as? Int ?? 0,
@@ -601,6 +861,7 @@ private extension BiliAPI {
                 cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                 duration: item["duration"] as? Int ?? 0,
                 upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
+                upMid: (item["owner"] as? [String: Any])?["mid"] as? Int ?? 0,
                 upAvatar: BiliAPI.coverURL((item["owner"] as? [String: Any])?["face"] as? String ?? ""),
                 views: stat?["view"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
@@ -650,6 +911,7 @@ private extension BiliAPI {
                     cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                     duration: parseDuration(item["duration"] as? String ?? "0"),
                     upName: item["author"] as? String ?? "",
+                    upMid: item["mid"] as? Int ?? 0,
                     upAvatar: "",
                     views: item["play"] as? Int ?? 0,
                     danmaku: item["video_review"] as? Int ?? 0,
@@ -677,6 +939,7 @@ private extension BiliAPI {
                 cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                 duration: item["duration"] as? Int ?? 0,
                 upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
+                upMid: (item["owner"] as? [String: Any])?["mid"] as? Int ?? 0,
                 upAvatar: BiliAPI.coverURL((item["owner"] as? [String: Any])?["face"] as? String ?? ""),
                 views: stat?["view"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
@@ -711,6 +974,7 @@ private extension BiliAPI {
                 cover: BiliAPI.coverURL(archive["cover"] as? String ?? ""),
                 duration: archive["duration"] as? Int ?? 0,
                 upName: moduleAuthor["name"] as? String ?? "",
+                upMid: moduleAuthor["mid"] as? Int ?? 0,
                 upAvatar: BiliAPI.coverURL(moduleAuthor["face"] as? String ?? ""),
                 views: stat?["play"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
@@ -729,10 +993,12 @@ private extension BiliAPI {
         let stat = d["stat"] as? [String: Any]
         return Video(
             id: d["bvid"] as? String ?? bvid,
+            aid: d["aid"] as? Int ?? 0,
             title: d["title"] as? String ?? "",
             cover: BiliAPI.coverURL(d["pic"] as? String ?? ""),
             duration: d["duration"] as? Int ?? 0,
             upName: (d["owner"] as? [String: Any])?["name"] as? String ?? "",
+            upMid: (d["owner"] as? [String: Any])?["mid"] as? Int ?? 0,
             upAvatar: BiliAPI.coverURL((d["owner"] as? [String: Any])?["face"] as? String ?? ""),
             views: stat?["view"] as? Int ?? 0,
             danmaku: stat?["danmaku"] as? Int ?? 0,
@@ -745,6 +1011,56 @@ private extension BiliAPI {
             shares: stat?["share"] as? Int ?? 0,
             cid: d["cid"] as? Int ?? 0
         )
+    }
+
+    func parseUPSpaceInfo(_ data: Data?) -> UPSpaceInfo? {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any] else { return nil }
+        let cards = d["cards"] as? [String: Any]
+        let fans = cards?["fans"] as? Int ?? d["fans"] as? Int ?? 0
+        let following = d["following"] as? Int ?? 0
+        let likes = d["likes"] as? Int ?? 0
+        let archiveCount = (cards?["archive_count"] as? Int) ?? (d["archive_count"] as? Int) ?? 0
+        return UPSpaceInfo(
+            mid: d["mid"] as? Int ?? 0,
+            name: d["name"] as? String ?? "",
+            avatar: BiliAPI.coverURL(d["face"] as? String ?? ""),
+            sign: d["sign"] as? String ?? "",
+            level: d["level"] as? Int ?? 0,
+            fans: fans,
+            following: following,
+            likes: likes,
+            archiveCount: archiveCount
+        )
+    }
+
+    func parseUPVideos(_ data: Data?) -> ([Video], Int) {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let list = d["list"] as? [String: Any],
+              let vlist = list["vlist"] as? [[String: Any]] else { return ([], 0) }
+        let total = (d["page"] as? [String: Any])?["count"] as? Int ?? vlist.count
+        let videos = vlist.compactMap { item -> Video? in
+            guard let bvid = item["bvid"] as? String,
+                  let title = item["title"] as? String else { return nil }
+            return Video(
+                id: bvid,
+                title: title,
+                cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
+                duration: parseDuration(item["length"] as? String ?? "0"),
+                upName: item["author"] as? String ?? "",
+                upMid: item["mid"] as? Int ?? 0,
+                upAvatar: "",
+                views: item["play"] as? Int ?? 0,
+                danmaku: item["video_review"] as? Int ?? 0,
+                publishTime: formatTime(item["created"] as? Int ?? 0),
+                category: "",
+                desc: item["description"] as? String ?? "",
+                likes: 0, coins: 0, favorites: 0, shares: 0,
+                cid: item["cid"] as? Int ?? 0
+            )
+        }
+        return (videos, total > 0 ? total : videos.count)
     }
 
     func parsePlayURL(_ data: Data?) -> URL? {
@@ -899,6 +1215,13 @@ struct Comment: Identifiable, Hashable {
     let time: String
 }
 
+/// A user's favorites folder
+struct FavoriteFolder: Identifiable, Hashable {
+    let id: Int
+    let title: String
+    let count: Int
+}
+
 /// Add cid to Video for playurl API
 extension Video {
     private static var cidStore: [String: Int] = [:]
@@ -909,9 +1232,9 @@ extension Video {
     init(id: String, title: String, cover: String, duration: Int, upName: String,
          upAvatar: String, views: Int, danmaku: Int, publishTime: String,
          category: String, desc: String, likes: Int, coins: Int,
-         favorites: Int, shares: Int, cid: Int) {
-        self.init(id: id, title: title, cover: cover, duration: duration,
-                  upName: upName, upAvatar: upAvatar, views: views, danmaku: danmaku,
+         favorites: Int, shares: Int, cid: Int, aid: Int = 0, upMid: Int = 0) {
+        self.init(id: id, aid: aid, title: title, cover: cover, duration: duration,
+                  upName: upName, upMid: upMid, upAvatar: upAvatar, views: views, danmaku: danmaku,
                   publishTime: publishTime, category: category, desc: desc,
                   likes: likes, coins: coins, favorites: favorites, shares: shares)
         self.cid = cid

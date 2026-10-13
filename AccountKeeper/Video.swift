@@ -9,10 +9,12 @@ import Foundation
 
 struct Video: Identifiable, Codable, Hashable {
     var id: String              // bvid
+    var aid: Int                // av number, 0 if unknown
     var title: String
     var cover: String           // cover image URL
     var duration: Int           // duration in seconds
     var upName: String
+    var upMid: Int              // UP主 user ID (mid), 0 if unknown
     var upAvatar: String
     var views: Int
     var danmaku: Int
@@ -25,10 +27,12 @@ struct Video: Identifiable, Codable, Hashable {
     var shares: Int
 
     init(id: String = UUID().uuidString,
+         aid: Int = 0,
          title: String = "",
          cover: String = "",
          duration: Int = 0,
          upName: String = "",
+         upMid: Int = 0,
          upAvatar: String = "",
          views: Int = 0,
          danmaku: Int = 0,
@@ -40,10 +44,12 @@ struct Video: Identifiable, Codable, Hashable {
          favorites: Int = 0,
          shares: Int = 0) {
         self.id = id
+        self.aid = aid
         self.title = title
         self.cover = cover
         self.duration = duration
         self.upName = upName
+        self.upMid = upMid
         self.upAvatar = upAvatar
         self.views = views
         self.danmaku = danmaku
@@ -74,6 +80,19 @@ struct Video: Identifiable, Codable, Hashable {
         }
         return "\(views)"
     }
+}
+
+/// UP主 space profile info
+struct UPSpaceInfo {
+    let mid: Int
+    let name: String
+    let avatar: String
+    let sign: String
+    let level: Int
+    let fans: Int
+    let following: Int
+    let likes: Int  // 获赞数
+    let archiveCount: Int  // 视频总数
 }
 
 /// Reason a video was blocked by the filter engine

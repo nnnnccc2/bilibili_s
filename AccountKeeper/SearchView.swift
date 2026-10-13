@@ -14,9 +14,15 @@ struct SearchView: View {
     @State private var searchType: SearchType = .video
     @State private var results: [Video] = []
     @State private var isLoading = false
+    @State private var isLoadingMore = false
+    @State private var page = 1
+    @State private var hasMore = true
     @State private var hasSearched = false
     @State private var selectedDurationIndex: Int = 0
     @State private var selectedVideo: Video?
+    @State private var selectedUPMid: Int = 0
+    @State private var selectedUPName: String = ""
+    @State private var showingUPSpace = false
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
@@ -164,16 +170,31 @@ struct SearchView: View {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(results) { video in
-                                VideoCardView(video: video)
+                                VideoCardView(video: video) {
+                                    if video.upMid > 0 {
+                                        selectedUPMid = video.upMid
+                                        selectedUPName = video.upName
+                                        showingUPSpace = true
+                                    }
+                                }
                                     .contentShape(Rectangle())
                                     .onTapGesture {
                                         selectedVideo = video
+                                    }
+                                    .onAppear {
+                                        if video.id == results.last?.id, hasMore, !isLoadingMore {
+                                            loadMore()
+                                        }
                                     }
                             }
                         }
                         .padding(.horizontal, 8)
                         .padding(.top, 8)
                         .padding(.bottom, 20)
+
+                        if isLoadingMore {
+                            ProgressView().padding(.vertical, 12)
+                        }
                     }
                 }
             }
@@ -192,6 +213,12 @@ struct SearchView: View {
                 VideoPlayerView(video: video)
                     .environmentObject(store)
             }
+            .sheet(isPresented: $showingUPSpace) {
+                if selectedUPMid > 0 {
+                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
+                        .environmentObject(store)
+                }
+            }
         }
     }
 
@@ -199,6 +226,8 @@ struct SearchView: View {
         guard !keyword.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         isLoading = true
         hasSearched = true
+        page = 1
+        hasMore = true
         // Reset duration filter display to match current setting
         if let cur = store.settings.searchMinDurationSeconds {
             if let idx = FilterSettings.searchDurationOptions.firstIndex(where: { $0.seconds == cur }) {
@@ -207,11 +236,33 @@ struct SearchView: View {
         } else {
             selectedDurationIndex = 0
         }
-        BiliAPI.shared.search(keyword: keyword, type: searchType) { raw in
+        BiliAPI.shared.search(keyword: keyword, type: searchType, page: page) { raw in
             let filtered = store.applySearchFilter(raw)
             DispatchQueue.main.async {
                 results = filtered
                 isLoading = false
+                if filtered.isEmpty {
+                    hasMore = false
+                } else {
+                    page += 1
+                }
+            }
+        }
+    }
+
+    private func loadMore() {
+        guard hasMore, !isLoadingMore else { return }
+        isLoadingMore = true
+        BiliAPI.shared.search(keyword: keyword, type: searchType, page: page) { raw in
+            let filtered = store.applySearchFilter(raw)
+            DispatchQueue.main.async {
+                if filtered.isEmpty {
+                    hasMore = false
+                } else {
+                    results.append(contentsOf: filtered)
+                    page += 1
+                }
+                isLoadingMore = false
             }
         }
     }

@@ -29,6 +29,8 @@
 		A1B2C3D4E5F60001007A0014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0014 /* SettingsView.swift */; };
 		A1B2C3D4E5F60001007A0015 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0015 /* BuildInfo.swift */; };
 		A1B2C3D4E5F60001007A0019 /* WBISigner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0019 /* WBISigner.swift */; };
+		A1B2C3D4E5F60001007A0020 /* UPSpaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0020 /* UPSpaceView.swift */; };
+		A1B2C3D4E5F60001007A0021 /* FavoritesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0021 /* FavoritesListView.swift */; };
 		A1B2C3D4E5F60001007A0016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0016 /* Assets.xcassets */; };
 		A1B2C3D4E5F60001007A0017 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0017 /* Preview Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -67,6 +69,8 @@
 		A1B2C3D4E5F60011007A0014 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0015 /* BuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInfo.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0019 /* WBISigner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WBISigner.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60011007A0020 /* UPSpaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UPSpaceView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60011007A0021 /* FavoritesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesListView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0017 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0018 /* AccountKeeper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AccountKeeper.entitlements; sourceTree = "<group>"; };
@@ -114,6 +118,8 @@
 				A1B2C3D4E5F60011007A0014 /* SettingsView.swift */,
 				A1B2C3D4E5F60011007A0015 /* BuildInfo.swift */,
 				A1B2C3D4E5F60011007A0019 /* WBISigner.swift */,
+				A1B2C3D4E5F60011007A0020 /* UPSpaceView.swift */,
+				A1B2C3D4E5F60011007A0021 /* FavoritesListView.swift */,
 				A1B2C3D4E5F60011007A0016 /* Assets.xcassets */,
 				A1B2C3D4E5F60011007A0018 /* AccountKeeper.entitlements */,
 				A1B2C3D4E5F60031007A0003 /* Preview Content */,
@@ -201,6 +207,8 @@
 			files = (
 				A1B2C3D4E5F60001007A0015 /* BuildInfo.swift in Sources */,
 				A1B2C3D4E5F60001007A0019 /* WBISigner.swift in Sources */,
+				A1B2C3D4E5F60001007A0020 /* UPSpaceView.swift in Sources */,
+				A1B2C3D4E5F60001007A0021 /* FavoritesListView.swift in Sources */,
 				A1B2C3D4E5F60001007A0014 /* SettingsView.swift in Sources */,
 				A1B2C3D4E5F60001007A0013 /* CategoryView.swift in Sources */,
 				A1B2C3D4E5F60001007A0012 /* FollowingView.swift in Sources */,

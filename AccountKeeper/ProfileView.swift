@@ -18,6 +18,8 @@ struct ProfileView: View {
     @State private var showingAbout = false
     @State private var remoteHistory: [HistoryItem] = []
     @State private var isLoadingHistory = false
+    @State private var favoriteCount: Int = 0
+    @State private var showingFavorites = false
 
     private var displayHistory: [HistoryItem] {
         store.currentUser != nil ? remoteHistory : store.history
@@ -98,6 +100,9 @@ struct ProfileView: View {
             .sheet(isPresented: $showingAbout) {
                 SettingsView()
             }
+            .sheet(isPresented: $showingFavorites) {
+                FavoritesListView().environmentObject(store)
+            }
         }
         .onAppear {
             refreshProfile()
@@ -110,6 +115,9 @@ struct ProfileView: View {
     private func refreshProfile() {
         guard store.currentUser != nil else { return }
         loadRemoteHistory()
+        BiliAPI.shared.fetchFavoriteCount { count in
+            DispatchQueue.main.async { favoriteCount = count }
+        }
     }
 
     private func loadRemoteHistory() {
@@ -266,7 +274,7 @@ struct ProfileView: View {
 
     private var favoritesStat: some View {
         Button {
-            // favorites (mock)
+            showingFavorites = true
         } label: {
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
@@ -275,7 +283,7 @@ struct ProfileView: View {
                     Text("我的收藏")
                         .font(.headline)
                         .foregroundStyle(.primary)
-                    Text("(8)")
+                    Text("(\(favoriteCount))")
                         .font(.headline)
                         .foregroundStyle(.primary)
                 }

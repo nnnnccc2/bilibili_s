@@ -13,8 +13,14 @@ struct HomeView: View {
     @State private var category: HomeCategory = .recommend
     @State private var videos: [Video] = []
     @State private var isLoading = false
+    @State private var isLoadingMore = false
+    @State private var page = 1
+    @State private var hasMore = true
     @State private var selectedVideo: Video?
     @State private var lastRefreshDate = Date.distantPast
+    @State private var selectedUPMid: Int = 0
+    @State private var selectedUPName: String = ""
+    @State private var showingUPSpace = false
 
     var body: some View {
         NavigationStack {
@@ -28,6 +34,8 @@ struct HomeView: View {
                             ForEach(HomeCategory.allCases) { cat in
                                 Button {
                                     category = cat
+                                    page = 1
+                                    hasMore = true
                                     loadVideos(force: true)
                                 } label: {
                                     VStack(spacing: 4) {
@@ -88,16 +96,31 @@ struct HomeView: View {
                         ScrollView {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(videos) { video in
-                                    VideoCardView(video: video)
+                                    VideoCardView(video: video) {
+                                        if video.upMid > 0 {
+                                            selectedUPMid = video.upMid
+                                            selectedUPName = video.upName
+                                            showingUPSpace = true
+                                        }
+                                    }
                                         .contentShape(Rectangle())
                                         .onTapGesture {
                                             selectedVideo = video
+                                        }
+                                        .onAppear {
+                                            if video.id == videos.last?.id, hasMore, !isLoadingMore {
+                                                loadMore()
+                                            }
                                         }
                                 }
                             }
                             .padding(.horizontal, 8)
                             .padding(.top, 8)
                             .padding(.bottom, 20)
+
+                            if isLoadingMore {
+                                ProgressView().padding(.vertical, 12)
+                            }
                         }
                         .refreshable {
                             await loadVideosAsync(force: true)
@@ -129,6 +152,12 @@ struct HomeView: View {
                 VideoPlayerView(video: video)
                     .environmentObject(store)
             }
+            .sheet(isPresented: $showingUPSpace) {
+                if selectedUPMid > 0 {
+                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
+                        .environmentObject(store)
+                }
+            }
         }
         .onAppear {
             // Refresh if never loaded or stale (>30s)
@@ -140,12 +169,36 @@ struct HomeView: View {
 
     private func loadVideos(force: Bool = false) {
         isLoading = true
-        BiliAPI.shared.fetchHome(category: category) { raw in
+        page = 1
+        hasMore = true
+        BiliAPI.shared.fetchHome(category: category, page: page) { raw in
             let filtered = store.applyFilter(raw)
             DispatchQueue.main.async {
                 videos = filtered
                 isLoading = false
                 lastRefreshDate = Date()
+                if filtered.isEmpty {
+                    hasMore = false
+                } else {
+                    page += 1
+                }
+            }
+        }
+    }
+
+    private func loadMore() {
+        guard hasMore, !isLoadingMore else { return }
+        isLoadingMore = true
+        BiliAPI.shared.fetchHome(category: category, page: page) { raw in
+            let filtered = store.applyFilter(raw)
+            DispatchQueue.main.async {
+                if filtered.isEmpty {
+                    hasMore = false
+                } else {
+                    videos.append(contentsOf: filtered)
+                    page += 1
+                }
+                isLoadingMore = false
             }
         }
     }
@@ -153,12 +206,14 @@ struct HomeView: View {
     @Sendable
     private func loadVideosAsync(force: Bool = false) async {
         await withCheckedContinuation { continuation in
-            BiliAPI.shared.fetchHome(category: category) { raw in
+            BiliAPI.shared.fetchHome(category: category, page: 1) { raw in
                 let filtered = store.applyFilter(raw)
                 DispatchQueue.main.async {
                     videos = filtered
                     isLoading = false
                     lastRefreshDate = Date()
+                    page = 2
+                    hasMore = !filtered.isEmpty
                     continuation.resume()
                 }
             }

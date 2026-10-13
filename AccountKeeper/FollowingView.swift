@@ -14,6 +14,9 @@ struct FollowingView: View {
     @State private var videos: [Video] = []
     @State private var isLoading = false
     @State private var selectedVideo: Video?
+    @State private var selectedUPMid: Int = 0
+    @State private var selectedUPName: String = ""
+    @State private var showingUPSpace = false
 
     enum FollowTab: String, CaseIterable, Identifiable {
         case all = "综合"
@@ -72,7 +75,13 @@ struct FollowingView: View {
                         ScrollView {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(videos) { video in
-                                    VideoCardView(video: video)
+                                    VideoCardView(video: video) {
+                                        if video.upMid > 0 {
+                                            selectedUPMid = video.upMid
+                                            selectedUPName = video.upName
+                                            showingUPSpace = true
+                                        }
+                                    }
                                         .contentShape(Rectangle())
                                         .onTapGesture { selectedVideo = video }
                                 }
@@ -107,6 +116,12 @@ struct FollowingView: View {
             }
             .sheet(item: $selectedVideo) { video in
                 VideoPlayerView(video: video).environmentObject(store)
+            }
+            .sheet(isPresented: $showingUPSpace) {
+                if selectedUPMid > 0 {
+                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
+                        .environmentObject(store)
+                }
             }
         }
         .onAppear { if videos.isEmpty { load() } }

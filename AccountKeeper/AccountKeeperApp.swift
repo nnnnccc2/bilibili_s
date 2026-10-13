@@ -7,27 +7,21 @@
 
 import SwiftUI
 
-// MARK: - Bilibili theme colors
+// MARK: - Bilibili theme colors (MiniBili-style clean theme)
 
 extension Color {
-    /// Bilibili brand blue (#2A9DF4) — primary accent
-    static let biliBlue = Color(red: 42/255, green: 157/255, blue: 244/255)
-    /// Light blue gradient start for page backgrounds
-    static let biliGradientTop = Color(red: 191/255, green: 227/255, blue: 249/255)
-    /// Light blue gradient end for page backgrounds
-    static let biliGradientBottom = Color(red: 232/255, green: 244/255, blue: 253/255)
-    /// Card surface color (soft white with blue tint)
-    static let biliCard = Color(red: 248/255, green: 251/255, blue: 254/255)
+    /// Bilibili brand blue (#00AEEC) — primary accent
+    static let biliBlue = Color(red: 0/255, green: 174/255, blue: 236/255)
+    /// Page background — clean off-white (MiniBili style)
+    static let biliBackground = Color(red: 245/255, green: 246/255, blue: 248/255)
+    /// Card surface color — pure white
+    static let biliCard = Color.white
     /// Subtle border for cards
-    static let biliBorder = Color(red: 220/255, green: 232/255, blue: 243/255)
+    static let biliBorder = Color(red: 230/255, green: 232/255, blue: 235/255)
 }
 
-/// Linear gradient used as the default page background (light blue)
-let biliBackgroundGradient = LinearGradient(
-    colors: [.biliGradientTop, .biliGradientBottom],
-    startPoint: .top,
-    endPoint: .bottom
-)
+/// Page background — solid clean color (no heavy gradient for performance)
+let biliBackgroundGradient = Color.biliBackground
 
 @main
 struct BiliBiliApp: App {

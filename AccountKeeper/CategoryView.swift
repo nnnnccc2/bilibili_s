@@ -14,6 +14,9 @@ struct CategoryView: View {
     @State private var partitionVideos: [Video] = []
     @State private var isLoading = false
     @State private var selectedVideo: Video?
+    @State private var selectedUPMid: Int = 0
+    @State private var selectedUPName: String = ""
+    @State private var showingUPSpace = false
 
     let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
@@ -55,7 +58,13 @@ struct CategoryView: View {
                         } else {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(partitionVideos) { video in
-                                    VideoCardView(video: video)
+                                    VideoCardView(video: video) {
+                                        if video.upMid > 0 {
+                                            selectedUPMid = video.upMid
+                                            selectedUPName = video.upName
+                                            showingUPSpace = true
+                                        }
+                                    }
                                         .contentShape(Rectangle())
                                         .onTapGesture { selectedVideo = video }
                                 }
@@ -96,6 +105,12 @@ struct CategoryView: View {
             }
             .sheet(item: $selectedVideo) { video in
                 VideoPlayerView(video: video).environmentObject(store)
+            }
+            .sheet(isPresented: $showingUPSpace) {
+                if selectedUPMid > 0 {
+                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
+                        .environmentObject(store)
+                }
             }
         }
     }

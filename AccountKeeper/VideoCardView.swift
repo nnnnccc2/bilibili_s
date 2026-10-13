@@ -9,6 +9,7 @@ import SwiftUI
 
 struct VideoCardView: View {
     let video: Video
+    var onTapUP主: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -106,15 +107,15 @@ struct VideoCardView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onTapUP主?()
+            }
         }
         .padding(10)
-        .background(.ultraThinMaterial)
-        .background(Color.white.opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
-        )
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
         .onAppear {
             // Prefetch stream URL when card becomes visible so playback starts instantly on tap
             BiliAPI.shared.prefetchStreamURL(for: video)
