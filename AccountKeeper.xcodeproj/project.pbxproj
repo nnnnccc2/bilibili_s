@@ -24,6 +24,7 @@
 		B1000001E5F60001007A0002 /* CredentialProviderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0002 /* CredentialProviderView.swift */; };
 		B1000001E5F60001007A0003 /* SharedAccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0003 /* SharedAccountStore.swift */; };
 		B1000001E5F60001007A0004 /* AccountItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0004 /* AccountItem.swift */; };
+		B1000001E5F60001007A0005 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0007 /* AuthenticationServices.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +72,7 @@
 		B1000001E5F60011007A0004 /* AccountItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountItem.swift; sourceTree = "<group>"; };
 		B1000001E5F60011007A0005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B1000001E5F60011007A0006 /* CredentialProvider.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CredentialProvider.entitlements; sourceTree = "<group>"; };
+		B1000001E5F60011007A0007 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +87,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B1000001E5F60001007A0005 /* AuthenticationServices.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

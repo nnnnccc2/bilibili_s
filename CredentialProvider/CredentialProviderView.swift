@@ -48,7 +48,7 @@ struct CredentialProviderView: View {
                     showingAddForm = true
                 } label: {
                     Label("添加新账号", systemImage: "plus.circle.fill")
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accentColor)
                 }
             }
 
@@ -91,7 +91,7 @@ struct CredentialProviderView: View {
                         .frame(width: 40, height: 40)
                     Text(String(account.name.prefix(1)).uppercased())
                         .font(.headline)
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accentColor)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(account.name)
@@ -103,7 +103,7 @@ struct CredentialProviderView: View {
                 }
                 Spacer()
                 Image(systemName: "key.fill")
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accentColor)
             }
         }
     }
