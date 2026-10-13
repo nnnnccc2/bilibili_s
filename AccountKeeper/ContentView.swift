@@ -129,7 +129,7 @@ struct AccountRowView: View {
                 Text(String(account.name.prefix(1)).uppercased())
                     .font(.title3)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accentColor)
             }
 
             VStack(alignment: .leading, spacing: 2) {
