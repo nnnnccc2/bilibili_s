@@ -54,7 +54,10 @@ jobs:
           fi
           echo "Found app at: $APP_PATH"
           echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "=== App contents ==="
           ls -la "$APP_PATH"
+          echo "=== PlugIns (extensions) ==="
+          ls -la "$APP_PATH/PlugIns" 2>/dev/null || echo "No PlugIns"
 
       - name: Inject compile time into Info.plist
         run: |
@@ -64,13 +67,19 @@ jobs:
           echo "Injecting compile time: $COMPILE_TIME"
           /usr/libexec/PlistBuddy -c "Add :BuildCompileTime string '$COMPILE_TIME'" "$INFO_PLIST" 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :BuildCompileTime '$COMPILE_TIME'" "$INFO_PLIST"
-          echo "=== Updated Info.plist ==="
           /usr/libexec/PlistBuddy -c "Print :BuildCompileTime" "$INFO_PLIST"
 
-      - name: Ad-hoc sign with codesign
+      - name: Ad-hoc sign app and extension
         run: |
           APP_PATH="${{ steps.find_app.outputs.app_path }}"
-          echo "Ad-hoc signing: $APP_PATH"
+          # Sign the extension first, then the app
+          for APPEX in "$APP_PATH/PlugIns"/*.appex; do
+            if [ -d "$APPEX" ]; then
+              echo "Signing extension: $APPEX"
+              codesign --force --sign - --entitlements /dev/null "$APPEX" 2>&1 || true
+            fi
+          done
+          echo "Signing app: $APP_PATH"
           codesign --force --sign - "$APP_PATH/AccountKeeper"
           codesign -dv "$APP_PATH/AccountKeeper" 2>&1 || true
           echo "Signing complete"

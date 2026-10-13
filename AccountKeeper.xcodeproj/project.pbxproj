@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		/* Main App Sources */
 		A1B2C3D4E5F60001007A0001 /* AccountKeeperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0001 /* AccountKeeperApp.swift */; };
 		A1B2C3D4E5F60001007A0002 /* AccountItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0002 /* AccountItem.swift */; };
 		A1B2C3D4E5F60001007A0003 /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0003 /* AccountStore.swift */; };
@@ -16,9 +17,41 @@
 		A1B2C3D4E5F60001007A0007 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0007 /* BuildInfo.swift */; };
 		A1B2C3D4E5F60001007A0008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0008 /* Assets.xcassets */; };
 		A1B2C3D4E5F60001007A0009 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0009 /* Preview Assets.xcassets */; };
+		/* Embed Extension */
+		A1B2C3D4E5F60001007A0010 /* CredentialProvider.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0000 /* CredentialProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		/* Extension Sources */
+		B1000001E5F60001007A0001 /* CredentialProviderViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0001 /* CredentialProviderViewController.swift */; };
+		B1000001E5F60001007A0002 /* CredentialProviderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0002 /* CredentialProviderView.swift */; };
+		B1000001E5F60001007A0003 /* SharedAccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0003 /* SharedAccountStore.swift */; };
+		B1000001E5F60001007A0004 /* AccountItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001E5F60011007A0004 /* AccountItem.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A1B2C3D4E5F60081007A0001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1B2C3D4E5F60051007A0001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B1000001E5F60041007A0001;
+			remoteInfo = CredentialProvider;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A1B2C3D4E5F60091007A0001 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A1B2C3D4E5F60001007A0010 /* CredentialProvider.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		/* Main App */
 		A1B2C3D4E5F60011007A0000 /* AccountKeeper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AccountKeeper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D4E5F60011007A0001 /* AccountKeeperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountKeeperApp.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0002 /* AccountItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountItem.swift; sourceTree = "<group>"; };
@@ -29,10 +62,26 @@
 		A1B2C3D4E5F60011007A0007 /* BuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInfo.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0009 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		A1B2C3D4E5F60011007A0010 /* AccountKeeper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AccountKeeper.entitlements; sourceTree = "<group>"; };
+		/* Extension */
+		B1000001E5F60011007A0000 /* CredentialProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CredentialProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1000001E5F60011007A0001 /* CredentialProviderViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialProviderViewController.swift; sourceTree = "<group>"; };
+		B1000001E5F60011007A0002 /* CredentialProviderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialProviderView.swift; sourceTree = "<group>"; };
+		B1000001E5F60011007A0003 /* SharedAccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedAccountStore.swift; sourceTree = "<group>"; };
+		B1000001E5F60011007A0004 /* AccountItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountItem.swift; sourceTree = "<group>"; };
+		B1000001E5F60011007A0005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B1000001E5F60011007A0006 /* CredentialProvider.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CredentialProvider.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A1B2C3D4E5F60021007A0001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1000001E5F60021007A0001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -46,6 +95,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60031007A0001 /* AccountKeeper */,
+				B1000001E5F60031007A0001 /* CredentialProvider */,
 				A1B2C3D4E5F60031007A0002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -54,6 +104,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60011007A0000 /* AccountKeeper.app */,
+				B1000001E5F60011007A0000 /* CredentialProvider.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -69,6 +120,7 @@
 				A1B2C3D4E5F60011007A0006 /* SettingsView.swift */,
 				A1B2C3D4E5F60011007A0007 /* BuildInfo.swift */,
 				A1B2C3D4E5F60011007A0008 /* Assets.xcassets */,
+				A1B2C3D4E5F60011007A0010 /* AccountKeeper.entitlements */,
 				A1B2C3D4E5F60031007A0003 /* Preview Content */,
 			);
 			path = AccountKeeper;
@@ -82,6 +134,19 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
+		B1000001E5F60031007A0001 /* CredentialProvider */ = {
+			isa = PBXGroup;
+			children = (
+				B1000001E5F60011007A0001 /* CredentialProviderViewController.swift */,
+				B1000001E5F60011007A0002 /* CredentialProviderView.swift */,
+				B1000001E5F60011007A0003 /* SharedAccountStore.swift */,
+				B1000001E5F60011007A0004 /* AccountItem.swift */,
+				B1000001E5F60011007A0005 /* Info.plist */,
+				B1000001E5F60011007A0006 /* CredentialProvider.entitlements */,
+			);
+			path = CredentialProvider;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -92,15 +157,34 @@
 				A1B2C3D4E5F60021007A0000 /* Sources */,
 				A1B2C3D4E5F60021007A0001 /* Frameworks */,
 				A1B2C3D4E5F60021007A0002 /* Resources */,
+				A1B2C3D4E5F60091007A0001 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A1B2C3D4E5F60081007A0002 /* PBXTargetDependency */,
 			);
 			name = AccountKeeper;
 			productName = AccountKeeper;
 			productReference = A1B2C3D4E5F60011007A0000 /* AccountKeeper.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B1000001E5F60041007A0001 /* CredentialProvider */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000001E5F60061007A0002 /* Build configuration list for PBXNativeTarget "CredentialProvider" */;
+			buildPhases = (
+				B1000001E5F60021007A0000 /* Sources */,
+				B1000001E5F60021007A0001 /* Frameworks */,
+				B1000001E5F60021007A0002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CredentialProvider;
+			productName = CredentialProvider;
+			productReference = B1000001E5F60011007A0000 /* CredentialProvider.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -113,6 +197,9 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					A1B2C3D4E5F60041007A0001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					B1000001E5F60041007A0001 = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -131,6 +218,7 @@
 			projectRoot = "";
 			targets = (
 				A1B2C3D4E5F60041007A0001 /* AccountKeeper */,
+				B1000001E5F60041007A0001 /* CredentialProvider */,
 			);
 		};
 /* End PBXProject section */
@@ -142,6 +230,13 @@
 			files = (
 				A1B2C3D4E5F60001007A0009 /* Preview Assets.xcassets in Resources */,
 				A1B2C3D4E5F60001007A0008 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1000001E5F60021007A0002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -162,26 +257,43 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B1000001E5F60021007A0000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000001E5F60001007A0001 /* CredentialProviderViewController.swift in Sources */,
+				B1000001E5F60001007A0002 /* CredentialProviderView.swift in Sources */,
+				B1000001E5F60001007A0003 /* SharedAccountStore.swift in Sources */,
+				B1000001E5F60001007A0004 /* AccountItem.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A1B2C3D4E5F60081007A0002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B1000001E5F60041007A0001 /* CredentialProvider */;
+			targetProxy = A1B2C3D4E5F60081007A0001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		/* Project Debug/Release */
 		A1B2C3D4E5F60071007A0001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
 				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
@@ -231,18 +343,15 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
 				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
@@ -280,11 +389,13 @@
 			};
 			name = Release;
 		};
+		/* Main App Debug */
 		A1B2C3D4E5F60071007A0003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = AccountKeeper/AccountKeeper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"AccountKeeper/Preview Content\"";
@@ -309,11 +420,13 @@
 			};
 			name = Debug;
 		};
+		/* Main App Release */
 		A1B2C3D4E5F60071007A0004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = AccountKeeper/AccountKeeper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"AccountKeeper/Preview Content\"";
@@ -338,6 +451,56 @@
 			};
 			name = Release;
 		};
+		/* Extension Debug */
+		B1000001E5F60071007A0003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CredentialProvider/CredentialProvider.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CredentialProvider/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.AccountKeeper.CredentialProvider;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		/* Extension Release */
+		B1000001E5F60071007A0004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CredentialProvider/CredentialProvider.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CredentialProvider/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.AccountKeeper.CredentialProvider;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -355,6 +518,15 @@
 			buildConfigurations = (
 				A1B2C3D4E5F60071007A0003 /* Debug */,
 				A1B2C3D4E5F60071007A0004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B1000001E5F60061007A0002 /* Build configuration list for PBXNativeTarget "CredentialProvider" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1000001E5F60071007A0003 /* Debug */,
+				B1000001E5F60071007A0004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

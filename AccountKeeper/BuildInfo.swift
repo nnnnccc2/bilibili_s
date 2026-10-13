@@ -9,7 +9,7 @@ import Foundation
 
 enum BuildInfo {
     /// Source code generation time (set at build)
-    static let sourceTime = "2026-10-13 17:25:49 UTC"
+    static let sourceTime = "2026-10-13 17:39:34 UTC"
 
     /// IPA compilation time (injected by CI, fallback shown if not set)
     static var compileTime: String {

@@ -2,7 +2,7 @@
 //  AccountStore.swift
 //  AccountKeeper
 //
-//  Data persistence using UserDefaults
+//  Data persistence using UserDefaults + App Group (shared with AutoFill extension)
 //
 
 import Foundation
@@ -11,25 +11,31 @@ class AccountStore: ObservableObject {
     @Published var accounts: [AccountItem] = []
 
     private let storageKey = "AccountKeeper.accounts"
+    private let appGroupID = "group.com.example.AccountKeeper"
 
     init() {
         load()
     }
 
     func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
-            accounts = []
+        // Prefer App Group shared data, fall back to local
+        if let shared = UserDefaults(suiteName: appGroupID),
+           let data = shared.data(forKey: storageKey),
+           let decoded = try? JSONDecoder().decode([AccountItem].self, from: data) {
+            accounts = decoded
             return
         }
-        if let decoded = try? JSONDecoder().decode([AccountItem].self, from: data) {
+        if let data = UserDefaults.standard.data(forKey: storageKey),
+           let decoded = try? JSONDecoder().decode([AccountItem].self, from: data) {
             accounts = decoded
         }
     }
 
     func save() {
-        if let encoded = try? JSONEncoder().encode(accounts) {
-            UserDefaults.standard.set(encoded, forKey: storageKey)
-        }
+        guard let encoded = try? JSONEncoder().encode(accounts) else { return }
+        // Save to both local and App Group for extension access
+        UserDefaults.standard.set(encoded, forKey: storageKey)
+        UserDefaults(suiteName: appGroupID)?.set(encoded, forKey: storageKey)
     }
 
     func add(_ account: AccountItem) {
