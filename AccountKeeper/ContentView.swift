@@ -42,15 +42,15 @@ struct ContentView: View {
                 }
                 .tag(3)
         }
-        .tint(.pink)
+        .tint(.biliBlue)
         .sheet(isPresented: $showingSearch) {
             SearchView().environmentObject(store)
         }
         .onAppear {
-            // Style the tab bar
+            // Style the tab bar — frosted glass, blue accent
             let appearance = UITabBarAppearance()
             appearance.configureWithDefaultBackground()
-            appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.92)
+            appearance.backgroundColor = UIColor.white.withAlphaComponent(0.92)
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }

@@ -23,30 +23,43 @@ struct ProfileView: View {
         store.currentUser != nil ? remoteHistory : store.history
     }
 
+    private var totalBlocked: Int { store.settings.stats.totalBlocked }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // User info header
-                    userHeader
+            ZStack {
+                biliBackgroundGradient.ignoresSafeArea()
 
-                    // Stats cards
-                    statsRow
-                        .padding(.horizontal)
-                        .padding(.top, 16)
-
-                    // Watch history
-                    historySection
-
-                    // Quick actions
-                    quickActions
-                        .padding(.horizontal)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Header title
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("个人中心")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundStyle(Color(red: 0.06, green: 0.09, blue: 0.16))
+                            Text("极简第三方客户端 · 纯净播放与账号管理")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 20)
                         .padding(.top, 8)
 
-                    Spacer(minLength: 24)
+                        // User card (includes watch history + favorites)
+                        userCard
+                            .padding(.horizontal, 16)
+
+                        // Purification dashboard
+                        purificationDashboard
+                            .padding(.horizontal, 16)
+
+                        // Filter config center entry
+                        filterConfigEntry
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 24)
+                    }
+                    .padding(.top, 8)
                 }
             }
-            .background(Color(.systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -55,16 +68,9 @@ struct ProfileView: View {
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.body)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.biliBlue)
                             .padding(8)
                             .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
                     }
                 }
             }
@@ -85,6 +91,9 @@ struct ProfileView: View {
                 }
             } message: {
                 Text("确定要退出当前账号吗？")
+            }
+            .sheet(isPresented: $showingHistory) {
+                historySheet
             }
             .sheet(isPresented: $showingAbout) {
                 SettingsView()
@@ -113,72 +122,88 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - User header
+    // MARK: - User card
 
     @ViewBuilder
-    private var userHeader: some View {
+    private var userCard: some View {
         if let user = store.currentUser {
-            HStack(spacing: 14) {
-                if !user.avatar.isEmpty, let url = URL(string: user.avatar) {
-                    AsyncImage(url: url) { phase in
-                        if let img = phase.image {
-                            img.resizable().scaledToFill()
-                        } else {
-                            Circle().fill(Color.pink.opacity(0.3))
+            VStack(spacing: 16) {
+                HStack(spacing: 14) {
+                    if !user.avatar.isEmpty, let url = URL(string: user.avatar) {
+                        AsyncImage(url: url) { phase in
+                            if let img = phase.image {
+                                img.resizable().scaledToFill()
+                            } else {
+                                Circle().fill(Color.biliBlue.opacity(0.3))
+                            }
+                        }
+                        .frame(width: 64, height: 64)
+                        .clipShape(Circle())
+                    } else {
+                        ZStack {
+                            Circle()
+                                .fill(Color.biliBlue.opacity(0.2))
+                                .frame(width: 64, height: 64)
+                            Text(String(user.name.prefix(1)))
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.biliBlue)
                         }
                     }
-                    .frame(width: 64, height: 64)
-                    .clipShape(Circle())
-                } else {
-                    ZStack {
-                        Circle()
-                            .fill(Color.pink.opacity(0.2))
-                            .frame(width: 64, height: 64)
-                        Text(String(user.name.prefix(1)))
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.pink)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(user.name)
+                                .font(.title3)
+                                .fontWeight(.bold)
+                            if user.isVip {
+                                Text("年度大会员")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Color(red: 0.95, green: 0.3, blue: 0.4))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        Text("硬币: \(user.coins) · LV\(user.level)\(user.maskedPhone.isEmpty ? "" : " · " + user.maskedPhone)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button {
+                        showingLogoutAlert = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                            Text("退出")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemGray5))
+                        .clipShape(Capsule())
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(user.name)
-                            .font(.title3)
-                            .fontWeight(.bold)
-                        if user.isVip {
-                            Text("大会员")
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(LinearGradient(colors: [.yellow, .orange], startPoint: .leading, endPoint: .trailing))
-                                .clipShape(Capsule())
-                        }
-                    }
-                    HStack(spacing: 8) {
-                        Text("LV\(user.level)")
-                            .font(.caption)
-                            .foregroundStyle(.pink)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Color.pink.opacity(0.12))
-                            .clipShape(Capsule())
-                        Text("硬币: \(user.coins)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if !user.maskedPhone.isEmpty {
-                            Text("· \(user.maskedPhone)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                // Watch history + favorites
+                HStack(spacing: 0) {
+                    historyStat
+                    Divider()
+                        .frame(height: 36)
+                    favoritesStat
                 }
-                Spacer()
             }
             .padding(16)
-            .background(Color(.systemBackground))
+            .background(Color.biliCard)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.biliBorder, lineWidth: 1)
+            )
         } else {
             Button {
                 showingLogin = true
@@ -186,11 +211,11 @@ struct ProfileView: View {
                 HStack(spacing: 14) {
                     ZStack {
                         Circle()
-                            .fill(Color.pink.opacity(0.15))
+                            .fill(Color.biliBlue.opacity(0.15))
                             .frame(width: 64, height: 64)
                         Image(systemName: "person.fill")
                             .font(.title2)
-                            .foregroundStyle(Color.pink)
+                            .foregroundStyle(Color.biliBlue)
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("点击登录")
@@ -206,118 +231,215 @@ struct ProfileView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .padding(16)
-                .background(Color(.systemBackground))
+                .background(Color.biliCard)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.biliBorder, lineWidth: 1)
+                )
             }
         }
     }
 
-    // MARK: - Stats row
-
-    private var statsRow: some View {
-        HStack(spacing: 0) {
-            statCard(label: "累计净化", value: "\(store.settings.stats.totalBlocked)", icon: "shield.lefthalf.filled", color: .green)
-            statCard(label: "观看历史", value: "\(displayHistory.count)", icon: "clock.arrow.circlepath", color: .blue)
-            statCard(label: "屏蔽词库", value: "\(store.settings.customBlockedWords.count + (store.settings.builtInWordsEnabled ? FilterSettings.builtInInsultWords.count : 0))", icon: "hand.raised.fill", color: .red)
+    private var historyStat: some View {
+        Button {
+            showingHistory = true
+        } label: {
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .foregroundStyle(.biliBlue)
+                    Text("观看历史")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("(\(displayHistory.count))")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                }
+                Text("真实记录随看随存")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
         }
-        .padding(12)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func statCard(label: String, value: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(color)
-            Text(value)
-                .font(.headline)
-                .fontWeight(.bold)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    private var favoritesStat: some View {
+        Button {
+            // favorites (mock)
+        } label: {
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "bookmark")
+                        .foregroundStyle(.orange)
+                    Text("我的收藏")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("(8)")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                }
+                Text("精选优质内容")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
     }
 
-    // MARK: - History section
+    // MARK: - Purification dashboard
 
-    private var historySection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+    private var purificationDashboard: some View {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("观看历史")
+                Image(systemName: "shield.lefthalf.filled")
+                    .foregroundStyle(.biliBlue)
+                Text("全站低质视频净化看板")
                     .font(.headline)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .fontWeight(.bold)
                 Spacer()
-                if !displayHistory.isEmpty {
-                    Button {
-                        if store.currentUser != nil {
-                            remoteHistory.removeAll()
-                        } else {
-                            store.clearHistory()
-                        }
-                    } label: {
-                        Text("清空")
+                Button {
+                    showingSettings = true
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("管理过滤规则")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.biliBlue)
+                }
+            }
+
+            // Big number card
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("全站累计净化屏蔽")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("\(totalBlocked)")
+                            .font(.system(size: 42, weight: .bold))
+                            .foregroundStyle(.biliBlue)
+                        Text("条低质视频")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                }
+                Spacer()
+                ZStack {
+                    Circle()
+                        .fill(Color.biliBlue.opacity(0.15))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: "shield.lefthalf.filled")
+                        .font(.title)
+                        .foregroundStyle(.biliBlue)
                 }
             }
+            .padding(16)
+            .background(Color.biliBlue.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
 
-            if isLoadingHistory {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 32)
-            } else if displayHistory.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "clock")
-                        .font(.largeTitle)
-                        .foregroundStyle(.tertiary)
-                    Text("暂无观看历史")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(displayHistory.prefix(10)) { item in
-                            historyCard(item: item)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
+            // Filter type breakdown
+            VStack(spacing: 0) {
+                filterRow(icon: "exclamationmark.circle.fill", iconColor: .red,
+                          title: "标题党与惊悚引导词", count: store.settings.stats.byClickbait)
+                filterRow(icon: "clock.fill", iconColor: .orange,
+                          title: "视频时长限制屏蔽", count: store.settings.stats.byDuration)
+                filterRow(icon: "character.book.closed.fill", iconColor: .purple,
+                          title: "博主/标题含日文字符",
+                          count: store.settings.stats.byJapaneseTitle + store.settings.stats.byJapaneseUP)
+                filterRow(icon: "hand.raised.fill", iconColor: .green,
+                          title: "侮辱贬低词库拦截", count: store.settings.stats.byInsultWord)
             }
+            .background(Color.biliCard)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.biliBorder, lineWidth: 1)
+        )
+    }
+
+    private func filterRow(icon: String, iconColor: Color, title: String, count: Int) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundStyle(iconColor)
+                    .frame(width: 24)
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("\(count) 次")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+            }
+            .padding(.vertical, 12)
+            Divider().padding(.leading, 32)
         }
     }
 
-    private func historyCard(item: HistoryItem) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ZStack(alignment: .bottomTrailing) {
-                AsyncImage(url: URL(string: item.cover)) { phase in
-                    if let img = phase.image {
-                        img.resizable().aspectRatio(contentMode: .fill)
+    // MARK: - History sheet
+
+    private var historySheet: some View {
+        NavigationStack {
+            ZStack {
+                biliBackgroundGradient.ignoresSafeArea()
+                Group {
+                    if isLoadingHistory {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if displayHistory.isEmpty {
+                        ContentUnavailableView("暂无观看历史", systemImage: "clock")
                     } else {
-                        Rectangle().fill(Color.gray.opacity(0.2))
+                        List {
+                            ForEach(displayHistory) { item in
+                                Button {
+                                    playHistoryItem(item)
+                                    showingHistory = false
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        AsyncImage(url: URL(string: item.cover)) { phase in
+                                            if let img = phase.image {
+                                                img.resizable().aspectRatio(contentMode: .fill)
+                                            } else {
+                                                Rectangle().fill(Color.gray.opacity(0.2))
+                                            }
+                                        }
+                                        .frame(width: 80, height: 50)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(item.title)
+                                                .font(.subheadline)
+                                                .lineLimit(2)
+                                                .foregroundStyle(.primary)
+                                            Text(item.upName)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .scrollContentBackground(.hidden)
                     }
                 }
-                .frame(width: 120, height: 70)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            Text(item.title)
-                .font(.caption)
-                .lineLimit(2)
-                .frame(width: 120, alignment: .leading)
-            Text(item.progressText)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            playHistoryItem(item)
+            .navigationTitle("观看历史")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { showingHistory = false }
+                        .foregroundStyle(.biliBlue)
+                }
+            }
         }
     }
 
@@ -331,50 +453,37 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Quick actions
+    // MARK: - Filter config entry
 
-    private var quickActions: some View {
-        VStack(spacing: 0) {
-            actionRow(icon: "gearshape", title: "过滤与设置", color: .pink) {
-                showingSettings = true
-            }
-            Divider().padding(.leading, 52)
-            actionRow(icon: "clock.arrow.circlepath", title: "观看历史", color: .blue) {
-                // scroll to history or open full list
-            }
-            Divider().padding(.leading, 52)
-            actionRow(icon: "heart.fill", title: "我的收藏", color: .red) {}
-            Divider().padding(.leading, 52)
-            actionRow(icon: "info.circle", title: "关于", color: .gray) {
-                showingAbout = true
-            }
-            if store.currentUser != nil {
-                Divider().padding(.leading, 52)
-                actionRow(icon: "rectangle.portrait.and.arrow.right", title: "退出登录", color: .red) {
-                    showingLogoutAlert = true
-                }
-            }
-        }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func actionRow(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
+    private var filterConfigEntry: some View {
+        Button {
+            showingSettings = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "slider.horizontal.3")
                     .font(.title3)
-                    .foregroundStyle(color)
+                    .foregroundStyle(.biliBlue)
                     .frame(width: 28)
-                Text(title)
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("过滤与词库配置中心")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+                    Text("16档时长多选屏蔽、日文过滤、侮辱词库管理")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption)
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(16)
+            .background(Color.white.opacity(0.6))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.biliBorder, lineWidth: 1)
+            )
         }
     }
 }

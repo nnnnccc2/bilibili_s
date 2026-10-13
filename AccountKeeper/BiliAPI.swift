@@ -169,6 +169,47 @@ final class BiliAPI {
         return json
     }
 
+    /// POST request with URL-encoded form body (used for SMS login).
+    private func postRequest(_ urlString: String, form: [String: String], completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        guard let url = URL(string: urlString) else {
+            completion(nil, nil, NSError(domain: "BiliAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
+            return
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        for (k, v) in baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
+        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        if !cookieHeader.isEmpty {
+            req.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
+        }
+        let body = form.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }
+            .joined(separator: "&")
+        req.httpBody = body.data(using: .utf8)
+        session.dataTask(with: req) { data, response, error in
+            completion(data, response, error)
+        }.resume()
+    }
+
+    /// Extract login cookies from a login response (Set-Cookie headers + url field).
+    private func extractLoginCookies(from data: Data?, response: URLResponse?) {
+        if let httpResponse = response as? HTTPURLResponse, let url = httpResponse.url {
+            var fields: [String: String] = [:]
+            for (key, value) in httpResponse.allHeaderFields {
+                if let k = key as? String, let v = value as? String {
+                    fields[k] = v
+                }
+            }
+            for c in HTTPCookie.cookies(withResponseHeaderFields: fields, for: url) {
+                cookies[c.name] = c.value
+            }
+        }
+        if let json = parseJSON(data),
+           let d = json["data"] as? [String: Any],
+           let cookieUrl = d["url"] as? String, cookieUrl.contains("SESSDATA") {
+            extractCookies(from: cookieUrl)
+        }
+    }
+
     /// Normalize a cover URL to an https:// URL that iOS can load under ATS.
     private static func coverURL(_ raw: String) -> String {
         if raw.hasPrefix("https://") { return raw }
@@ -374,6 +415,60 @@ final class BiliAPI {
                 DispatchQueue.main.async { completion(.scanned) }
             default:
                 DispatchQueue.main.async { completion(.waiting) }
+            }
+        }
+    }
+
+    // MARK: - Login (SMS verification code)
+
+    /// Send an SMS verification code to the given phone number.
+    /// - Parameters:
+    ///   - phone: 11-digit Chinese mobile number
+    ///   - completion: success flag + optional message
+    func sendSMSCode(phone: String, completion: @escaping (Bool, String?) -> Void) {
+        let form: [String: String] = [
+            "tel": phone,
+            "cid": "86",
+            "source": "main_web",
+            "keep": "1"
+        ]
+        postRequest("https://passport.bilibili.com/x/passport-login/web/sms/send", form: form) { [weak self] data, _, _ in
+            guard let json = self?.parseJSON(data) else {
+                DispatchQueue.main.async { completion(false, "网络错误") }
+                return
+            }
+            let code = json["code"] as? Int ?? -1
+            let msg = json["message"] as? String ?? "发送失败"
+            if code == 0 {
+                DispatchQueue.main.async { completion(true, nil) }
+            } else {
+                DispatchQueue.main.async { completion(false, msg) }
+            }
+        }
+    }
+
+    /// Login with phone number + SMS verification code.
+    /// On success, cookies are extracted and stored; user info must be fetched separately.
+    func loginWithSMS(phone: String, code: String, completion: @escaping (Bool, String?) -> Void) {
+        let form: [String: String] = [
+            "tel": phone,
+            "cid": "86",
+            "code": code,
+            "source": "main_web",
+            "keep": "1"
+        ]
+        postRequest("https://passport.bilibili.com/x/passport-login/web/sms/login", form: form) { [weak self] data, response, _ in
+            guard let self = self, let json = self.parseJSON(data) else {
+                DispatchQueue.main.async { completion(false, "网络错误") }
+                return
+            }
+            let code = json["code"] as? Int ?? -1
+            let msg = json["message"] as? String ?? "登录失败"
+            if code == 0 {
+                self.extractLoginCookies(from: data, response: response)
+                DispatchQueue.main.async { completion(true, nil) }
+            } else {
+                DispatchQueue.main.async { completion(false, msg) }
             }
         }
     }

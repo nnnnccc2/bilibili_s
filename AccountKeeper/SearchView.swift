@@ -53,7 +53,7 @@ struct SearchView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(Color.pink)
+                            .background(Color.biliBlue)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                 }
@@ -72,8 +72,8 @@ struct SearchView: View {
                                     .font(.subheadline)
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 6)
-                                    .background(searchType == type ? Color.pink.opacity(0.15) : Color.clear)
-                                    .foregroundStyle(searchType == type ? Color.pink : .secondary)
+                                    .background(searchType == type ? Color.biliBlue.opacity(0.15) : Color.clear)
+                                    .foregroundStyle(searchType == type ? Color.biliBlue : .secondary)
                                     .clipShape(Capsule())
                             }
                         }
@@ -96,7 +96,7 @@ struct SearchView: View {
                                     .font(.caption)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 5)
-                                    .background(selectedDurationIndex == index ? Color.pink : Color(.secondarySystemBackground))
+                                    .background(selectedDurationIndex == index ? Color.biliBlue : Color(.secondarySystemBackground))
                                     .foregroundStyle(selectedDurationIndex == index ? .white : .primary)
                                     .clipShape(Capsule())
                             }

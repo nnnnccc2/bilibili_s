@@ -13,199 +13,388 @@ struct FilterSettingsView: View {
     @State private var newWord: String = ""
     @State private var showWordError: String? = nil
 
+    private var selectedDurationCount: Int {
+        store.settings.blockedDurationSeconds.count
+    }
+
     var body: some View {
         NavigationStack {
-            List {
-                // Purification dashboard
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "shield.lefthalf.filled")
-                                .font(.title2)
-                                .foregroundStyle(.green)
-                            Text("净化引擎")
-                                .font(.headline)
-                            Spacer()
-                            Text("运行中")
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.green.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
+            ZStack {
+                biliBackgroundGradient.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Purification dashboard
+                        dashboardCard
 
-                        HStack(spacing: 0) {
-                            statBlock(label: "累计净化", value: "\(store.settings.stats.totalBlocked)", color: .pink)
-                            Divider().frame(height: 36)
-                            statBlock(label: "标题党", value: "\(store.settings.stats.byClickbait)", color: .orange)
-                            Divider().frame(height: 36)
-                            statBlock(label: "日语标题", value: "\(store.settings.stats.byJapaneseTitle)", color: .blue)
-                            Divider().frame(height: 36)
-                            statBlock(label: "日语UP主", value: "\(store.settings.stats.byJapaneseUP)", color: .purple)
-                        }
+                        // Clickbait filter
+                        clickbaitCard
 
-                        HStack(spacing: 0) {
-                            statBlock(label: "时长过短", value: "\(store.settings.stats.byDuration)", color: .teal)
-                            Divider().frame(height: 36)
-                            statBlock(label: "侮辱词", value: "\(store.settings.stats.byInsultWord)", color: .red)
-                            Spacer()
+                        // Japanese filters
+                        japaneseCard
+
+                        // Duration filter (multi-select)
+                        durationCard
+
+                        // Insult word list
+                        insultWordCard
+
+                        // UI toggle
+                        uiCard
+
+                        // Reset
+                        Button(role: .destructive) {
+                            store.settings.stats = FilterStats()
+                        } label: {
+                            Label("重置净化统计数据", systemImage: "arrow.counterclockwise")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.white.opacity(0.6))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 24)
                     }
-                    .padding(.vertical, 4)
-                } header: {
-                    Text("净化统计看板")
+                    .padding(.vertical, 12)
                 }
-
-                // Title / clickbait filtering
-                Section {
-                    Toggle("自动过滤垃圾与引导式标题", isOn: $store.settings.enableClickbaitFilter)
-                    if store.settings.enableClickbaitFilter {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(FilterSettings.builtInClickbaitWords.prefix(12), id: \.self) { word in
-                                    Text(word)
-                                        .font(.caption2)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.orange.opacity(0.12))
-                                        .foregroundStyle(.orange)
-                                        .clipShape(Capsule())
-                                }
-                                Text("等 \(FilterSettings.builtInClickbaitWords.count) 个关键词")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
-                    Toggle("过滤日语标题视频", isOn: $store.settings.enableJapaneseTitleFilter)
-                } header: {
-                    Text("标题过滤")
-                } footer: {
-                    Text("命中疯了、炸了、屌爆了、！等夸张引导词，或含日文字符的标题视频将被自动拦截。")
-                }
-
-                // UP主 filtering
-                Section {
-                    Toggle("自动过滤博主名称含日语字的博主", isOn: $store.settings.enableJapaneseUPFilter)
-                } header: {
-                    Text("UP主过滤")
-                } footer: {
-                    Text("开启后，昵称包含日文字符的创作者发布的视频将全部拦截。")
-                }
-
-                // Duration filtering (global)
-                Section {
-                    NavigationLink {
-                        DurationPickerView(selection: $store.settings.durationThresholdSeconds)
+            }
+            .navigationTitle("垃圾过滤与设置中心")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
                     } label: {
-                        HStack {
-                            Text("根据视频时长屏蔽短视频")
-                            Spacer()
-                            Text(currentDurationLabel)
-                                .foregroundStyle(.secondary)
-                        }
+                        Image(systemName: "chevron.left")
+                            .foregroundStyle(.biliBlue)
                     }
-                } header: {
-                    Text("时长屏蔽")
-                } footer: {
-                    Text("视频总时长小于或等于所选档位时自动拦截隐藏。")
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                        .foregroundStyle(.biliBlue)
+                }
+            }
+        }
+    }
 
-                // Insult / derogatory word list
-                Section {
-                    Toggle("按词语屏蔽视频", isOn: $store.settings.enableInsultWordFilter)
-                    Toggle("内置侮辱、贬低词语清单", isOn: $store.settings.builtInWordsEnabled)
-                        .disabled(!store.settings.enableInsultWordFilter)
+    // MARK: - Dashboard
 
-                    if store.settings.builtInWordsEnabled {
-                        Text("内置 \(FilterSettings.builtInInsultWords.count) 个核心词")
-                            .font(.caption)
+    private var dashboardCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Image(systemName: "checkmark.shield.fill")
+                    .foregroundStyle(.biliBlue)
+                Text("净化引擎实时看板")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Spacer()
+                Button {
+                    // log detail (mock)
+                } label: {
+                    Text("拦截明细日志")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.biliBlue)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.biliBlue.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+            }
+
+            // Big number
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("累计拦截低质视频")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("\(store.settings.stats.totalBlocked)")
+                            .font(.system(size: 42, weight: .bold))
+                            .foregroundStyle(.biliBlue)
+                        Text("条")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
+                }
+                Spacer()
+                ZStack {
+                    Circle()
+                        .fill(Color.biliBlue.opacity(0.15))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: "sparkles")
+                        .font(.title)
+                        .foregroundStyle(.biliBlue)
+                }
+            }
+            .padding(16)
+            .background(Color.biliBlue.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
 
-                    // Add custom word
-                    HStack {
-                        TextField("添加自定义屏蔽词", text: $newWord)
-                            .onSubmit { addWord() }
-                        Button(action: addWord) {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(.pink)
+            // 4 stat cards grid
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                miniStat(label: "标题党/引导词", value: store.settings.stats.byClickbait, color: .red)
+                miniStat(label: "时长过滤拦截", value: store.settings.stats.byDuration, color: .orange)
+                miniStat(label: "日文字符UP主", value: store.settings.stats.byJapaneseUP + store.settings.stats.byJapaneseTitle, color: .purple)
+                miniStat(label: "侮辱贬低词库", value: store.settings.stats.byInsultWord, color: .green)
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    private func miniStat(label: String, value: Int, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(value)")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(color)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.biliCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Clickbait
+
+    private var clickbaitCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: $store.settings.enableClickbaitFilter) {
+                Label("自动过滤垃圾与引导式标题", systemImage: "exclamationmark.circle.fill")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("自动拦截包含\"疯了\"、\"炸了\"、\"屌爆了\"、\"！\"等标点或夸张煽动词的视频")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if store.settings.enableClickbaitFilter {
+                FlowLayout(spacing: 8) {
+                    ForEach(FilterSettings.builtInClickbaitWords, id: \.self) { word in
+                        Text(word)
+                            .font(.caption)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.pink.opacity(0.12))
+                            .foregroundStyle(.pink)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Japanese
+
+    private var japaneseCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: $store.settings.enableJapaneseUPFilter) {
+                Text("自动过滤博主名称含日语字")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+            Text("识别UP主昵称中的平假名/片假名字符并自动拦截其视频")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            Toggle(isOn: $store.settings.enableJapaneseTitleFilter) {
+                Text("过滤日语标题视频")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+            Text("自动过滤含有日文字符的视频标题")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Duration (multi-select)
+
+    private var durationCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("根据视频时长屏蔽短视频", systemImage: "clock.fill")
+                    .font(.headline)
+                Spacer()
+                Text("已选 \(selectedDurationCount) 档")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.biliBlue)
+            }
+
+            Text("勾选的档位表示屏蔽视频时长小于或等于该档位的视频（拦截无实质内容的碎片短视频）：")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(FilterSettings.durationBlockOptions, id: \.seconds) { opt in
+                    let selected = store.settings.blockedDurationSeconds.contains(opt.seconds)
+                    Button {
+                        if selected {
+                            store.settings.blockedDurationSeconds.remove(opt.seconds)
+                        } else {
+                            store.settings.blockedDurationSeconds.insert(opt.seconds)
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(selected ? .orange : .gray)
+                            Text(opt.label)
+                                .font(.subheadline)
+                                .foregroundStyle(selected ? .orange : .primary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(selected ? Color.orange.opacity(0.1) : Color(.systemGray5))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(selected ? Color.orange : Color.clear, lineWidth: 1.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Insult words
+
+    private var insultWordCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableInsultWordFilter) {
+                Label("侮辱、贬低词语屏蔽清单", systemImage: "exclamationmark.triangle.fill")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Toggle("内置侮辱、贬低词语清单", isOn: $store.settings.builtInWordsEnabled)
+                .disabled(!store.settings.enableInsultWordFilter)
+                .tint(.biliBlue)
+
+            Text("内置常见攻击、侮辱性词汇，包含标题或简介命中该词时直接屏蔽：")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            // Add custom word
+            HStack {
+                TextField("输入要屏蔽的侮辱/低质词语...", text: $newWord)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { addWord() }
+                Button(action: addWord) {
+                    Text("+ 添加")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.biliBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+
+            if store.settings.builtInWordsEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("内置核心词库 (\(FilterSettings.builtInInsultWords.count)个):")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 8) {
+                        ForEach(FilterSettings.builtInInsultWords, id: \.self) { word in
+                            Text(word)
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(.systemGray5))
+                                .foregroundStyle(.primary)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
+                }
+            }
 
-                    // Custom words list
-                    if !store.settings.customBlockedWords.isEmpty {
+            if !store.settings.customBlockedWords.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("自定义屏蔽词 (\(store.settings.customBlockedWords.count)个):")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 8) {
                         ForEach(store.settings.customBlockedWords, id: \.self) { word in
-                            HStack {
-                                Image(systemName: "hand.raised.fill")
-                                    .foregroundStyle(.red)
-                                    .font(.caption)
+                            HStack(spacing: 4) {
                                 Text(word)
-                                Spacer()
+                                    .font(.caption)
                                 Button {
                                     store.removeCustomWord(word)
                                 } label: {
-                                    Image(systemName: "trash")
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
                                         .foregroundStyle(.red)
                                 }
                             }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color(.systemGray5))
+                            .foregroundStyle(.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
-                } header: {
-                    Text("侮辱、贬低词语屏蔽清单")
-                } footer: {
-                    if let err = showWordError {
-                        Text(err).foregroundStyle(.red)
-                    }
-                }
-
-                // UI
-                Section {
-                    Toggle("显示已过滤提示条", isOn: $store.settings.showFilteredBanner)
-                } header: {
-                    Text("显示")
-                }
-
-                // Reset stats
-                Section {
-                    Button(role: .destructive) {
-                        store.settings.stats = FilterStats()
-                    } label: {
-                        Label("重置净化统计数据", systemImage: "arrow.counterclockwise")
-                    }
                 }
             }
-            .navigationTitle("过滤与设置")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
-                }
+
+            if let err = showWordError {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
     }
 
-    private var currentDurationLabel: String {
-        if let sec = store.settings.durationThresholdSeconds {
-            return FilterSettings.durationBlockOptions.first { $0.seconds == sec }?.label ?? "不限制"
-        }
-        return "不限制"
-    }
+    // MARK: - UI
 
-    private func statBlock(label: String, value: String, color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
-                .foregroundStyle(color)
-            Text(label)
-                .font(.caption2)
+    private var uiCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("显示已过滤提示条", isOn: $store.settings.showFilteredBanner)
+                .tint(.biliBlue)
+            Text("在首页顶部展示已净化视频条数与规则快捷入口")
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity)
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
     }
+
+    // MARK: - Helpers
 
     private func addWord() {
         let trimmed = newWord.trimmingCharacters(in: .whitespaces)
@@ -224,34 +413,6 @@ struct FilterSettingsView: View {
         showWordError = nil
         store.addCustomWord(trimmed)
         newWord = ""
-    }
-}
-
-// MARK: - Duration picker
-
-struct DurationPickerView: View {
-    @Binding var selection: Int?
-
-    var body: some View {
-        List {
-            ForEach(Array(FilterSettings.durationBlockOptions.enumerated()), id: \.offset) { _, opt in
-                Button {
-                    selection = opt.seconds
-                } label: {
-                    HStack {
-                        Text(opt.label)
-                        Spacer()
-                        if selection == opt.seconds {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.pink)
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                }
-            }
-        }
-        .navigationTitle("屏蔽时长档位")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

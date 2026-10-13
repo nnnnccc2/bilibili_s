@@ -24,59 +24,66 @@ struct FollowingView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Tabs
-                HStack(spacing: 24) {
-                    ForEach(FollowTab.allCases) { tab in
-                        Button {
-                            selectedTab = tab
-                        } label: {
-                            VStack(spacing: 4) {
-                                Text(tab.rawValue)
-                                    .font(.subheadline)
-                                    .fontWeight(selectedTab == tab ? .bold : .regular)
-                                    .foregroundStyle(selectedTab == tab ? Color.pink : .secondary)
-                                if selectedTab == tab {
-                                    Capsule().fill(Color.pink).frame(width: 18, height: 3)
-                                } else {
-                                    Capsule().fill(Color.clear).frame(width: 18, height: 3)
+            ZStack {
+                biliBackgroundGradient.ignoresSafeArea()
+                VStack(spacing: 0) {
+                    // Tabs
+                    HStack(spacing: 24) {
+                        ForEach(FollowTab.allCases) { tab in
+                            Button {
+                                selectedTab = tab
+                                load()
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Text(tab.rawValue)
+                                        .font(.subheadline)
+                                        .fontWeight(selectedTab == tab ? .bold : .regular)
+                                        .foregroundStyle(selectedTab == tab ? Color.biliBlue : .secondary)
+                                    if selectedTab == tab {
+                                        Capsule().fill(Color.biliBlue).frame(width: 18, height: 3)
+                                    } else {
+                                        Capsule().fill(Color.clear).frame(width: 18, height: 3)
+                                    }
                                 }
                             }
                         }
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
-
-                if store.settings.showFilteredBanner && store.lastBlockedCount > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "shield.lefthalf.filled").foregroundStyle(.green)
-                        Text("已净化 \(store.lastBlockedCount) 条低质内容")
-                            .font(.caption).foregroundStyle(.secondary)
                         Spacer()
                     }
-                    .padding(.horizontal).padding(.vertical, 6)
-                    .background(Color.green.opacity(0.08))
-                }
+                    .padding(.horizontal)
+                    .padding(.top, 8)
 
-                if isLoading {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if videos.isEmpty {
-                    ContentUnavailableView("暂无动态", systemImage: "heart",
-                        description: Text("关注的UP主还没有发布新内容"))
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            ForEach(videos) { video in
-                                VideoCardView(video: video)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { selectedVideo = video }
-                            }
+                    if store.settings.showFilteredBanner && store.lastBlockedCount > 0 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "shield.lefthalf.filled").foregroundStyle(.biliBlue)
+                            Text("已净化 \(store.lastBlockedCount) 条低质内容")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Spacer()
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.top, 8)
-                        .padding(.bottom, 20)
+                        .padding(.horizontal).padding(.vertical, 6)
+                        .background(Color.biliBlue.opacity(0.08))
+                    }
+
+                    if isLoading {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if videos.isEmpty {
+                        ContentUnavailableView("暂无动态", systemImage: "heart",
+                            description: Text("关注的UP主还没有发布新内容"))
+                    } else {
+                        ScrollView {
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(videos) { video in
+                                    VideoCardView(video: video)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture { selectedVideo = video }
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.top, 8)
+                            .padding(.bottom, 20)
+                        }
+                        .refreshable {
+                            await loadAsync()
+                        }
                     }
                 }
             }
@@ -92,7 +99,7 @@ struct FollowingView: View {
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.body)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.biliBlue)
                             .padding(8)
                             .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
                     }
@@ -112,6 +119,16 @@ struct FollowingView: View {
             DispatchQueue.main.async {
                 videos = filtered
                 isLoading = false
+            }
+        }
+    }
+
+    @Sendable
+    private func loadAsync() async {
+        await withCheckedContinuation { continuation in
+            load()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                continuation.resume()
             }
         }
     }
