@@ -19,7 +19,7 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
         // Called when user taps the key icon in a password field
         let serviceIdentifier = serviceIdentifiers.first?.identifier ?? ""
 
-        let view = CredentialProviderView(
+        let rootView = CredentialProviderView(
             serviceIdentifier: serviceIdentifier,
             accounts: sharedStore.loadAccounts(),
             onSelect: { [weak self] account in
@@ -37,11 +37,11 @@ class CredentialProviderViewController: ASCredentialProviderViewController {
             }
         )
 
-        let hostingController = UIHostingController(rootView: view)
+        let hostingController = UIHostingController(rootView: rootView)
         self.hostingController = hostingController
         addChild(hostingController)
-        view.addSubview(hostingController.view)
-        hostingController.view.frame = view.bounds
+        self.view.addSubview(hostingController.view)
+        hostingController.view.frame = self.view.bounds
         hostingController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         hostingController.didMove(toParent: self)
     }
