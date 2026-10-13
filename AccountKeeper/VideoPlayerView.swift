@@ -165,7 +165,7 @@ struct VideoPlayerView: View {
                 Text("\(video.viewsText) 播放")
                 Text(video.publishTime)
                 Text(video.id)
-                    .foregroundStyle(.biliBlue)
+                    .foregroundColor(.biliBlue)
                 Spacer()
             }
             .font(.caption)
@@ -222,7 +222,7 @@ struct VideoPlayerView: View {
                     } label: {
                         Text(showDescFull ? "收起简介" : "展开简介")
                             .font(.caption)
-                            .foregroundStyle(.biliBlue)
+                            .foregroundColor(.biliBlue)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -258,7 +258,7 @@ struct VideoPlayerView: View {
                 ForEach(["#魔术", "#奇迹", "#杂谈", "#娱乐"], id: \.self) { tag in
                     Text(tag)
                         .font(.caption)
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(Color.biliBlue.opacity(0.08))

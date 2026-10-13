@@ -54,7 +54,7 @@ struct FollowingView: View {
 
                     if store.settings.showFilteredBanner && store.lastBlockedCount > 0 {
                         HStack(spacing: 6) {
-                            Image(systemName: "shield.lefthalf.filled").foregroundStyle(.biliBlue)
+                            Image(systemName: "shield.lefthalf.filled").foregroundColor(.biliBlue)
                             Text("已净化 \(store.lastBlockedCount) 条低质内容")
                                 .font(.caption).foregroundStyle(.secondary)
                             Spacer()
@@ -99,7 +99,7 @@ struct FollowingView: View {
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.body)
-                            .foregroundStyle(.biliBlue)
+                            .foregroundColor(.biliBlue)
                             .padding(8)
                             .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
                     }

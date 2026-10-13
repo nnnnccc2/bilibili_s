@@ -65,12 +65,12 @@ struct FilterSettingsView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "chevron.left")
-                            .foregroundStyle(.biliBlue)
+                            .foregroundColor(.biliBlue)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                 }
             }
         }
@@ -82,7 +82,7 @@ struct FilterSettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Image(systemName: "checkmark.shield.fill")
-                    .foregroundStyle(.biliBlue)
+                    .foregroundColor(.biliBlue)
                 Text("净化引擎实时看板")
                     .font(.headline)
                     .fontWeight(.bold)
@@ -93,7 +93,7 @@ struct FilterSettingsView: View {
                     Text("拦截明细日志")
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Color.biliBlue.opacity(0.12))
@@ -110,7 +110,7 @@ struct FilterSettingsView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("\(store.settings.stats.totalBlocked)")
                             .font(.system(size: 42, weight: .bold))
-                            .foregroundStyle(.biliBlue)
+                            .foregroundColor(.biliBlue)
                         Text("条")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -123,7 +123,7 @@ struct FilterSettingsView: View {
                         .frame(width: 56, height: 56)
                     Image(systemName: "sparkles")
                         .font(.title)
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                 }
             }
             .padding(16)
@@ -237,7 +237,7 @@ struct FilterSettingsView: View {
                 Text("已选 \(selectedDurationCount) 档")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(.biliBlue)
+                    .foregroundColor(.biliBlue)
             }
 
             Text("勾选的档位表示屏蔽视频时长小于或等于该档位的视频（拦截无实质内容的碎片短视频）：")

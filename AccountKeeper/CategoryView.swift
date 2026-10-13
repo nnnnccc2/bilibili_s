@@ -74,7 +74,7 @@ struct CategoryView: View {
                             selectedPartition = nil
                         } label: {
                             Image(systemName: "chevron.left")
-                                .foregroundStyle(.biliBlue)
+                                .foregroundColor(.biliBlue)
                         }
                     }
                 }
@@ -88,7 +88,7 @@ struct CategoryView: View {
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.body)
-                            .foregroundStyle(.biliBlue)
+                            .foregroundColor(.biliBlue)
                             .padding(8)
                             .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
                     }

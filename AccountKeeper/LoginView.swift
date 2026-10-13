@@ -100,7 +100,7 @@ struct LoginView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                 }
             }
             .onAppear {
@@ -225,7 +225,7 @@ struct LoginView: View {
                     Text(countdown > 0 ? "\(countdown)s 后重发" : "获取验证码")
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundStyle(countdown > 0 || phone.count != 11 ? .secondary : .biliBlue)
+                        .foregroundColor(countdown > 0 || phone.count != 11 ? .secondary : .biliBlue)
                 }
                 .disabled(countdown > 0 || phone.count != 11 || isSendingCode)
             }
@@ -338,8 +338,7 @@ struct LoginView: View {
         guard phone.count == 11, smsCode.count == 6 else { return }
         smsError = nil
         isLoggingIn = true
-        BiliAPI.shared.loginWithSMS(phone: phone, code: smsCode) { [weak self] success, msg in
-            guard let self = self else { return }
+        BiliAPI.shared.loginWithSMS(phone: phone, code: smsCode) { success, msg in
             DispatchQueue.main.async {
                 self.isLoggingIn = false
                 if success {

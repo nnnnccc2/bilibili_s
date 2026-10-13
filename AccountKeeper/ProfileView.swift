@@ -68,7 +68,7 @@ struct ProfileView: View {
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.body)
-                            .foregroundStyle(.biliBlue)
+                            .foregroundColor(.biliBlue)
                             .padding(8)
                             .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
                     }
@@ -248,7 +248,7 @@ struct ProfileView: View {
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: "clock.arrow.circlepath")
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                     Text("观看历史")
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -293,7 +293,7 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Image(systemName: "shield.lefthalf.filled")
-                    .foregroundStyle(.biliBlue)
+                    .foregroundColor(.biliBlue)
                 Text("全站低质视频净化看板")
                     .font(.headline)
                     .fontWeight(.bold)
@@ -308,7 +308,7 @@ struct ProfileView: View {
                         Image(systemName: "chevron.right")
                             .font(.caption)
                     }
-                    .foregroundStyle(.biliBlue)
+                    .foregroundColor(.biliBlue)
                 }
             }
 
@@ -321,7 +321,7 @@ struct ProfileView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("\(totalBlocked)")
                             .font(.system(size: 42, weight: .bold))
-                            .foregroundStyle(.biliBlue)
+                            .foregroundColor(.biliBlue)
                         Text("条低质视频")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -334,7 +334,7 @@ struct ProfileView: View {
                         .frame(width: 56, height: 56)
                     Image(systemName: "shield.lefthalf.filled")
                         .font(.title)
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                 }
             }
             .padding(16)
@@ -437,7 +437,7 @@ struct ProfileView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") { showingHistory = false }
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                 }
             }
         }
@@ -462,7 +462,7 @@ struct ProfileView: View {
             HStack(spacing: 14) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.title3)
-                    .foregroundStyle(.biliBlue)
+                    .foregroundColor(.biliBlue)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("过滤与词库配置中心")
