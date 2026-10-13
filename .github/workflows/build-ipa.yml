@@ -11,6 +11,8 @@ jobs:
   build-ipa:
     name: Build BiliBili IPA
     runs-on: macos-14
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -98,6 +100,7 @@ jobs:
 
       - name: Publish IPA to GitHub Release
         if: github.ref == 'refs/heads/main'
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
@@ -122,6 +125,6 @@ jobs:
             ## 安装
             使用 Sideloadly 或 AltStore 配合 Apple ID 重签名后安装。
           files: BiliBili.ipa
-          overwrite: true
+          overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
