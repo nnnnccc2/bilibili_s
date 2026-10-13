@@ -69,19 +69,29 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :BuildCompileTime '$COMPILE_TIME'" "$INFO_PLIST"
           /usr/libexec/PlistBuddy -c "Print :BuildCompileTime" "$INFO_PLIST"
 
-      - name: Ad-hoc sign app and extension
+      - name: Ad-hoc sign app and extension with entitlements
         run: |
           APP_PATH="${{ steps.find_app.outputs.app_path }}"
-          # Sign the extension first, then the app
+          # Sign extension with its entitlements (App Group + AutoFill)
           for APPEX in "$APP_PATH/PlugIns"/*.appex; do
             if [ -d "$APPEX" ]; then
               echo "Signing extension: $APPEX"
-              codesign --force --sign - --entitlements /dev/null "$APPEX" 2>&1 || true
+              codesign --force --sign - \
+                --entitlements CredentialProvider/CredentialProvider.entitlements \
+                "$APPEX" 2>&1 || true
             fi
           done
+          # Sign main app with its entitlements (App Group)
           echo "Signing app: $APP_PATH"
-          codesign --force --sign - "$APP_PATH/AccountKeeper"
-          codesign -dv "$APP_PATH/AccountKeeper" 2>&1 || true
+          codesign --force --sign - \
+            --entitlements AccountKeeper/AccountKeeper.entitlements \
+            "$APP_PATH/AccountKeeper"
+          echo "=== Verify app entitlements ==="
+          codesign -d --entitlements - "$APP_PATH/AccountKeeper" 2>/dev/null | head -20
+          echo "=== Verify extension entitlements ==="
+          for APPEX in "$APP_PATH/PlugIns"/*.appex; do
+            codesign -d --entitlements - "$APPEX" 2>/dev/null | head -20
+          done
           echo "Signing complete"
 
       - name: Package into IPA
