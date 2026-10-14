@@ -32,7 +32,7 @@ struct HomeView: View {
                 contentBoard
             }
         }
-        .sheet(item: $selectedVideo) { video in
+        .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video)
                 .environmentObject(store)
         }

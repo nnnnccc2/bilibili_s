@@ -258,14 +258,15 @@ final class BiliAPI {
                 DispatchQueue.main.async { completion(videos) }
             }
         case .live:
-            // Live rooms
-            request("https://api.live.bilibili.com/xlive/web-interface/v1/second/getList?platform=web&parent_area_id=0&area_id=0&page=\(page)") { [weak self] data, _, _ in
+            // Live rooms (home page index returns recommend_room_list + room_list modules)
+            request("https://api.live.bilibili.com/xlive/web-interface/v1/index/getList?platform=web&parent_area_id=0") { [weak self] data, _, _ in
                 let videos = self?.parseLive(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
             }
         case .cinema:
-            let params: [String: String] = ["ps": "20", "pn": String(page), "type": "1"]
-            request("https://api.bilibili.com/pgc/web/rank/list?season_type=1", params: params) { [weak self] data, _, _ in
+            // PGC cinema rank list (movies & TV)
+            let params: [String: String] = ["season_type": "2", "day": "7"]
+            request("https://api.bilibili.com/pgc/season/rank/web/list", params: params) { [weak self] data, _, _ in
                 let videos = self?.parseCinema(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
             }
@@ -291,7 +292,8 @@ final class BiliAPI {
         let params: [String: String] = [
             "search_type": searchType,
             "keyword": keyword,
-            "page": String(page)
+            "page": String(page),
+            "ps": "50"
         ]
         request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: true) { [weak self] data, _, _ in
             let videos = self?.parseSearch(data, type: type) ?? []
@@ -403,15 +405,16 @@ final class BiliAPI {
 
     // MARK: - Live stream URL
 
-    /// Resolve a live room's playable stream URL (FLV, muxed audio+video).
+    /// Resolve a live room's playable stream URL (HLS m3u8, playable by AVPlayer).
     private func requestLivePlayURL(roomId: String, completion: @escaping (URL?) -> Void) {
         guard let rid = Int(roomId), rid > 0 else {
             DispatchQueue.main.async { completion(nil) }
             return
         }
+        // protocol=1 → http_hls (ts/fmp4 m3u8); AVPlayer cannot play FLV.
         let params: [String: String] = [
             "room_id": String(rid),
-            "protocol": "0",
+            "protocol": "1",
             "format": "0,1,2",
             "codec": "0,1",
             "qn": "10000",
@@ -1293,22 +1296,40 @@ private extension BiliAPI {
 
     func parseLive(_ data: Data?) -> [Video] {
         guard let json = parseJSON(data),
-              let d = json["data"] as? [String: Any],
-              let list = d["list"] as? [[String: Any]] else { return [] }
-        return list.compactMap { item in
-            guard let title = item["title"] as? String else { return nil }
+              let d = json["data"] as? [String: Any] else { return [] }
+
+        var rooms: [[String: Any]] = []
+
+        // 1. Recommend rooms (top of the live home page)
+        if let rrl = d["recommend_room_list"] as? [[String: Any]] {
+            rooms.append(contentsOf: rrl)
+        }
+
+        // 2. Modular room lists (area-based groupings)
+        if let modules = d["room_list"] as? [[String: Any]] {
+            for module in modules {
+                if let list = module["list"] as? [[String: Any]] {
+                    rooms.append(contentsOf: list)
+                }
+            }
+        }
+
+        return rooms.compactMap { item in
+            guard let title = item["title"] as? String,
+                  let roomid = item["roomid"] as? Int, roomid > 0 else { return nil }
             return Video(
-                id: "\(item["roomid"] as? Int ?? 0)",
+                id: "\(roomid)",
                 title: title,
-                cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
+                cover: BiliAPI.coverURL(item["cover"] as? String ?? item["face"] as? String ?? ""),
                 duration: 0,
                 upName: item["uname"] as? String ?? "",
+                upMid: item["uid"] as? Int ?? item["up_id"] as? Int ?? 0,
                 upAvatar: BiliAPI.coverURL(item["face"] as? String ?? ""),
                 views: item["online"] as? Int ?? 0,
                 danmaku: 0,
                 publishTime: "直播中",
                 category: "直播",
-                desc: "",
+                desc: item["area_v2_name"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0
             )
         }
@@ -1319,19 +1340,21 @@ private extension BiliAPI {
               let d = json["data"] as? [String: Any],
               let list = d["list"] as? [[String: Any]] else { return [] }
         return list.compactMap { item in
-            guard let title = item["title"] as? String else { return nil }
+            guard let title = item["title"] as? String,
+                  let sid = item["season_id"] as? Int, sid > 0 else { return nil }
+            let stat = item["stat"] as? [String: Any]
             return Video(
-                id: "\(item["season_id"] as? Int ?? 0)",
+                id: "\(sid)",
                 title: title,
-                cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
+                cover: BiliAPI.coverURL(item["cover"] as? String ?? item["ss_horizontal_cover"] as? String ?? ""),
                 duration: 0,
                 upName: "",
                 upAvatar: "",
-                views: (item["stat"] as? [String: Any])?["views"] as? Int ?? 0,
+                views: stat?["views"] as? Int ?? stat?["follow"] as? Int ?? 0,
                 danmaku: 0,
-                publishTime: "",
+                publishTime: item["new_ep"] as? String ?? "",
                 category: "影视",
-                desc: item["evaluate"] as? String ?? "",
+                desc: item["desc"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0
             )
         }

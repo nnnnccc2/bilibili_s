@@ -78,10 +78,10 @@ final class FilterEngine {
 
     // MARK: - Japanese character detection
 
-    /// Returns true if the string contains any Japanese kana or kanji
-    /// (Hiragana: U+3040–U+309F, Katakana: U+30A0–U+30FF,
-    ///  CJK Unified Ideographs that are also used in Japanese: U+4E00–U+9FFF,
-    ///  plus Japanese punctuation).
+    /// Returns true if the string contains Japanese-specific scripts.
+    /// IMPORTANT: Do NOT include CJK Unified Ideographs (U+4E00–U+9FFF) — they
+    /// are shared with Chinese and would falsely flag every Chinese video.
+    /// Only detects kana and Japanese-only punctuation/symbols.
     private func containsJapanese(_ text: String) -> Bool {
         for scalar in text.unicodeScalars {
             let v = scalar.value
@@ -91,16 +91,17 @@ final class FilterEngine {
             if v >= 0x30A0 && v <= 0x30FF { return true }
             // Katakana Phonetic Extensions
             if v >= 0x31F0 && v <= 0x31FF { return true }
-            // CJK Radicals Supplement & Kangxi Radicals
-            if v >= 0x2E80 && v <= 0x2FDF { return true }
             // Hiragana/Katakana small letter ranges
             if v >= 0x1B000 && v <= 0x1B12F { return true }
             // Kana Supplement
             if v >= 0x1B130 && v <= 0x1B16F { return true }
             // Small Kana Extension
             if v >= 0x1B170 && v <= 0x1B2FF { return true }
-            // Japanese-specific punctuation (e.g. 「」『』、。)
-            if v >= 0x3000 && v <= 0x303F { return true }
+            // Enclosed Ideographic Supplement (contains 🈁 etc., Japanese-specific)
+            if v >= 0x1F200 && v <= 0x1F2FF { return true }
+            // Japanese-specific punctuation (「」『』、。 etc.) — U+3000–U+303F
+            // Exclude ideographic space (U+3000) itself but keep the rest
+            if v > 0x3000 && v <= 0x303F { return true }
         }
         return false
     }

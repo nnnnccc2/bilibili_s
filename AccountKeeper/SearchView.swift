@@ -222,7 +222,7 @@ struct SearchView: View {
                     Button("取消") { dismiss() }
                 }
             }
-            .sheet(item: $selectedVideo) { video in
+            .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video)
                     .environmentObject(store)
             }

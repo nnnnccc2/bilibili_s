@@ -33,44 +33,83 @@ struct VideoPlayerView: View {
     @State private var upFans: Int = 0
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Player
-                    playerSection
-                        .frame(height: 220)
+        ZStack(alignment: .top) {
+            // Dark background so letterbox areas are black, not white
+            Color.black.ignoresSafeArea()
 
-                    // Tabs: 简介 / 评论
-                    HStack(spacing: 24) {
-                        tabButton(title: "简介", index: 0)
-                        tabButton(title: "评论 \(comments.count)", index: 1)
+            if showFullScreen {
+                // True full-screen: only the player, edge-to-edge
+                if let p = player {
+                    VideoPlayer(player: p)
+                        .ignoresSafeArea()
+                        .onAppear { p.play() }
+                } else {
+                    Color.black.ignoresSafeArea()
+                }
+                // Top controls overlay
+                VStack {
+                    HStack {
+                        Button { showFullScreen = false } label: {
+                            Image(systemName: "xmark")
+                                .font(.title2)
+                                .foregroundStyle(.white)
+                                .padding(12)
+                        }
                         Spacer()
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 12)
+                    .padding(.top, 4)
+                    Spacer()
+                }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Player (16:9, edge-to-edge, no white bar above)
+                        playerSection
+                            .aspectRatio(16.0/9.0, contentMode: .fit)
+                            .frame(maxWidth: .infinity)
 
-                    if selectedTab == 0 {
-                        introSection
-                    } else {
-                        commentsSection
+                        // Tabs: 简介 / 评论
+                        HStack(spacing: 24) {
+                            tabButton(title: "简介", index: 0)
+                            tabButton(title: "评论 \(comments.count)", index: 1)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 12)
+
+                        if selectedTab == 0 {
+                            introSection
+                        } else {
+                            commentsSection
+                        }
                     }
                 }
-            }
-            .background(biliBackgroundGradient.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                .background(Color.biliBackground)
+                .scrollIndicators(.hidden)
+                .ignoresSafeArea(edges: .top)
+
+                // Top controls overlaid on the player
+                HStack {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Color.black.opacity(0.35))
+                            .clipShape(Circle())
                     }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showFullScreen.toggle() } label: {
+                    Spacer()
+                    Button { showFullScreen = true } label: {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Color.black.opacity(0.35))
+                            .clipShape(Circle())
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
             }
         }
         .onAppear {
@@ -85,11 +124,6 @@ struct VideoPlayerView: View {
                 BiliAPI.shared.checkRelation(mid: video.upMid) { following in
                     DispatchQueue.main.async { isFollowing = following }
                 }
-            }
-        }
-        .fullScreenCover(isPresented: $showFullScreen) {
-            if let player = player {
-                FullScreenPlayer(player: player)
             }
         }
         .sheet(isPresented: $showingUPSpace) {
@@ -114,6 +148,7 @@ struct VideoPlayerView: View {
                     }
             }
         }
+        .statusBarHidden(showFullScreen)
     }
 
     // MARK: - Tabs

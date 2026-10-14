@@ -47,7 +47,7 @@ struct FavoritesListView: View {
                     Button("完成") { dismiss() }.foregroundColor(.biliBlue)
                 }
             }
-            .sheet(item: $selectedVideo) { video in
+            .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video).environmentObject(store)
             }
             .onAppear { loadFolders() }

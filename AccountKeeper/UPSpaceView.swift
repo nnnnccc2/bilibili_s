@@ -48,7 +48,7 @@ struct UPSpaceView: View {
                         .lineLimit(1)
                 }
             }
-            .sheet(item: $selectedVideo) { video in
+            .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video).environmentObject(store)
             }
             .onAppear {

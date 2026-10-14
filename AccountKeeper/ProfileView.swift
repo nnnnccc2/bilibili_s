@@ -82,7 +82,7 @@ struct ProfileView: View {
             .sheet(isPresented: $showingSettings) {
                 FilterSettingsView().environmentObject(store)
             }
-            .sheet(item: $selectedVideo) { video in
+            .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video).environmentObject(store)
             }
             .alert("退出登录", isPresented: $showingLogoutAlert) {

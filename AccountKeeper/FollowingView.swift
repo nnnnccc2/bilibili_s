@@ -114,7 +114,7 @@ struct FollowingView: View {
                     }
                 }
             }
-            .sheet(item: $selectedVideo) { video in
+            .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video).environmentObject(store)
             }
             .sheet(isPresented: $showingUPSpace) {
