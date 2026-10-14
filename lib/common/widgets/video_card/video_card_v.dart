@@ -190,20 +190,8 @@ class VideoCardV extends StatelessWidget {
           // Row 1: uploader avatar + name
           Row(
             children: [
-              if (videoItem.owner.face != null &&
-                  videoItem.owner.face!.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(7),
-                  child: Image.network(
-                    videoItem.owner.face!,
-                    width: 14,
-                    height: 14,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                )
-              else
-                Icon(Icons.person, size: 14, color: theme.colorScheme.outline),
+              Icon(Icons.account_circle_outlined,
+                  size: 14, color: theme.colorScheme.outline),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
