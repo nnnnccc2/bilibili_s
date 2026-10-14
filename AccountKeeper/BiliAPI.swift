@@ -84,6 +84,10 @@ final class BiliAPI {
         config.httpCookieStorage = nil
         self.session = URLSession(configuration: config)
         loadCookies()
+        // Set a locally-generated buvid3 IMMEDIATELY so the first API call
+        // (popular/live/cinema/search return -352 风控 without it) always has one.
+        // The real one from finger/spi overwrites it once fetched.
+        visitorCookies["buvid3"] = Self.generateBuvid3()
         fetchBuvid3()
     }
 
@@ -95,20 +99,50 @@ final class BiliAPI {
         return all.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
     }
 
-    /// Fetch buvid3/buvid4 visitor IDs required by anti-bot checks (e.g. search API).
-    private func fetchBuvid3() {
+    /// Generate a synthetic buvid3 in Bilibili's format:
+    ///   XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX{unix_ts}infoc
+    /// Used as an immediate fallback so the first request isn't blocked by -352.
+    private static func generateBuvid3() -> String {
+        let hex = "0123456789ABCDEF"
+        func rand(_ n: Int) -> String {
+            String((0..<n).map { _ in hex.randomElement()! })
+        }
+        let uuid = "\(rand(8))-\(rand(4))-\(rand(4))-\(rand(4))-\(rand(12))"
+        let ts = String(Int(Date().timeIntervalSince1970))
+        return "\(uuid)\(ts)infoc"
+    }
+
+    /// Fetch buvid3/buvid4 visitor IDs required by anti-bot checks.
+    /// Retries up to 3 times on failure.
+    private func fetchBuvid3(retry: Int = 3) {
         guard let url = URL(string: "https://api.bilibili.com/x/frontend/finger/spi") else { return }
         var req = URLRequest(url: url)
         for (k, v) in baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
-        session.dataTask(with: req) { [weak self] data, _, _ in
+        session.dataTask(with: req) { [weak self] data, _, error in
+            guard let self = self else { return }
+            if error != nil {
+                if retry > 0 {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                        self.fetchBuvid3(retry: retry - 1)
+                    }
+                }
+                return
+            }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let d = json["data"] as? [String: Any] else { return }
-            if let b3 = d["b_3"] as? String {
-                self?.visitorCookies["buvid3"] = b3
+                  let d = json["data"] as? [String: Any] else {
+                if retry > 0 {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                        self.fetchBuvid3(retry: retry - 1)
+                    }
+                }
+                return
             }
-            if let b4 = d["b_4"] as? String {
-                self?.visitorCookies["buvid4"] = b4
+            let b3 = d["b_3"] as? String
+            let b4 = d["b_4"] as? String
+            DispatchQueue.main.async {
+                if let b3 = b3, !b3.isEmpty { self.visitorCookies["buvid3"] = b3 }
+                if let b4 = b4, !b4.isEmpty { self.visitorCookies["buvid4"] = b4 }
             }
         }.resume()
     }

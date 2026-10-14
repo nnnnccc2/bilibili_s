@@ -62,6 +62,10 @@ final class WBISigner {
     // MARK: - Key fetching
 
     private func fetchKeys(completion: @escaping (Bool) -> Void) {
+        fetchKeys(retry: 3, completion: completion)
+    }
+
+    private func fetchKeys(retry: Int, completion: @escaping (Bool) -> Void) {
         guard let url = URL(string: "https://api.bilibili.com/x/web-interface/nav") else {
             completion(false)
             return
@@ -69,22 +73,39 @@ final class WBISigner {
         var req = URLRequest(url: url)
         req.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
         req.setValue("https://www.bilibili.com/", forHTTPHeaderField: "Referer")
-        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, error in
+            guard let self = self else { return }
+            if error != nil {
+                if retry > 0 {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                        self.fetchKeys(retry: retry - 1, completion: completion)
+                    }
+                } else {
+                    completion(false)
+                }
+                return
+            }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let dataDict = json["data"] as? [String: Any],
                   let wbi = dataDict["wbi_img"] as? [String: Any],
                   let imgUrl = wbi["img_url"] as? String,
                   let subUrl = wbi["sub_url"] as? String else {
-                completion(false)
+                if retry > 0 {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                        self.fetchKeys(retry: retry - 1, completion: completion)
+                    }
+                } else {
+                    completion(false)
+                }
                 return
             }
             let img = WBISigner.extractKey(from: imgUrl)
             let sub = WBISigner.extractKey(from: subUrl)
             DispatchQueue.main.async {
-                self?.imgKey = img
-                self?.subKey = sub
-                self?.mixinKey = self?.genMixinKey(img + sub) ?? ""
+                self.imgKey = img
+                self.subKey = sub
+                self.mixinKey = self.genMixinKey(img + sub)
                 completion(true)
             }
         }.resume()

@@ -261,17 +261,29 @@ struct SearchView: View {
         } else {
             selectedDurationIndex = 0
         }
-        BiliAPI.shared.search(keyword: keyword, type: searchType, page: page) { raw in
-            let filtered = store.applySearchFilter(raw)
-            DispatchQueue.main.async {
-                results = filtered
-                isLoading = false
-                if filtered.isEmpty {
-                    hasMore = false
-                } else {
-                    page += 1
-                }
+        // Fetch 2 pages in parallel for more results (Bilibili caps at 20/page)
+        var page1: [Video] = []
+        var page2: [Video] = []
+        let group = DispatchGroup()
+        group.enter()
+        BiliAPI.shared.search(keyword: keyword, type: searchType, page: 1) { raw in
+            page1 = store.applySearchFilter(raw)
+            group.leave()
+        }
+        group.enter()
+        BiliAPI.shared.search(keyword: keyword, type: searchType, page: 2) { raw in
+            page2 = store.applySearchFilter(raw)
+            group.leave()
+        }
+        group.notify(queue: .main) {
+            var combined = page1
+            for v in page2 where !combined.contains(where: { $0.id == v.id }) {
+                combined.append(v)
             }
+            results = combined
+            isLoading = false
+            page = 3
+            hasMore = !combined.isEmpty
         }
     }
 
