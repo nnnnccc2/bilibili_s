@@ -1,0 +1,34 @@
+name: MiniBiliWeb
+options:
+  bundleIdPrefix: com.minibili
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: false
+targets:
+  MiniBiliWeb:
+    type: application
+    platform: iOS
+    sources:
+      - path: MiniBiliWeb
+    info:
+      path: MiniBiliWeb/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.minibili.web
+        INFOPLIST_FILE: MiniBiliWeb/Info.plist
+schemes:
+  MiniBiliWeb:
+    build:
+      targets:
+        MiniBiliWeb: all
+    run:
+      config: Debug
+    archive:
+      config: Release
