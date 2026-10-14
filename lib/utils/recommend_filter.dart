@@ -1,4 +1,5 @@
 import 'package:PiliPlus/models/model_video.dart';
+import 'package:PiliPlus/utils/purification.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 
 abstract final class RecommendFilter {
@@ -45,8 +46,21 @@ abstract final class RecommendFilter {
 
   /// related/[filterWithExempt]
   static bool filterAll(BaseVideoItemModel videoItem) {
-    return filterDuration(videoItem.duration) ||
+    if (filterDuration(videoItem.duration) ||
         filterLikeRatio(videoItem.stat.like, videoItem.stat.view) ||
-        filterTitle(videoItem.title);
+        filterTitle(videoItem.title)) {
+      return true;
+    }
+    // 内容净化引擎（标题党/侮辱词库/日文/时长档位）
+    final hit = Purification.evaluate(
+      title: videoItem.title,
+      upName: videoItem.owner.name,
+      duration: videoItem.duration,
+    );
+    if (hit != null) {
+      Purification.record(hit, title: videoItem.title);
+      return true;
+    }
+    return false;
   }
 }

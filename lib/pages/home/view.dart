@@ -1,14 +1,17 @@
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/custom_height_widget.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
+import 'package:PiliPlus/common/widgets/pure/pure.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart' show tabBarView;
 import 'package:PiliPlus/pages/common/common_page.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
+import 'package:PiliPlus/pages/purification/view.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/purification.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:material_ui/material_ui.dart';
@@ -41,86 +44,140 @@ class _HomePageState extends CommonPageState<HomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final tabs = _homeController.tabs;
     Widget tabBar;
-    if (_homeController.tabs.length > 1) {
-      tabBar = Padding(
-        padding: const EdgeInsets.only(top: 4, left: 14, right: 14),
-        child: Container(
-          height: 42,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.8),
+    if (tabs.length > 1) {
+      tabBar = Container(
+        height: 42,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+        ),
+        child: TabBar(
+          controller: _homeController.tabController,
+          tabs: tabs.map((e) => Tab(text: e.label)).toList(),
+          isScrollable: true,
+          dividerColor: Colors.transparent,
+          dividerHeight: 0,
+          splashBorderRadius: Style.mdRadius,
+          tabAlignment: TabAlignment.center,
+          labelColor: Colors.white,
+          unselectedLabelColor: PureColors.tabGray,
+          labelStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+          indicator: BoxDecoration(
+            color: PureColors.brand,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.5),
+          ),
+          indicatorSize: TabBarIndicatorSize.label,
+          indicatorPadding: const EdgeInsets.symmetric(horizontal: 2),
+          onTap: (_) {
+            feedBack();
+            if (!_homeController.tabController.indexIsChanging) {
+              _homeController.animateToTop();
+            }
+          },
+        ),
+      );
+    } else {
+      tabBar = const SizedBox.shrink();
+    }
+
+    final isPortrait = MediaQuery.sizeOf(context).isPortrait;
+    return ColoredBox(
+      color: PureColors.heroBg,
+      child: Column(
+        children: [
+          if (!_mainController.useSideBar && isPortrait) customAppBar(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+            child: Row(
+              children: [
+                if (tabs.length > 1)
+                  Flexible(child: tabBar)
+                else
+                  const Spacer(),
+                const SizedBox(width: 8),
+                const PureDirectChip(),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 2,
-                offset: const Offset(0, 1),
+          ),
+          Expanded(
+            child: PureBoard(
+              child: Column(
+                children: [
+                  _filterTipBar(),
+                  Expanded(
+                    child: onBuild(
+                      tabBarView(
+                        controller: _homeController.tabController,
+                        children: tabs.map((e) => e.page).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 净化提示条：显示本次已净化条数与规则入口
+  Widget _filterTipBar() {
+    return Obx(() {
+      if (!Purification.enableFilterTipBar) {
+        return const SizedBox.shrink();
+      }
+      final count = Purification.sessionCount.value;
+      if (count <= 0) {
+        return const SizedBox.shrink();
+      }
+      return GestureDetector(
+        onTap: () => Get.to(() => const PurificationSettingPage()),
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: PureColors.brand.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.verified_user_outlined,
+                size: 16,
+                color: PureColors.brand,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '本次已净化 $count 条低质视频，点击查看过滤规则',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: PureColors.brand,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: PureColors.brand,
               ),
             ],
           ),
-          child: TabBar(
-            controller: _homeController.tabController,
-            tabs: _homeController.tabs.map((e) => Tab(text: e.label)).toList(),
-            isScrollable: true,
-            dividerColor: Colors.transparent,
-            dividerHeight: 0,
-            splashBorderRadius: Style.mdRadius,
-            tabAlignment: TabAlignment.center,
-            labelColor: Colors.white,
-            unselectedLabelColor: _colorScheme.onSurfaceVariant,
-            labelStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-            unselectedLabelStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-            indicator: BoxDecoration(
-              color: _colorScheme.primary,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            indicatorSize: TabBarIndicatorSize.label,
-            indicatorPadding: const EdgeInsets.symmetric(horizontal: 2),
-            onTap: (_) {
-              feedBack();
-              if (!_homeController.tabController.indexIsChanging) {
-                _homeController.animateToTop();
-              }
-            },
-          ),
         ),
       );
-      if (_homeController.hideTopBar &&
-          _mainController.barHideType == .instant) {
-        tabBar = Material(
-          color: _colorScheme.surface,
-          child: tabBar,
-        );
-      }
-    } else {
-      tabBar = const SizedBox(height: 6);
-    }
-    return Column(
-      children: [
-        if (!_mainController.useSideBar &&
-            MediaQuery.sizeOf(context).isPortrait)
-          customAppBar(),
-        tabBar,
-        Expanded(
-          child: onBuild(
-            tabBarView(
-              controller: _homeController.tabController,
-              children: _homeController.tabs.map((e) => e.page).toList(),
-            ),
-          ),
-        ),
-      ],
-    );
+    });
   }
 
   Widget customAppBar() {
@@ -181,7 +238,7 @@ class _HomePageState extends CommonPageState<HomePage>
         height: 44,
         child: Material(
           borderRadius: borderRadius,
-          color: _colorScheme.onSecondaryContainer.withValues(alpha: 0.05),
+          color: Colors.white.withValues(alpha: 0.75),
           child: InkWell(
             borderRadius: borderRadius,
             splashColor: _colorScheme.primaryContainer.withValues(
@@ -196,9 +253,9 @@ class _HomePageState extends CommonPageState<HomePage>
             child: Row(
               children: [
                 const SizedBox(width: 14),
-                Icon(
+                const Icon(
                   Icons.search_outlined,
-                  color: _colorScheme.onSecondaryContainer,
+                  color: PureColors.subText,
                   semanticLabel: '搜索',
                 ),
                 const SizedBox(width: 10),
@@ -208,7 +265,7 @@ class _HomePageState extends CommonPageState<HomePage>
                       _homeController.defaultSearch.value,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: _colorScheme.outline),
+                      style: const TextStyle(color: PureColors.subText),
                     ),
                   ),
                 ),

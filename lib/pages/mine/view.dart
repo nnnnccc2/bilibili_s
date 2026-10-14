@@ -6,6 +6,7 @@ import 'package:PiliPlus/common/widgets/flutter/list_tile.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/player_bar.dart';
+import 'package:PiliPlus/common/widgets/pure/pure.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/mine_tab_type.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
@@ -18,11 +19,13 @@ import 'package:PiliPlus/pages/mine/widgets/fav_item.dart';
 import 'package:PiliPlus/pages/mine/widgets/history_item.dart';
 import 'package:PiliPlus/pages/mine/widgets/later_item.dart';
 import 'package:PiliPlus/pages/mine/widgets/sub_item.dart';
+import 'package:PiliPlus/pages/purification/view.dart';
 import 'package:PiliPlus/utils/bili_utils.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
+import 'package:PiliPlus/utils/purification.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
@@ -95,6 +98,7 @@ class _MediaPageState extends CommonPageState<MinePage>
                   children: [
                     _buildUserInfo(theme, secondary),
                     _buildActions(secondary),
+                    _buildPurifyBoard(),
                     for (final tab in controller.mineTabs)
                       switch (tab) {
                         .favorite => Obx(_buildFav),
@@ -143,6 +147,180 @@ class _MediaPageState extends CommonPageState<MinePage>
             ),
           )
           .toList(),
+    );
+  }
+
+  /// 全站低质视频净化看板入口（对齐参考 demo）
+  Widget _buildPurifyBoard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
+      child: Obx(
+        () {
+          // 依赖 sessionCount，在被拦截时自动刷新看板
+          Purification.sessionCount.value;
+          final stats = Purification.stats;
+          return PureGlassCard(
+            padding: const EdgeInsets.all(16),
+            onTap: () => Get.to(() => const PurificationSettingPage()),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.verified_user_outlined,
+                      size: 16,
+                      color: PureColors.brand,
+                    ),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '全站低质视频净化看板',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: PureColors.brand,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '管理过滤规则',
+                      style: TextStyle(fontSize: 12, color: PureColors.subText),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 16,
+                      color: PureColors.subText,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [PureColors.brand, Color(0xFF38BDF8)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '全站累计净化屏蔽',
+                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '${Purification.totalCount}',
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            '条低质视频',
+                            style: TextStyle(fontSize: 12, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: PureStatTile(
+                        icon: Icons.campaign_outlined,
+                        iconColor: PureColors.roseText,
+                        value: stats[PurifyCat.clickbait] ?? 0,
+                        label: '标题党与惊悚\n引导词',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: PureStatTile(
+                        icon: Icons.timelapse_outlined,
+                        iconColor: const Color(0xFFF59E0B),
+                        value: stats[PurifyCat.duration] ?? 0,
+                        label: '视频时长\n限制屏蔽',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: PureStatTile(
+                        icon: Icons.translate_outlined,
+                        iconColor: PureColors.brand,
+                        value: Purification.japaneseCount,
+                        label: '博主/标题\n含日文字符',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: PureStatTile(
+                        icon: Icons.gavel_outlined,
+                        iconColor: const Color(0xFF10B981),
+                        value: stats[PurifyCat.insult] ?? 0,
+                        label: '侮辱贬低\n词库拦截',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [PureColors.brand, Color(0xFF38BDF8)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '过滤与词库配置中心',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              '16档时长多选屏蔽、日文过滤、侮辱词库管理',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
