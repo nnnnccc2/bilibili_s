@@ -39,12 +39,18 @@ class SliverHotKeyword extends StatelessWidget {
             .map(
               (i) => Material(
                 type: .transparency,
-                borderRadius: const .all(.circular(3)),
+                borderRadius: const .all(.circular(999)),
                 child: InkWell(
-                  borderRadius: const .all(.circular(3)),
+                  borderRadius: const .all(.circular(999)),
                   onTap: () => onClick?.call(i.keyword),
-                  child: Padding(
-                    padding: const .only(left: 2, right: 10),
+                  child: Container(
+                    margin: const .only(left: 2, right: 10, top: 3, bottom: 3),
+                    padding: const .fromLTRB(10, 4, 10, 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
                     child: Tooltip(
                       message: i.showName,
                       child: Row(

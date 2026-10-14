@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/pure/pure.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart' show tabBarView;
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
@@ -165,46 +166,115 @@ class _DynamicsPageState extends CommonPageState<DynamicsPage>
         actions = const EndDrawerButton();
     }
 
-    return Scaffold(
-      primary: false,
-      resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.transparent,
-      appBar: PreferredSize(
-        preferredSize: const .fromHeight(50),
-        child: Row(
-          children: [
-            ?leading,
-            Expanded(
-              child: TabBar(
-                dividerHeight: 0,
-                isScrollable: true,
-                tabAlignment: .start,
-                dividerColor: Colors.transparent,
-                labelColor: colorScheme.primary,
-                indicatorColor: colorScheme.primary,
-                controller: _dynamicsController.tabController,
-                unselectedLabelColor: colorScheme.onSurface,
-                labelStyle:
-                    TabBarTheme.of(context).labelStyle
-                        ?.copyWith(fontSize: 13) ??
-                    const TextStyle(fontSize: 13),
-                tabs: DynamicsTabType.values
-                    .map((e) => Tab(text: e.label))
-                    .toList(),
-                onTap: (index) {
-                  if (!_dynamicsController.tabController.indexIsChanging) {
-                    _dynamicsController.animateToTop();
-                  }
-                },
+    return ColoredBox(
+      color: PureColors.heroBg,
+      child: Scaffold(
+        primary: false,
+        resizeToAvoidBottomInset: false,
+        backgroundColor: Colors.transparent,
+        appBar: PreferredSize(
+          preferredSize: const .fromHeight(116),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 10, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '关注',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: PureColors.titleText,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            '已关注 UP 的动态 · 实时净化过滤',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: PureColors.subText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PureDirectChip(),
+                  ],
+                ),
               ),
-            ),
-            actions,
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: Row(
+                  children: [
+                    ?leading,
+                    Expanded(
+                      child: Container(
+                        height: 42,
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: TabBar(
+                          dividerHeight: 0,
+                          isScrollable: true,
+                          tabAlignment: .center,
+                          dividerColor: Colors.transparent,
+                          splashBorderRadius: const BorderRadius.all(
+                            Radius.circular(999),
+                          ),
+                          controller: _dynamicsController.tabController,
+                          labelColor: Colors.white,
+                          unselectedLabelColor: PureColors.tabGray,
+                          labelStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          unselectedLabelStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          indicator: BoxDecoration(
+                            color: PureColors.brand,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          indicatorSize: TabBarIndicatorSize.label,
+                          indicatorPadding: const EdgeInsets.symmetric(
+                            horizontal: 2,
+                          ),
+                          tabs: DynamicsTabType.values
+                              .map((e) => Tab(text: e.label))
+                              .toList(),
+                          onTap: (index) {
+                            if (!_dynamicsController
+                                .tabController
+                                .indexIsChanging) {
+                              _dynamicsController.animateToTop();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    actions,
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
+        drawer: drawer,
+        endDrawer: endDrawer,
+        body: PureBoard(child: onBuild(child)),
       ),
-      drawer: drawer,
-      endDrawer: endDrawer,
-      body: onBuild(child),
     );
   }
 }
