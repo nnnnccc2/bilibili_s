@@ -2,7 +2,8 @@
 //  HomeView.swift
 //  BiliBili
 //
-//  Home page with category tabs and filtered video feed
+//  Home page with pill category tabs and filtered video feed
+//  (matches the reference design: hero backdrop, translucent content board)
 //
 
 import SwiftUI
@@ -23,140 +24,22 @@ struct HomeView: View {
     @State private var showingUPSpace = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                biliBackgroundGradient.ignoresSafeArea()
+        ZStack(alignment: .top) {
+            Color.biliHero.ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    // Top category tabs
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 20) {
-                            ForEach(HomeCategory.allCases) { cat in
-                                Button {
-                                    category = cat
-                                    page = 1
-                                    hasMore = true
-                                    loadVideos(force: true)
-                                } label: {
-                                    VStack(spacing: 4) {
-                                        Text(cat.rawValue)
-                                            .font(.subheadline)
-                                            .fontWeight(category == cat ? .bold : .regular)
-                                            .foregroundStyle(category == cat ? Color.biliBlue : .secondary)
-                                        if category == cat {
-                                            Capsule()
-                                                .fill(Color.biliBlue)
-                                                .frame(width: 20, height: 3)
-                                        } else {
-                                            Capsule()
-                                                .fill(Color.clear)
-                                                .frame(width: 20, height: 3)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                    }
-
-                    // Filtered banner
-                    if store.settings.showFilteredBanner && store.lastBlockedCount > 0 {
-                        HStack(spacing: 6) {
-                            Image(systemName: "shield.lefthalf.filled")
-                                .foregroundColor(.biliBlue)
-                            Text("已为你净化 \(store.lastBlockedCount) 条低质内容")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button {
-                                store.lastBlockedCount = 0
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 6)
-                        .background(Color.biliBlue.opacity(0.08))
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-
-                    // Video grid
-                    if isLoading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if videos.isEmpty {
-                        ContentUnavailableView(
-                            "暂无内容",
-                            systemImage: "tray",
-                            description: Text("试试切换其他分类或调整过滤规则")
-                        )
-                    } else {
-                        ScrollView {
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                                ForEach(videos) { video in
-                                    VideoCardView(video: video) {
-                                        if video.upMid > 0 {
-                                            selectedUPMid = video.upMid
-                                            selectedUPName = video.upName
-                                            showingUPSpace = true
-                                        }
-                                    }
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            selectedVideo = video
-                                        }
-                                        .onAppear {
-                                            if video.id == videos.last?.id, hasMore, !isLoadingMore {
-                                                loadMore()
-                                            }
-                                        }
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.top, 8)
-                            .padding(.bottom, 20)
-
-                            if isLoadingMore {
-                                ProgressView().padding(.vertical, 12)
-                            }
-                        }
-                        .refreshable {
-                            await loadVideosAsync(force: true)
-                        }
-                    }
-                }
+            VStack(spacing: 0) {
+                header
+                contentBoard
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text("BiliBili")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(.biliBlue)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingSearch = true
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.body)
-                            .foregroundColor(.biliBlue)
-                            .padding(8)
-                            .background(Circle().fill(.ultraThinMaterial).opacity(0.9))
-                    }
-                }
-            }
-            .sheet(item: $selectedVideo) { video in
-                VideoPlayerView(video: video)
+        }
+        .sheet(item: $selectedVideo) { video in
+            VideoPlayerView(video: video)
+                .environmentObject(store)
+        }
+        .sheet(isPresented: $showingUPSpace) {
+            if selectedUPMid > 0 {
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
                     .environmentObject(store)
-            }
-            .sheet(isPresented: $showingUPSpace) {
-                if selectedUPMid > 0 {
-                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
-                        .environmentObject(store)
-                }
             }
         }
         .onAppear {
@@ -165,6 +48,130 @@ struct HomeView: View {
                 loadVideos(force: true)
             }
         }
+    }
+
+    // MARK: - Header (pill tabs + app badge)
+    private var header: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 2) {
+                ForEach(HomeCategory.allCases) { cat in
+                    Button {
+                        guard category != cat else { return }
+                        category = cat
+                        page = 1
+                        hasMore = true
+                        loadVideos(force: true)
+                    } label: {
+                        Text(cat.rawValue)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(category == cat ? Color.white : Color.biliTabText)
+                            .frame(minWidth: 56)
+                            .padding(.vertical, 8)
+                            .background(category == cat ? Color.biliBlue : Color.clear)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(4)
+            .background(Color.white.opacity(0.8))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 1))
+            .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 1)
+
+            Spacer(minLength: 4)
+
+            HStack(spacing: 4) {
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color(red: 16/255, green: 185/255, blue: 129/255))
+                Text("BiliBili 直连")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.biliSubtext)
+                    .fixedSize()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Content board (rounded translucent surface over the hero)
+    private var contentBoard: some View {
+        VStack(spacing: 0) {
+            // Filtered banner
+            if store.settings.showFilteredBanner && store.lastBlockedCount > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .foregroundColor(.biliBlue)
+                    Text("已为你净化 \(store.lastBlockedCount) 条低质内容")
+                        .font(.caption)
+                        .foregroundStyle(Color.biliSubtext)
+                    Spacer()
+                    Button {
+                        store.lastBlockedCount = 0
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .background(Color.biliBlue.opacity(0.08))
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if videos.isEmpty {
+                ContentUnavailableView(
+                    "暂无内容",
+                    systemImage: "tray",
+                    description: Text("试试切换其他分类或调整过滤规则")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+                        spacing: 12
+                    ) {
+                        ForEach(videos) { video in
+                            VideoCardView(video: video) {
+                                if video.upMid > 0 {
+                                    selectedUPMid = video.upMid
+                                    selectedUPName = video.upName
+                                    showingUPSpace = true
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedVideo = video
+                            }
+                            .onAppear {
+                                if video.id == videos.last?.id, hasMore, !isLoadingMore {
+                                    loadMore()
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 24)
+
+                    if isLoadingMore {
+                        ProgressView().padding(.vertical, 12)
+                    }
+                }
+                .refreshable {
+                    await loadVideosAsync(force: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.biliBackground)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24, style: .continuous))
     }
 
     private func loadVideos(force: Bool = false) {

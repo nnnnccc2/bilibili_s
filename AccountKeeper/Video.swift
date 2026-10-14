@@ -80,6 +80,14 @@ struct Video: Identifiable, Codable, Hashable {
         }
         return "\(views)"
     }
+
+    /// Formatted danmaku count e.g. "4.3万"
+    var danmakuText: String {
+        if danmaku >= 10000 {
+            return String(format: "%.1f万", Double(danmaku) / 10000.0)
+        }
+        return "\(danmaku)"
+    }
 }
 
 /// UP主 space profile info
