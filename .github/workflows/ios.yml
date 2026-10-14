@@ -34,6 +34,10 @@ jobs:
         shell: pwsh
         run: lib/scripts/patch.ps1 iOS
 
+      - name: Disable code signing
+        run: |
+          perl -pi -e 's/DEVELOPMENT_TEAM = "";/DEVELOPMENT_TEAM = "AAAAAAAAAA";/g' ios/Runner.xcodeproj/project.pbxproj
+
       - name: Build iOS
         run: |
           flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json --no-pub
