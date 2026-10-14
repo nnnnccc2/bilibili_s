@@ -1,0 +1,11 @@
+name: Build iOS (push)
+
+on:
+  push:
+    branches: [piliplus-ui-demo]
+
+jobs:
+  ios:
+    name: Release IOS
+    uses: ./.github/workflows/ios.yml
+    permissions: write-all

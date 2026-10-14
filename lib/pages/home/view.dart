@@ -44,10 +44,24 @@ class _HomePageState extends CommonPageState<HomePage>
     Widget tabBar;
     if (_homeController.tabs.length > 1) {
       tabBar = Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: SizedBox(
+        padding: const EdgeInsets.only(top: 4, left: 14, right: 14),
+        child: Container(
           height: 42,
-          width: double.infinity,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.5),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
           child: TabBar(
             controller: _homeController.tabController,
             tabs: _homeController.tabs.map((e) => Tab(text: e.label)).toList(),
@@ -56,6 +70,22 @@ class _HomePageState extends CommonPageState<HomePage>
             dividerHeight: 0,
             splashBorderRadius: Style.mdRadius,
             tabAlignment: TabAlignment.center,
+            labelColor: Colors.white,
+            unselectedLabelColor: _colorScheme.onSurfaceVariant,
+            labelStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+            indicator: BoxDecoration(
+              color: _colorScheme.primary,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            indicatorSize: TabBarIndicatorSize.label,
+            indicatorPadding: const EdgeInsets.symmetric(horizontal: 2),
             onTap: (_) {
               feedBack();
               if (!_homeController.tabController.indexIsChanging) {

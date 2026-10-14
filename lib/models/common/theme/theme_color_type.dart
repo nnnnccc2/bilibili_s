@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 const List<({Color color, String label})> colorThemeTypes = [
+  (color: Color(0xFF0DA2E7), label: '直连蓝'),
   (color: Color(0xFF5CB67B), label: '默认绿'),
   (color: Color(0xFFFF7299), label: '粉红色'),
   (color: Colors.red, label: '红色'),
