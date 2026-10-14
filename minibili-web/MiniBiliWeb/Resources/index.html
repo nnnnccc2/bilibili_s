@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>MiniBili</title>
+<style>
+:root{
+  --pink:#fb7299; --pink-d:#e05c85; --blue:#00aeec;
+  --bg:#f6f7f9; --card:#ffffff; --text:#18191c; --sub:#9499a0;
+  --line:#e9eaec; --bar:rgba(255,255,255,.94); --chip:#f1f2f4;
+  --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1013; --card:#1b1c20; --text:#e7e9ec; --sub:#8b9098;
+    --line:#2a2c31; --bar:rgba(18,19,22,.94); --chip:#26282d;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);}
+body{
+  color:var(--text);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+  overscroll-behavior:none;
+}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+
+/* ---------- 顶栏 ---------- */
+#topbar{
+  flex:none;display:flex;align-items:center;gap:10px;
+  padding:calc(var(--safe-top) + 10px) 14px 10px;
+  background:var(--bar);backdrop-filter:saturate(180%) blur(16px);
+  -webkit-backdrop-filter:saturate(180%) blur(16px);
+  border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:20;
+}
+.logo{font-size:18px;font-weight:800;color:var(--pink);letter-spacing:.3px;white-space:nowrap;}
+.logo span{color:var(--blue);font-weight:700;}
+.search{flex:1;display:flex;align-items:center;background:var(--chip);border-radius:18px;padding:0 6px 0 12px;height:34px;}
+.search input{flex:1;border:0;background:transparent;color:var(--text);font-size:14px;outline:none;min-width:0;}
+.search button{border:0;background:var(--pink);color:#fff;border-radius:14px;height:26px;padding:0 14px;font-size:13px;font-weight:600;}
+
+/* ---------- 主体 ---------- */
+#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px calc(72px + var(--safe-bottom));}
+.page{display:none;}
+.page.active{display:block;}
+
+.section-title{font-size:15px;font-weight:700;margin:2px 2px 10px;display:flex;align-items:center;gap:8px;}
+.section-title:before{content:"";width:4px;height:15px;border-radius:2px;background:var(--pink);}
+
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+@media (min-width:680px){ .grid{grid-template-columns:repeat(3,1fr);} }
+
+.card{background:var(--card);border-radius:10px;overflow:hidden;border:1px solid var(--line);}
+.card .cover{position:relative;width:100%;aspect-ratio:16/9;background:var(--chip);}
+.card .cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.card .dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.66);color:#fff;font-size:11px;padding:1px 5px;border-radius:4px;}
+.card .meta{padding:8px 9px 10px;}
+.card .title{
+  font-size:13px;font-weight:600;line-height:1.4;margin-bottom:6px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px;
+}
+.card .title em{font-style:normal;color:var(--pink);}
+.card .sub{font-size:11px;color:var(--sub);display:flex;justify-content:space-between;gap:6px;}
+.card .sub span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.row{display:flex;align-items:center;gap:12px;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;}
+.row .ava{width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--chip);flex:none;}
+.row .rname{font-weight:600;font-size:14px;}
+.row .rsub{font-size:12px;color:var(--sub);}
+
+.empty{padding:60px 20px;text-align:center;color:var(--sub);font-size:14px;}
+.empty .big{font-size:40px;margin-bottom:10px;}
+.btn{border:0;border-radius:20px;background:var(--pink);color:#fff;font-size:14px;font-weight:600;padding:9px 22px;margin-top:14px;}
+.btn.ghost{background:var(--chip);color:var(--text);}
+
+.skel{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+.skel .b{background:var(--chip);animation:pulse 1.1s infinite;}
+.skel .b.cover{aspect-ratio:16/9;}
+.skel .b.line{height:12px;margin:10px;border-radius:6px;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+/* ---------- 底栏 ---------- */
+#tabbar{
+  flex:none;display:flex;background:var(--bar);
+  backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px);
+  border-top:1px solid var(--line);
+  padding-bottom:var(--safe-bottom);position:relative;z-index:20;
+}
+#tabbar button{
+  flex:1;border:0;background:transparent;color:var(--sub);
+  font-size:11px;font-weight:600;padding:7px 0 8px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+}
+#tabbar button svg{width:23px;height:23px;fill:currentColor;}
+#tabbar button.active{color:var(--pink);}
+
+/* ---------- 播放页 ---------- */
+#player{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;}
+#player.show{display:flex;}
+#player .p-head{
+  flex:none;display:flex;align-items:center;gap:8px;
+  padding:calc(var(--safe-top) + 8px) 12px 8px;background:var(--bar);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line);
+}
+#player .p-head button{width:34px;height:34px;border:0;border-radius:50%;background:var(--chip);color:var(--text);font-size:20px;line-height:1;flex:none;}
+#player .p-title{flex:1;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#video{width:100%;background:#000;max-height:46vh;display:block;}
+.p-body{flex:1;overflow-y:auto;padding:12px 14px calc(24px + var(--safe-bottom));}
+.p-body h2{font-size:16px;margin:0 0 10px;line-height:1.4;font-weight:700;}
+.p-up{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.p-up img{width:36px;height:36px;border-radius:50%;object-fit:cover;background:var(--chip);}
+.p-up .n{font-size:13px;font-weight:600;}
+.p-up .t{font-size:12px;color:var(--sub);}
+.p-stat{font-size:12px;color:var(--sub);margin-bottom:14px;}
+.q-label{font-size:12px;color:var(--sub);margin-bottom:8px;}
+.q-list{display:flex;flex-wrap:wrap;gap:8px;}
+.q-list button{border:1px solid var(--line);background:var(--card);color:var(--text);font-size:13px;padding:6px 14px;border-radius:16px;}
+.q-list button.on{border-color:var(--pink);color:var(--pink);background:rgba(251,114,153,.1);}
+
+/* ---------- 登录弹层 ---------- */
+#loginMask{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:24px;}
+#loginMask.show{display:flex;}
+.login-box{width:100%;max-width:300px;background:var(--card);border-radius:16px;padding:20px;text-align:center;position:relative;}
+.login-box h3{margin:0 0 4px;font-size:16px;}
+.login-box p{margin:0 0 14px;font-size:12px;color:var(--sub);}
+.qr-wrap{width:200px;height:200px;margin:0 auto;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.qr-wrap img{width:100%;height:100%;object-fit:contain;}
+.qr-status{font-size:12px;color:var(--sub);margin-top:12px;}
+.login-x{position:absolute;right:10px;top:8px;border:0;background:transparent;color:var(--sub);font-size:22px;line-height:1;}
+#player .client-badge{position:absolute;right:12px;top:calc(var(--safe-top) + 12px);background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="logo">bilibili<span>·mini</span></div>
+    <div class="search">
+      <input id="searchInput" placeholder="搜索视频 / UP主" enterkeyhint="search">
+      <button id="searchBtn">搜索</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section id="page-hot" class="page active"></section>
+    <section id="page-dyn" class="page"></section>
+    <section id="page-follow" class="page"></section>
+    <section id="page-mine" class="page"></section>
+  </main>
+
+  <nav id="tabbar">
+    <button data-tab="hot" class="active">
+      <svg viewBox="0 0 24 24"><path d="M12 2c1.9 3 .9 5.1-.5 6.6C9.9 10.3 8 12.2 8 15a5 5 0 0 0 10 0c0-2-1-3.5-2-4.6.3 1.4-.3 2.6-1.4 3.1.6-2.6-.6-5.1-2.6-6.9V2z"/><circle cx="12" cy="16" r="0"/></svg>
+      热门
+    </button>
+    <button data-tab="dyn">
+      <svg viewBox="0 0 24 24"><path d="M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H8l-4 4V5a1 1 0 0 1 1-1z"/></svg>
+      动态
+    </button>
+    <button data-tab="follow">
+      <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-4 0-8 2-8 4.5V21h16v-2.5C20 16 16 14 12 14z"/></svg>
+      关注
+    </button>
+    <button data-tab="mine">
+      <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-3.3 0-6 1.6-6 3.6V20h12v-2.4c0-2-2.7-3.6-6-3.6z"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+
+<div id="player">
+  <div class="p-head">
+    <button id="pBack">‹</button>
+    <div class="p-title" id="pTitle">视频</div>
+  </div>
+  <video id="video" controls autoplay playsinline referrerpolicy="no-referrer"></video>
+  <div class="p-body">
+    <h2 id="pName"></h2>
+    <div class="p-up">
+      <img id="pFace" alt="">
+      <div><div class="n" id="pUp"></div><div class="t" id="pStat"></div></div>
+    </div>
+    <div class="q-label">清晰度（无需登录最高 720P）</div>
+    <div class="q-list" id="qList"></div>
+  </div>
+</div>
+
+<div id="loginMask">
+  <div class="login-box">
+    <button class="login-x" id="loginClose">×</button>
+    <h3>扫码登录</h3>
+    <p>使用哔哩哔哩 App 扫码，登录后才能查看动态 / 关注</p>
+    <div class="qr-wrap"><img id="qrImg" alt="二维码"></div>
+    <div class="qr-status" id="qrStatus">正在获取二维码…</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= 基础工具 ================= */
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const img = (u) => { if (!u) return ""; u = String(u); return u.startsWith("//") ? "https:" + u : u; };
+function fmtNum(n) {
+  n = Number(n) || 0;
+  if (n >= 1e8) return (n / 1e8).toFixed(1) + "亿";
+  if (n >= 1e4) return (n / 1e4).toFixed(1) + "万";
+  return String(n);
+}
+function fmtDur(sec) {
+  sec = Math.floor(Number(sec) || 0);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const p = (v) => String(v).padStart(2, "0");
+  return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
+}
+function fmtDurStr(str) { return str ? String(str) : ""; }
+let toastTimer = null;
+function toast(msg) {
+  let el = $("#toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.style.cssText = "position:fixed;left:50%;bottom:88px;transform:translateX(-50%);background:rgba(0,0,0,.82);color:#fff;font-size:13px;padding:8px 16px;border-radius:18px;z-index:200;max-width:80%;text-align:center;";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = "none"; }, 2200);
+}
+
+/* ================= MD5（WBI 签名需要） ================= */
+function md5(s) {
+  function add32(a, b) { return (a + b) & 0xFFFFFFFF; }
+  function cmn(q, a, b, x, s, t) {
+    a = add32(add32(a, q), add32(x, t));
+    return add32((a << s) | (a >>> (32 - s)), b);
+  }
+  function ff(a, b, c, d, x, s, t) { return cmn((b & c) | (~b & d), a, b, x, s, t); }
+  function gg(a, b, c, d, x, s, t) { return cmn((b & d) | (c & ~d), a, b, x, s, t); }
+  function hh(a, b, c, d, x, s, t) { return cmn(b ^ c ^ d, a, b, x, s, t); }
+  function ii(a, b, c, d, x, s, t) { return cmn(c ^ (b | ~d), a, b, x, s, t); }
+  function md5cycle(x, k) {
+    let a = x[0], b = x[1], c = x[2], d = x[3];
+    a = ff(a, b, c, d, k[0], 7, -680876936); d = ff(d, a, b, c, k[1], 12, -389564586);
+    c = ff(c, d, a, b, k[2], 17, 606105819); b = ff(b, c, d, a, k[3], 22, -1044525330);
+    a = ff(a, b, c, d, k[4], 7, -176418897); d = ff(d, a, b, c, k[5], 12, 1200080426);
+    c = ff(c, d, a, b, k[6], 17, -1473231341); b = ff(b, c, d, a, k[7], 22, -45705983);
+    a = ff(a, b, c, d, k[8], 7, 1770035416); d = ff(d, a, b, c, k[9], 12, -1958414417);
+    c = ff(c, d, a, b, k[10], 17, -42063); b = ff(b, c, d, a, k[11], 22, -1990404162);
+    a = ff(a, b, c, d, k[12], 7, 1804603682); d = ff(d, a, b, c, k[13], 12, -40341101);
+    c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329);
+    a = gg(a, b, c, d, k[1], 5, -165796510); d = gg(d, a, b, c, k[6], 9, -1069501632);
+    c = gg(c, d, a, b, k[11], 14, 643717713); b = gg(b, c, d, a, k[0], 20, -373897302);
+    a = gg(a, b, c, d, k[5], 5, -701558691); d = gg(d, a, b, c, k[10], 9, 38016083);
+    c = gg(c, d, a, b, k[15], 14, -660478335); b = gg(b, c, d, a, k[4], 20, -405537848);
+    a = gg(a, b, c, d, k[9], 5, 568446438); d = gg(d, a, b, c, k[14], 9, -1019803690);
+    c = gg(c, d, a, b, k[3], 14, -187363961); b = gg(b, c, d, a, k[8], 20, 1163531501);
+    a = gg(a, b, c, d, k[13], 5, -1444681467); d = gg(d, a, b, c, k[2], 9, -51403784);
+    c = gg(c, d, a, b, k[7], 14, 1735328473); b = gg(b, c, d, a, k[12], 20, -1926607734);
+    a = hh(a, b, c, d, k[5], 4, -378558); d = hh(d, a, b, c, k[8], 11, -2022574463);
+    c = hh(c, d, a, b, k[11], 16, 1839030562); b = hh(b, c, d, a, k[14], 23, -35309556);
+    a = hh(a, b, c, d, k[1], 4, -1530992060); d = hh(d, a, b, c, k[4], 11, 1272893353);
+    c = hh(c, d, a, b, k[7], 16, -155497632); b = hh(b, c, d, a, k[10], 23, -1094730640);
+    a = hh(a, b, c, d, k[13], 4, 681279174); d = hh(d, a, b, c, k[0], 11, -358537222);
+    c = hh(c, d, a, b, k[3], 16, -722521979); b = hh(b, c, d, a, k[6], 23, 76029189);
+    a = hh(a, b, c, d, k[9], 4, -640364487); d = hh(d, a, b, c, k[12], 11, -421815835);
+    c = hh(c, d, a, b, k[15], 16, 530742520); b = hh(b, c, d, a, k[2], 23, -995338651);
+    a = ii(a, b, c, d, k[0], 6, -198630844); d = ii(d, a, b, c, k[7], 10, 1126891415);
+    c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055);
+    a = ii(a, b, c, d, k[12], 6, 1700485571); d = ii(d, a, b, c, k[3], 10, -1894986606);
+    c = ii(c, d, a, b, k[10], 15, -1051523); b = ii(b, c, d, a, k[1], 21, -2054922799);
+    a = ii(a, b, c, d, k[8], 6, 1873313359); d = ii(d, a, b, c, k[15], 10, -30611744);
+    c = ii(c, d, a, b, k[6], 15, -1560198380); b = ii(b, c, d, a, k[13], 21, 1309151649);
+    a = ii(a, b, c, d, k[4], 6, -145523070); d = ii(d, a, b, c, k[11], 10, -1120210379);
+    c = ii(c, d, a, b, k[2], 15, 718787259); b = ii(b, c, d, a, k[9], 21, -343485551);
+    x[0] = add32(a, x[0]); x[1] = add32(b, x[1]); x[2] = add32(c, x[2]); x[3] = add32(d, x[3]);
+  }
+  function md5blk(s) {
+    const b = [];
+    for (let i = 0; i < 64; i += 4) {
+      b[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
+    }
+    return b;
+  }
+  function md51(s) {
+    const n = s.length, state = [1732584193, -271733879, -1732584194, 271733878];
+    let i;
+    for (i = 64; i <= s.length; i += 64) md5cycle(state, md5blk(s.substring(i - 64, i)));
+    s = s.substring(i - 64);
+    const tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
+    tail[i >> 2] |= 0x80 << ((i % 4) << 3);
+    if (i > 55) { md5cycle(state, tail); for (i = 0; i < 16; i++) tail[i] = 0; }
+    tail[14] = n * 8;
+    md5cycle(state, tail);
+    return state;
+  }
+  function hex(x) {
+    const t = "0123456789abcdef";
+    let out = "";
+    for (let i = 0; i < x.length * 4; i++) {
+      const byte = (x[i >> 2] >> ((i % 4) * 8)) & 0xff;
+      out += t[(byte >> 4) & 0x0f] + t[byte & 0x0f];
+    }
+    return out;
+  }
+  return hex(md51(s));
+}
+
+/* ================= 登录态 / Cookie ================= */
+const store = {
+  cookies: {},
+  get isLogin() { return !!this.cookies.SESSDATA; }
+};
+function loadCookies() {
+  try { store.cookies = JSON.parse(localStorage.getItem("minibili.cookies") || "{}") || {}; }
+  catch (e) { store.cookies = {}; }
+}
+function saveCookies() { localStorage.setItem("minibili.cookies", JSON.stringify(store.cookies)); }
+function cookieString() {
+  return Object.keys(store.cookies).map((k) => `${k}=${store.cookies[k]}`).join("; ");
+}
+
+/* ================= 网络层 ================= */
+const MIXIN_TAB = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52];
+let _wbiKeys = null, _wbiAt = 0;
+
+async function fetchRaw(url, headers) {
+  const res = await fetch(url, { headers: headers || {} });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+async function wbiKeys() {
+  if (_wbiKeys && Date.now() - _wbiAt < 6 * 3600 * 1000) return _wbiKeys;
+  const data = await api("/x/web-interface/nav", null, { noWbi: true });
+  const imgKey = (data.wbi_img.img_url.split("/").pop() || "").split(".")[0];
+  const subKey = (data.wbi_img.sub_url.split("/").pop() || "").split(".")[0];
+  _wbiKeys = { img: imgKey, sub: subKey };
+  _wbiAt = Date.now();
+  return _wbiKeys;
+}
+
+function getMixinKey(raw) { return MIXIN_TAB.map((n) => raw[n]).join("").slice(0, 32); }
+
+function encWbi(params, imgKey, subKey) {
+  const mixinKey = getMixinKey(imgKey + subKey);
+  const wts = Math.round(Date.now() / 1000);
+  const filter = (s) => String(s).replace(/[!'()*]/g, "");
+  const p = Object.assign({}, params, { wts });
+  const query = Object.keys(p).sort().map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(filter(p[k]))}`).join("&");
+  return query + "&w_rid=" + md5(query + mixinKey);
+}
+
+async function api(path, params, opt) {
+  opt = opt || {};
+  const prefix = opt.passport ? "/passport" : "/api";
+  let query = "";
+  if (!opt.noWbi && opt.wbi) {
+    const keys = await wbiKeys();
+    query = "?" + encWbi(params || {}, keys.img, keys.sub);
+  } else if (params && Object.keys(params).length) {
+    const q = new URLSearchParams();
+    Object.keys(params).forEach((k) => { if (params[k] !== undefined && params[k] !== null) q.append(k, params[k]); });
+    const s = q.toString();
+    query = s ? "?" + s : "";
+  }
+  const headers = {};
+  const cookie = cookieString();
+  if (cookie) headers["X-Bili-Cookie"] = cookie;
+  const json = await fetchRaw(prefix + path + query, headers);
+  if (json.code !== 0) {
+    const err = new Error(json.message || ("code " + json.code));
+    err.code = json.code;
+    throw err;
+  }
+  return json.data;
+}
+
+/* ================= 通用渲染 ================= */
+function skeleton(n) {
+  let h = '<div class="grid">';
+  for (let i = 0; i < (n || 6); i++) h += '<div class="skel"><div class="b cover"></div><div class="b line"></div><div class="b line" style="width:60%"></div></div>';
+  return h + "</div>";
+}
+
+function videoCard(v) {
+  const pic = img(v.pic || (v.cover) || "");
+  const bvid = v.bvid || "";
+  const title = v.title || "";
+  const up = (v.owner && v.owner.name) || v.author || v.up_name || "";
+  const dur = v.duration ? fmtDur(typeof v.duration === "string" ? 0 : v.duration) || fmtDurStr(v.duration) : fmtDurStr(v.length);
+  const durTxt = typeof v.duration === "number" ? fmtDur(v.duration) : fmtDurStr(v.duration || v.length);
+  const play = (v.stat && v.stat.view) || v.play || 0;
+  return `<article class="card" data-bvid="${esc(bvid)}">
+    <div class="cover"><img loading="lazy" src="${esc(pic)}" alt=""><span class="dur">${esc(durTxt)}</span></div>
+    <div class="meta">
+      <div class="title">${v.title && /<em/.test(v.title) ? v.title : esc(title)}</div>
+      <div class="sub"><span>${esc(up)}</span><span>${esc(fmtNum(play))} 播放</span></div>
+    </div>
+  </article>`;
+  void dur;
+}
+
+function renderGrid(container, list) {
+  if (!list || !list.length) { container.innerHTML = '<div class="empty">暂无内容</div>'; return; }
+  container.innerHTML = '<div class="grid">' + list.map(videoCard).join("") + "</div>";
+}
+
+function needLogin(container, tip) {
+  container.innerHTML = `<div class="empty"><div class="big">🔒</div><div>${esc(tip || "登录后查看")}</div><button class="btn" id="goLogin">扫码登录</button></div>`;
+  const b = container.querySelector("#goLogin");
+  if (b) b.onclick = openLogin;
+}
+
+/* ================= 页面：热门 ================= */
+async function loadHot() {
+  const box = $("#page-hot");
+  box.innerHTML = '<div class="section-title">热门推荐</div>' + skeleton(6);
+  try {
+    const data = await api("/x/web-interface/popular", { ps: 20, pn: 1 });
+    box.innerHTML = '<div class="section-title">热门推荐</div>';
+    const wrap = document.createElement("div");
+    box.appendChild(wrap);
+    renderGrid(wrap, data.list || []);
+  } catch (e) {
+    box.innerHTML = '<div class="empty">加载失败：' + esc(e.message) + '<button class="btn ghost" id="retryHot">重试</button></div>';
+    const r = box.querySelector("#retryHot"); if (r) r.onclick = loadHot;
+  }
+}
+
+/* ================= 页面：动态 ================= */
+async function loadDynamic() {
+  const box = $("#page-dyn");
+  if (!store.isLogin) return needLogin(box, "登录后查看「动态」");
+  box.innerHTML = '<div class="section-title">我的动态</div>' + skeleton(4);
+  try {
+    const data = await api("/x/polymer/web-dynamic/v1/feed/all", { type: "all", page: 1, timezone_offset: -480 });
+    const items = (data && data.items) || [];
+    box.innerHTML = '<div class="section-title">我的动态</div>';
+    if (!items.length) { box.innerHTML += '<div class="empty">暂无动态</div>'; return; }
+    box.innerHTML += items.map((it) => {
+      const author = (it.modules && it.modules.module_author && it.modules.module_author.name) || "";
+      const face = img((it.modules && it.modules.module_author && it.modules.module_author.face) || "");
+      const desc = (it.modules && it.modules.module_dynamic && it.modules.module_dynamic.desc && it.modules.module_dynamic.desc.text) || "";
+      return `<div class="row"><img class="ava" src="${esc(face)}" alt=""><div style="min-width:0"><div class="rname">${esc(author)}</div><div class="rsub" style="white-space:normal">${esc(desc).slice(0, 120)}</div></div></div>`;
+    }).join("");
+  } catch (e) {
+    box.innerHTML = '<div class="empty">加载失败：' + esc(e.message) + "</div>";
+  }
+}
+
+/* ================= 页面：关注 ================= */
+async function loadFollow() {
+  const box = $("#page-follow");
+  if (!store.isLogin) return needLogin(box, "登录后查看「关注」");
+  box.innerHTML = '<div class="section-title">我的关注</div>' + skeleton(4);
+  try {
+    const mid = store.cookies.DedeUserID;
+    const data = await api("/x/relation/followings", { vmid: mid, pn: 1, ps: 30, order: "desc" });
+    const list = (data && data.list) || [];
+    box.innerHTML = '<div class="section-title">我的关注</div>';
+    if (!list.length) { box.innerHTML += '<div class="empty">还没有关注任何人</div>'; return; }
+    box.innerHTML += list.map((u) => `<div class="row" data-mid="${esc(u.mid)}"><img class="ava" src="${esc(img(u.face))}" alt=""><div style="min-width:0"><div class="rname">${esc(u.uname)}</div><div class="rsub">${esc(u.sign || "")}</div></div></div>`).join("");
+    $$("#page-follow .row").forEach((el) => { el.onclick = () => openUpSpace(el.dataset.mid, el.querySelector(".rname").textContent); });
+  } catch (e) {
+    box.innerHTML = '<div class="empty">加载失败：' + esc(e.message) + "</div>";
+  }
+}
+
+async function openUpSpace(mid, name) {
+  const box = $("#page-mine");
+  switchTab("mine");
+  box.innerHTML = `<div class="section-title">${esc(name || "UP主")} 的投稿</div>` + skeleton(6);
+  try {
+    await ensureBuvid();
+    const data = await api("/x/space/wbi/arc/search", { mid: mid, pn: 1, ps: 20, order: "pubdate", tid: 0 }, { wbi: true });
+    const list = (data && data.list && data.list.vlist) || [];
+    box.innerHTML = `<div class="section-title">${esc(name || "UP主")} 的投稿</div>`;
+    const wrap = document.createElement("div");
+    box.appendChild(wrap);
+    renderGrid(wrap, list);
+  } catch (e) {
+    box.innerHTML = '<div class="empty">加载失败：' + esc(e.message) + "</div>";
+  }
+}
+
+/* ================= 页面：我的 ================= */
+async function loadMine() {
+  const box = $("#page-mine");
+  box.innerHTML = '<div class="section-title">我的</div>' + skeleton(3);
+  try {
+    const nav = await api("/x/web-interface/nav", null, { noWbi: true });
+    if (!nav.isLogin) { return needLogin(box, "登录后查看「我的」"); }
+    const face = img(nav.face), name = nav.uname, mid = nav.mid;
+    box.innerHTML = `<div class="section-title">我的</div>
+      <div class="row"><img class="ava" src="${esc(face)}" alt=""><div style="min-width:0"><div class="rname">${esc(name)}</div><div class="rsub">UID ${esc(String(mid))} · 硬币 ${esc(String(nav.money || 0))}</div></div></div>
+      <div class="section-title" style="margin-top:16px">我的收藏</div>`;
+    const favWrap = document.createElement("div");
+    box.appendChild(favWrap);
+    try {
+      const folders = await api("/x/v3/fav/folder/created/list-all", { up_mid: mid });
+      const list = (folders && folders.list) || [];
+      if (!list.length) { favWrap.innerHTML = '<div class="empty">暂无收藏夹</div>'; }
+      else {
+        const mediaId = list[0].id;
+        const res = await api("/x/v3/fav/resource/list", { media_id: mediaId, pn: 1, ps: 20, platform: "web" });
+        renderGrid(favWrap, (res && res.medias) || []);
+      }
+    } catch (e) {
+      favWrap.innerHTML = '<div class="empty">收藏加载失败</div>';
+    }
+    const out = document.createElement("div");
+    out.style.cssText = "text-align:center;margin:20px 0";
+    out.innerHTML = '<button class="btn ghost" id="logout">退出登录</button>';
+    box.appendChild(out);
+    box.querySelector("#logout").onclick = () => {
+      store.cookies = {};
+      saveCookies();
+      toast("已退出登录");
+      loadMine();
+    };
+  } catch (e) {
+    box.innerHTML = '<div class="empty">加载失败：' + esc(e.message) + "</div>";
+  }
+}
+
+/* ================= 搜索 ================= */
+async function doSearch() {
+  const kw = $("#searchInput").value.trim();
+  if (!kw) return;
+  const box = $("#page-hot");
+  switchTab("hot");
+  box.innerHTML = `<div class="section-title">搜索：${esc(kw)}</div>` + skeleton(6);
+  try {
+    const data = await api("/x/web-interface/wbi/search/type", { search_type: "video", keyword: kw, page: 1, page_size: 20 }, { wbi: true });
+    const list = (data && data.result) || [];
+    box.innerHTML = `<div class="section-title">搜索：${esc(kw)}</div>`;
+    const wrap = document.createElement("div");
+    box.appendChild(wrap);
+    renderGrid(wrap, list.map((r) => ({
+      bvid: r.bvid, pic: r.pic, title: r.title, author: r.author,
+      duration: r.duration, play: r.play
+    })));
+  } catch (e) {
+    box.innerHTML = '<div class="empty">搜索失败：' + esc(e.message) + "</div>";
+  }
+}
+
+/* ================= 播放器 ================= */
+let cur = null;
+async function openVideo(bvid) {
+  $("#player").classList.add("show");
+  $("#pName").textContent = "加载中…";
+  $("#video").removeAttribute("src");
+  try {
+    const view = await api("/x/web-interface/view", { bvid: bvid });
+    cur = { bvid: bvid, cid: view.cid, title: view.title };
+    $("#pTitle").textContent = view.title || "";
+    $("#pName").textContent = view.title || "";
+    $("#pUp").textContent = (view.owner && view.owner.name) || "";
+    $("#pFace").src = img((view.owner && view.owner.face) || "");
+    $("#pStat").textContent = `${fmtNum(view.stat && view.stat.view)} 播放 · ${fmtNum(view.stat && view.stat.danmaku)} 弹幕`;
+    await loadPlayurl(64);
+  } catch (e) {
+    $("#pName").textContent = "加载失败：" + e.message;
+    toast("加载失败：" + e.message);
+  }
+}
+async function loadPlayurl(qn) {
+  const data = await api("/x/player/wbi/playurl", {
+    bvid: cur.bvid, cid: cur.cid, qn: qn, fnval: 1, platform: "html5", high_quality: 1
+  }, { wbi: true });
+  const url = data.durl && data.durl[0] && data.durl[0].url;
+  if (!url) throw new Error("无播放地址");
+  const v = $("#video");
+  v.src = url;
+  v.play().catch(() => {});
+  renderQualities(data);
+}
+function renderQualities(data) {
+  const qs = data.accept_quality || [];
+  const ds = data.accept_description || [];
+  const box = $("#qList");
+  if (!qs.length) { box.innerHTML = ""; return; }
+  box.innerHTML = qs.map((q, i) => `<button data-q="${q}" class="${q === data.quality ? "on" : ""}">${esc(ds[i] || q)}</button>`).join("");
+  $$("#qList button").forEach((b) => {
+    b.onclick = async () => {
+      if (b.classList.contains("on")) return;
+      try { await loadPlayurl(Number(b.dataset.q)); } catch (e) { toast("切换失败：" + e.message); }
+    };
+  });
+}
+function closePlayer() {
+  $("#player").classList.remove("show");
+  const v = $("#video");
+  v.pause();
+  v.removeAttribute("src");
+}
+
+/* ================= 扫码登录 ================= */
+let loginTimer = null;
+async function openLogin() {
+  $("#loginMask").classList.add("show");
+  $("#qrImg").removeAttribute("src");
+  $("#qrStatus").textContent = "正在获取二维码…";
+  clearInterval(loginTimer);
+  try {
+    const data = await api("/x/passport-login/web/qrcode/generate", null, { passport: true });
+    $("#qrImg").src = data.url;
+    $("#qrStatus").textContent = "请使用哔哩哔哩 App 扫码";
+    const key = data.qrcode_key;
+    loginTimer = setInterval(async () => {
+      try {
+        const r = await api("/x/passport-login/web/qrcode/poll", { qrcode_key: key }, { passport: true });
+        if (r.code === 86101) $("#qrStatus").textContent = "等待扫码…";
+        else if (r.code === 86090) $("#qrStatus").textContent = "已扫码，请在手机上确认";
+        else if (r.code === 86038) { $("#qrStatus").textContent = "二维码已过期，请重试"; clearInterval(loginTimer); }
+        else if (r.code === 0) {
+          clearInterval(loginTimer);
+          const cookies = (r.cookie_info && r.cookie_info.cookies) || [];
+          cookies.forEach((c) => { store.cookies[c.name] = c.value; });
+          saveCookies();
+          $("#loginMask").classList.remove("show");
+          toast("登录成功");
+          refreshCurrent();
+        }
+      } catch (e) { /* 忽略单次轮询失败 */ }
+    }, 2000);
+  } catch (e) {
+    $("#qrStatus").textContent = "二维码获取失败：" + e.message;
+  }
+}
+function closeLogin() {
+  $("#loginMask").classList.remove("show");
+  clearInterval(loginTimer);
+}
+
+/* ================= Buvid ================= */
+async function ensureBuvid() {
+  if (store.cookies.buvid3) return;
+  try {
+    const d = await api("/x/frontend/finger/spi", null, { noWbi: true });
+    store.cookies.buvid3 = d.b_3;
+    store.cookies.buvid4 = d.b_4;
+    store.cookies.b_nut = Math.round(Date.now() / 1000);
+    saveCookies();
+  } catch (e) { /* 忽略 */ }
+}
+
+/* ================= Tab / 路由 ================= */
+let activeTab = "hot";
+function switchTab(tab) {
+  activeTab = tab;
+  $$("#tabbar button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  $$("#main .page").forEach((p) => p.classList.toggle("active", p.id === "page-" + tab));
+  $("#main").scrollTop = 0;
+  if (tab === "hot") loadHot();
+  else if (tab === "dyn") loadDynamic();
+  else if (tab === "follow") loadFollow();
+  else if (tab === "mine") loadMine();
+}
+function refreshCurrent() { switchTab(activeTab); }
+
+/* ================= 事件绑定 ================= */
+document.addEventListener("click", (e) => {
+  const card = e.target.closest(".card");
+  if (card && card.dataset.bvid) { openVideo(card.dataset.bvid); return; }
+  const tab = e.target.closest("#tabbar button");
+  if (tab) { switchTab(tab.dataset.tab); }
+});
+$$("#tabbar button").forEach((b) => { b.onclick = () => switchTab(b.dataset.tab); });
+$("#searchBtn").onclick = doSearch;
+$("#searchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.target.blur(); doSearch(); } });
+$("#pBack").onclick = closePlayer;
+$("#loginClose").onclick = closeLogin;
+$("#loginMask").addEventListener("click", (e) => { if (e.target.id === "loginMask") closeLogin(); });
+
+/* ================= 启动 ================= */
+(async function boot() {
+  loadCookies();
+  await ensureBuvid();
+  switchTab("hot");
+})();
+</script>
+</body>
+</html>

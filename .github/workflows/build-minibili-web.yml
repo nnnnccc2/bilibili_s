@@ -1,0 +1,101 @@
+name: Build MiniBiliWeb IPA
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'minibili-web/**'
+      - '.github/workflows/build-minibili-web.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'minibili-web/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build MiniBiliWeb IPA
+    runs-on: macos-14
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: minibili-web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using Xcode at: $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (unsigned, arm64)
+        run: |
+          xcodebuild build \
+            -project MiniBiliWeb.xcodeproj \
+            -scheme MiniBiliWeb \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            ARCHS="arm64"
+
+      - name: Package into IPA
+        run: |
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "MiniBiliWeb.app" | head -1)
+          echo "Found app at: $APP_PATH"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r MiniBiliWeb-unsigned.ipa Payload/ -x "*.DS_Store"
+          echo "IPA created:"
+          ls -la MiniBiliWeb-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiniBiliWeb-unsigned-ipa
+          path: minibili-web/MiniBiliWeb-unsigned.ipa
+          retention-days: 30
+
+      - name: Publish IPA to GitHub Release (latest)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release delete minibili-web-latest --yes --cleanup-tag 2>/dev/null || echo "No existing release to delete"
+          sleep 2
+          cat > RELEASE_NOTES.md <<'NOTES_EOF'
+          # MiniBiliWeb — 基于 WKWebView 的哔哩哔哩第三方客户端
+
+          | 项目 | 值 |
+          |------|-----|
+          | 架构 | arm64 |
+          | 部署目标 | iOS 18.0 |
+          | 签名 | 未签名（需自签） |
+
+          ## 功能
+          - 热门 / 动态 / 关注 / 我的 四大标签页
+          - 视频搜索与播放（html5 直链，最高 720P）
+          - 扫码登录
+          - 无弹幕
+          - 深浅色自动适配
+
+          ## 安装
+          使用 Sideloadly / AltStore 配合 Apple ID 重签名后安装。
+          NOTES_EOF
+          gh release create minibili-web-latest MiniBiliWeb-unsigned.ipa \
+            --title "MiniBiliWeb Latest Build" \
+            --notes-file RELEASE_NOTES.md
