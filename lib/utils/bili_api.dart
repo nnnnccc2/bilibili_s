@@ -8,15 +8,12 @@ import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/login.dart';
 import 'package:PiliPlus/models/common/account_type.dart';
-import 'package:PiliPlus/pages/login/view.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
-import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/purification.dart';
 import 'package:PiliPlus/utils/wbi_sign.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:get/get.dart';
 
 /// JS Bridge 后端入口 —— 所有 Bilibili 功能通过 [call] 分派
 abstract final class BiliApi {
@@ -81,10 +78,6 @@ abstract final class BiliApi {
           return await _userInfo();
         case 'loginStatus':
           return await _loginStatus();
-        case 'openPlayer':
-          return await _openPlayer(p);
-        case 'openLogin':
-          return await _openLogin();
         case 'toast':
           return await _toast(p);
         default:
@@ -722,22 +715,6 @@ abstract final class BiliApi {
           'face': '',
         },
       };
-    }
-  }
-
-  static Future<Map<String, dynamic>> _openPlayer(Map<String, dynamic> p) async {
-    final aid = p['aid'] != null ? (p['aid'] as num).toInt() : null;
-    final bvid = p['bvid'] as String?;
-    PiliScheme.videoPush(aid, bvid);
-    return {'ok': true};
-  }
-
-  static Future<Map<String, dynamic>> _openLogin() async {
-    try {
-      Get.to(() => const LoginPage());
-      return {'ok': true};
-    } catch (e) {
-      return {'ok': false, 'message': e.toString()};
     }
   }
 
