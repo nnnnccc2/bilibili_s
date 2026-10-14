@@ -111,7 +111,12 @@ extension FilterSettings {
         ("10分钟", 600),
         ("12分钟", 720),
         ("14分钟", 840),
-        ("15分钟", 900)
+        ("15分钟", 900),
+        ("20分钟", 1200),
+        ("30分钟", 1800),
+        ("40分钟", 2400),
+        ("60分钟", 3600),
+        ("2小时", 7200)
     ]
 
     /// Effective global duration block threshold = max of all selected durations.

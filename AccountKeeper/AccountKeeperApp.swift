@@ -39,6 +39,15 @@ let biliBackgroundGradient = Color.biliBackground
 struct BiliBiliApp: App {
     @StateObject private var store = AppStore()
 
+    init() {
+        // Large shared URL cache so cover/avatar images load instantly on
+        // scroll-back and do not cause jank from repeated network fetches.
+        let memoryCap = 64 * 1024 * 1024   // 64 MB in-memory
+        let diskCap = 256 * 1024 * 1024     // 256 MB on-disk
+        let cache = URLCache(memoryCapacity: memoryCap, diskCapacity: diskCap, diskPath: "BiliBiliImages")
+        URLCache.shared = cache
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

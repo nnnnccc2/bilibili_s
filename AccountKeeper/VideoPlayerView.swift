@@ -364,6 +364,13 @@ struct VideoPlayerView: View {
 
     private func setupPlayer() {
         isBuffering = true
+        // Activate playback audio session so audio plays even with the silent switch on.
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+        } catch {
+            print("[BiliBili] AVAudioSession setup failed: \(error)")
+        }
         // Prefetch stream URL; once we have it, build an AVPlayerItem tuned for fast start.
         BiliAPI.shared.streamURL(for: video) { url in
             DispatchQueue.main.async {
@@ -381,7 +388,9 @@ struct VideoPlayerView: View {
                     item.preferredPeakBitRate = 2_000_000
                 }
                 let p = AVPlayer(playerItem: item)
-                p.automaticallyWaitsToMinimizeStalling = false
+                p.automaticallyWaitsToMinimizeStalling = true
+                p.isMuted = false
+                p.volume = 1.0
                 p.rate = 1.0
                 self.player = p
                 // Start loading immediately

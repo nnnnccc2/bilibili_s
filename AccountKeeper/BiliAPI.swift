@@ -357,41 +357,168 @@ final class BiliAPI {
 
     /// Get a playable video stream URL using the Bilibili player API.
     /// Prefers a progressive mp4 (durl) with muxed audio+video so AVPlayer can play directly.
-    /// Uses the cached cid (from feed APIs) when available to skip a redundant detail request.
+    /// Routes by video.category: regular videos use playurl, live rooms use the live
+    /// playurl API, and cinema (PGC) seasons resolve the first episode then playurl.
     func streamURL(for video: Video, completion: @escaping (URL?) -> Void) {
         // Return cached URL immediately if available
         if let cached = streamURLCache[video.id] {
             DispatchQueue.main.async { completion(cached) }
             return
         }
-        let cachedCid = video.cid
-        if cachedCid > 0 {
-            // Fast path: cid already known from feed, go straight to playurl
-            requestPlayURL(bvid: video.id, cid: cachedCid) { [weak self] url in
+
+        switch video.category {
+        case "直播":
+            requestLivePlayURL(roomId: video.id) { [weak self] url in
                 if let url = url { self?.streamURLCache[video.id] = url }
                 completion(url)
             }
-            return
-        }
-        // Slow path: fetch detail to get cid first
-        fetchVideoDetail(bvid: video.id) { [weak self] detail in
-            guard let cid = detail?.cid, cid > 0 else {
-                DispatchQueue.main.async { completion(nil) }
+        case "影视":
+            requestCinemaPlayURL(seasonId: video.id) { [weak self] url in
+                if let url = url { self?.streamURLCache[video.id] = url }
+                completion(url)
+            }
+        default:
+            let cachedCid = video.cid
+            if cachedCid > 0 {
+                // Fast path: cid already known from feed, go straight to playurl
+                requestPlayURL(bvid: video.id, cid: cachedCid) { [weak self] url in
+                    if let url = url { self?.streamURLCache[video.id] = url }
+                    completion(url)
+                }
                 return
             }
-            self?.requestPlayURL(bvid: video.id, cid: cid) { url in
-                if let url = url { self?.streamURLCache[video.id] = url }
-                completion(url)
+            // Slow path: fetch detail to get cid first
+            fetchVideoDetail(bvid: video.id) { [weak self] detail in
+                guard let cid = detail?.cid, cid > 0 else {
+                    DispatchQueue.main.async { completion(nil) }
+                    return
+                }
+                self?.requestPlayURL(bvid: video.id, cid: cid) { url in
+                    if let url = url { self?.streamURLCache[video.id] = url }
+                    completion(url)
+                }
             }
         }
     }
 
+    // MARK: - Live stream URL
+
+    /// Resolve a live room's playable stream URL (FLV, muxed audio+video).
+    private func requestLivePlayURL(roomId: String, completion: @escaping (URL?) -> Void) {
+        guard let rid = Int(roomId), rid > 0 else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        let params: [String: String] = [
+            "room_id": String(rid),
+            "protocol": "0",
+            "format": "0,1,2",
+            "codec": "0,1",
+            "qn": "10000",
+            "platform": "web",
+            "ptype": "8"
+        ]
+        request("https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo", params: params) { [weak self] data, _, _ in
+            let url = self?.parseLivePlayURL(data)
+            DispatchQueue.main.async { completion(url) }
+        }
+    }
+
+    /// Parse the live playurl response. Prefers HLS (ts/fmp4) which AVPlayer can
+    /// play directly; falls back to FLV only if HLS is unavailable.
+    func parseLivePlayURL(_ data: Data?) -> URL? {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let playurlInfo = d["playurl_info"] as? [String: Any],
+              let playurl = playurlInfo["playurl"] as? [String: Any],
+              let streams = playurl["stream"] as? [[String: Any]] else { return nil }
+
+        // Collect all stream URLs grouped by format, prefer HLS.
+        var hlsCandidates: [URL] = []
+        var flvCandidates: [URL] = []
+
+        for stream in streams {
+            guard let formats = stream["format"] as? [[String: Any]] else { continue }
+            for fmt in formats {
+                let formatName = fmt["format_name"] as? String ?? ""
+                guard let codecs = fmt["codec"] as? [[String: Any]] else { continue }
+                for codec in codecs {
+                    guard let baseURL = codec["base_url"] as? String,
+                          let urlInfos = codec["url_info"] as? [[String: Any]],
+                          let info = urlInfos.first,
+                          let host = info["host"] as? String,
+                          let extra = info["extra"] as? String else { continue }
+                    let full = host + baseURL + extra
+                    if let url = URL(string: full) {
+                        if formatName == "ts" || formatName == "fmp4" {
+                            hlsCandidates.append(url)
+                        } else {
+                            flvCandidates.append(url)
+                        }
+                    }
+                }
+            }
+        }
+        return hlsCandidates.first ?? flvCandidates.first
+    }
+
+    // MARK: - Cinema (PGC) stream URL
+
+    /// Resolve a cinema season's first episode stream URL.
+    private func requestCinemaPlayURL(seasonId: String, completion: @escaping (URL?) -> Void) {
+        guard let sid = Int(seasonId), sid > 0 else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        // 1. Get season detail to find the first episode id
+        request("https://api.bilibili.com/pgc/view/web/season", params: ["season_id": String(sid)]) { [weak self] data, _, _ in
+            guard let json = self?.parseJSON(data),
+                  let result = json["result"] as? [String: Any],
+                  let episodes = result["episodes"] as? [[String: Any]],
+                  let firstEp = episodes.first,
+                  let epid = firstEp["id"] as? Int else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            // 2. Get playurl for the first episode
+            let params: [String: String] = [
+                "ep_id": String(epid),
+                "qn": "80",
+                "fnval": "0",
+                "fnver": "0",
+                "fourk": "1"
+            ]
+            self?.request("https://api.bilibili.com/pgc/player/web/playurl", params: params) { [weak self] data, _, _ in
+                let url = self?.parseCinemaPlayURL(data)
+                DispatchQueue.main.async { completion(url) }
+            }
+        }
+    }
+
+    /// Parse the PGC playurl response and return the first durl stream URL.
+    func parseCinemaPlayURL(_ data: Data?) -> URL? {
+        guard let json = parseJSON(data),
+              let result = json["result"] as? [String: Any] else { return nil }
+        if let durl = result["durl"] as? [[String: Any]],
+           let first = durl.first,
+           let url = first["url"] as? String {
+            return URL(string: url)
+        }
+        return nil
+    }
+
     /// Prefetch the stream URL for a video (called when a card appears on screen).
     /// Only prefetches when cid is already known to avoid extra requests.
+    /// Concurrency is capped to avoid saturating the network while scrolling.
+    private var prefetchInFlight = 0
+    private let maxPrefetchInFlight = 4
     func prefetchStreamURL(for video: Video) {
         guard streamURLCache[video.id] == nil, video.cid > 0 else { return }
+        guard prefetchInFlight < maxPrefetchInFlight else { return }
+        prefetchInFlight += 1
         requestPlayURL(bvid: video.id, cid: video.cid) { [weak self] url in
             if let url = url { self?.streamURLCache[video.id] = url }
+            self?.prefetchInFlight -= 1
         }
     }
 

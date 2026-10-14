@@ -172,6 +172,8 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.biliBackground)
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24, style: .continuous))
+        // Rasterize the rounded board so it doesn't re-clip every scroll frame.
+        .drawingGroup()
     }
 
     private func loadVideos(force: Bool = false) {
