@@ -30,6 +30,7 @@ struct VideoPlayerView: View {
     @State private var toast: String?
     @State private var aid: Int = 0
     @State private var isSendingComment = false
+    @State private var upFans: Int = 0
 
     var body: some View {
         NavigationStack {
@@ -75,6 +76,11 @@ struct VideoPlayerView: View {
         .onAppear {
             setupPlayer()
             loadComments()
+            if video.upMid > 0 {
+                BiliAPI.shared.fetchUPSpaceInfo(mid: video.upMid) { info in
+                    DispatchQueue.main.async { upFans = info?.fans ?? 0 }
+                }
+            }
             if store.currentUser != nil, video.upMid > 0 {
                 BiliAPI.shared.checkRelation(mid: video.upMid) { following in
                     DispatchQueue.main.async { isFollowing = following }
@@ -228,7 +234,7 @@ struct VideoPlayerView: View {
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundStyle(.primary)
-                            Text("\(video.viewsText) 粉丝")
+                            Text(upFans > 0 ? "\(upFans > 10000 ? String(format: "%.1f万", Double(upFans)/10000) : "\(upFans)") 粉丝" : "UP主")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -301,20 +307,10 @@ struct VideoPlayerView: View {
 
             Divider().padding(.horizontal)
 
-            // Tags
-            HStack(spacing: 8) {
-                ForEach(["#魔术", "#奇迹", "#杂谈", "#娱乐"], id: \.self) { tag in
-                    Text(tag)
-                        .font(.caption)
-                        .foregroundColor(.biliBlue)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.biliBlue.opacity(0.08))
-                        .clipShape(Capsule())
-                }
+            // Tags area reserved (not returned by basic view API)
+            if !video.desc.isEmpty {
+                Spacer().frame(height: 8)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 16)
         }
     }
 

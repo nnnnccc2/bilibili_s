@@ -210,9 +210,20 @@ final class BiliAPI {
             }
         }
         if let json = parseJSON(data),
-           let d = json["data"] as? [String: Any],
-           let cookieUrl = d["url"] as? String, cookieUrl.contains("SESSDATA") {
-            extractCookies(from: cookieUrl)
+           let d = json["data"] as? [String: Any] {
+            // Primary source: cookie_info.cookies array returned in the JSON body
+            if let cookieInfo = d["cookie_info"] as? [String: Any],
+               let cookieList = cookieInfo["cookies"] as? [[String: Any]] {
+                for c in cookieList {
+                    if let name = c["name"] as? String, let value = c["value"] as? String {
+                        cookies[name] = value
+                    }
+                }
+            }
+            // Fallback: parse from url field if present
+            if let cookieUrl = d["url"] as? String, cookieUrl.contains("SESSDATA") {
+                extractCookies(from: cookieUrl)
+            }
         }
     }
 
@@ -285,6 +296,23 @@ final class BiliAPI {
         request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: true) { [weak self] data, _, _ in
             let videos = self?.parseSearch(data, type: type) ?? []
             DispatchQueue.main.async { completion(videos) }
+        }
+    }
+
+    // MARK: - Trending search keywords
+
+    /// Fetch real-time hot search keywords from Bilibili.
+    func fetchTrendingKeywords(limit: Int = 10, completion: @escaping ([String]) -> Void) {
+        request("https://api.bilibili.com/x/web-interface/search/square", params: ["limit": String(limit)]) { data, _, _ in
+            guard let json = self.parseJSON(data),
+                  let d = json["data"] as? [String: Any],
+                  let trending = d["trending"] as? [String: Any],
+                  let list = trending["list"] as? [[String: Any]] else {
+                DispatchQueue.main.async { completion([]) }
+                return
+            }
+            let keywords = list.compactMap { $0["keyword"] as? String }.prefix(limit)
+            DispatchQueue.main.async { completion(Array(keywords)) }
         }
     }
 
@@ -442,7 +470,16 @@ final class BiliAPI {
                         self?.cookies[c.name] = c.value
                     }
                 }
-                // Also parse cookie from url field if present
+                // Primary source: cookie_info.cookies array returned in the JSON body
+                if let cookieInfo = d["cookie_info"] as? [String: Any],
+                   let cookieList = cookieInfo["cookies"] as? [[String: Any]] {
+                    for c in cookieList {
+                        if let name = c["name"] as? String, let value = c["value"] as? String {
+                            self?.cookies[name] = value
+                        }
+                    }
+                }
+                // Also parse cookie from url field if present (fallback)
                 if let cookieUrl = d["url"] as? String, cookieUrl.contains("SESSDATA") {
                     self?.extractCookies(from: cookieUrl)
                 }

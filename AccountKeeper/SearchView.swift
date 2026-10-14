@@ -23,6 +23,8 @@ struct SearchView: View {
     @State private var selectedUPMid: Int = 0
     @State private var selectedUPName: String = ""
     @State private var showingUPSpace = false
+    @State private var hotKeywords: [String] = []
+    @State private var isLoadingKeywords = false
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
@@ -119,27 +121,38 @@ struct SearchView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if !hasSearched {
-                    // Hot search suggestions
+                    // Hot search suggestions (real-time from Bilibili)
                     VStack(alignment: .leading, spacing: 12) {
                         Text("大家都在搜")
                             .font(.headline)
                             .padding(.horizontal)
-                        FlowLayout(spacing: 8) {
-                            ForEach(MockVideos.hotKeywords, id: \.self) { kw in
-                                Button {
-                                    keyword = kw
-                                    performSearch()
-                                } label: {
-                                    Text(kw)
-                                        .font(.subheadline)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 7)
-                                        .background(Color(.secondarySystemBackground))
-                                        .clipShape(Capsule())
+                        if isLoadingKeywords && hotKeywords.isEmpty {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                        } else if hotKeywords.isEmpty {
+                            Text("暂无热搜数据")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal)
+                        } else {
+                            FlowLayout(spacing: 8) {
+                                ForEach(hotKeywords, id: \.self) { kw in
+                                    Button {
+                                        keyword = kw
+                                        performSearch()
+                                    } label: {
+                                        Text(kw)
+                                            .font(.subheadline)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 7)
+                                            .background(Color(.secondarySystemBackground))
+                                            .clipShape(Capsule())
+                                    }
                                 }
                             }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                         Spacer()
                     }
                     .padding(.top)
@@ -218,6 +231,18 @@ struct SearchView: View {
                     UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
                         .environmentObject(store)
                 }
+            }
+            .onAppear { loadHotKeywords() }
+        }
+    }
+
+    private func loadHotKeywords() {
+        guard hotKeywords.isEmpty else { return }
+        isLoadingKeywords = true
+        BiliAPI.shared.fetchTrendingKeywords(limit: 10) { keywords in
+            DispatchQueue.main.async {
+                hotKeywords = keywords
+                isLoadingKeywords = false
             }
         }
     }
