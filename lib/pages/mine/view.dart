@@ -99,6 +99,7 @@ class _MediaPageState extends CommonPageState<MinePage>
                     _buildUserInfo(theme, secondary),
                     _buildActions(secondary),
                     _buildPurifyBoard(),
+                    _buildWebAppEntry(),
                     for (final tab in controller.mineTabs)
                       switch (tab) {
                         .favorite => Obx(_buildFav),
@@ -147,6 +148,44 @@ class _MediaPageState extends CommonPageState<MinePage>
             ),
           )
           .toList(),
+    );
+  }
+
+  /// HTML 直连版入口：以 WebView 加载 demo 前端，
+  /// 经原生桥对接 PiliPlus 的真实接口与登录态
+  Widget _buildWebAppEntry() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: PureGlassCard(
+        onTap: () => Get.toNamed('/webapp'),
+        child: const Row(
+          children: [
+            Icon(Icons.language, size: 20, color: PureColors.brand),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'HTML 直连版界面',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: PureColors.titleText,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    '以 WebView 载入 demo 页面，数据走 App 真实接口',
+                    style: TextStyle(fontSize: 11, color: PureColors.subText),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 18, color: PureColors.subText),
+          ],
+        ),
+      ),
     );
   }
 
