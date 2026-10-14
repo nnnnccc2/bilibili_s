@@ -35,15 +35,19 @@ class _WebAssetServer {
   };
 
   /// 启动本地服务并返回入口地址（幂等，端口随机）
+  ///
+  /// 入口用站点根路径 `/`：demo 是 Expo Router 应用，其初始路由按
+  /// pathname 匹配，若直接访问 `/index.html` 会被判为不存在的路由而
+  /// 落到 404 页面；根路径 `/` 才会命中 index 路由并重定向到 `/home`。
   static Future<String> start() async {
     if (_server != null && _port != null) {
-      return 'http://127.0.0.1:$_port/index.html';
+      return 'http://127.0.0.1:$_port/';
     }
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server = server;
     _port = server.port;
     server.listen(_handle, onError: (_) {});
-    return 'http://127.0.0.1:$_port/index.html';
+    return 'http://127.0.0.1:$_port/';
   }
 
   static Future<void> _handle(HttpRequest req) async {
