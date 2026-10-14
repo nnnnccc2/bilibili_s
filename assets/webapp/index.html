@@ -1,52 +1,42 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>PiliPlus Web</title>
-<link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <!-- Hero 蓝色顶栏 -->
-  <header class="hero">
-    <div class="hero-inner">
-      <div id="hero-title" class="hero-title">PiliPlus</div>
-      <div id="hero-sub" class="hero-sub"></div>
-      <!-- 搜索页的搜索框 -->
-      <div id="hero-search" class="hero-search hidden">
-        <input id="search-input" type="search" placeholder="搜索视频..." autocomplete="off" />
-        <button id="search-btn">搜索</button>
-      </div>
-    </div>
-  </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover, user-scalable=no, maximum-scale=1"
+    />
+    <meta name="theme-color" content="#A7D8F0" />
+    <title>哔哩哔哩客户端</title>
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        overflow: hidden;
+        background: #a7d8f0;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+        box-sizing: border-box;
+      }
+    </style>
+    <link rel="stylesheet" href="web.css" />
+  </head>
 
-  <!-- 内容主区 -->
-  <main id="app" class="app">
-    <div id="loading" class="loading hidden">加载中...</div>
-    <div id="error" class="error hidden"></div>
-    <!-- 页面容器：各路由把内容渲染到这里 -->
-    <section id="page" class="page"></section>
-  </main>
+  <body>
+    <noscript>需要开启 JavaScript 才能运行此应用。</noscript>
+    <div id="root"></div>
 
-  <!-- 底 pill 导航 -->
-  <nav class="nav">
-    <a href="#/home" class="nav-item" data-tab="home">
-      <span class="nav-icon">🏠</span><span class="nav-label">首页</span>
-    </a>
-    <a href="#/follow" class="nav-item" data-tab="follow">
-      <span class="nav-icon">❤️</span><span class="nav-label">关注</span>
-    </a>
-    <a href="#/region" class="nav-item" data-tab="region">
-      <span class="nav-icon">📺</span><span class="nav-label">分区</span>
-    </a>
-    <a href="#/search" class="nav-item" data-tab="search">
-      <span class="nav-icon">🔍</span><span class="nav-label">搜索</span>
-    </a>
-    <a href="#/mine" class="nav-item" data-tab="mine">
-      <span class="nav-icon">👤</span><span class="nav-label">我的</span>
-    </a>
-  </nav>
-
-  <script src="app.js"></script>
-</body>
+    <!-- 1) 原生桥（同步，必须在业务 bundle 之前执行） -->
+    <script src="qrcode.js"></script>
+    <script src="bridge.js"></script>
+    <!-- 2) 参考 demo 的原始前端 bundle（1:1 复刻，仅注入数据层） -->
+    <script src="entry.js" defer></script>
+  </body>
 </html>

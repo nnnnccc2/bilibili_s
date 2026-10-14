@@ -5,8 +5,12 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/http/init.dart';
+import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/http/login.dart';
+import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/pages/login/view.dart';
 import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/accounts/account.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/purification.dart';
 import 'package:PiliPlus/utils/wbi_sign.dart';
@@ -31,6 +35,18 @@ abstract final class BiliApi {
           : <String, dynamic>{};
 
       switch (action) {
+        case 'proxy':
+          return await _proxy(p);
+        case 'whoami':
+          return await _whoami();
+        case 'logout':
+          return await _logout();
+        case 'loginQr':
+          return await _loginQr();
+        case 'loginPoll':
+          return await _loginPoll(p);
+        case 'deviceInset':
+          return await _deviceInset();
         case 'home':
           return await _home(p);
         case 'follow':
@@ -89,41 +105,38 @@ abstract final class BiliApi {
   // 底层网络工具
   // ---------------------------------------------------------------------------
 
+  /// 把各种形态的响应体统一成 Map<String, dynamic>
+  static Map<String, dynamic> _normalize(dynamic data) {
+    if (data is Map) {
+      return data.map((k, v) => MapEntry(k.toString(), v));
+    }
+    if (data is String && data.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded is Map) {
+          return decoded.map((k, v) => MapEntry(k.toString(), v));
+        }
+      } catch (_) {}
+    }
+    return {'code': -1, 'message': 'unexpected response'};
+  }
+
   /// 统一 GET：返回 Map（解析后的 JSON）
+  /// 复用 [Request] 单例，自动携带 cookie / buvid 拦截器链
   static Future<Map<String, dynamic>> _get(
     String url, {
     Map<String, dynamic>? queryParameters,
     bool wbi = false,
   }) async {
     try {
-      Map<String, Object>? params = queryParameters
-          ?.map((k, v) => MapEntry(k, v as Object));
+      Map<String, dynamic>? params = queryParameters;
       if (wbi && params != null) {
-        params = await WbiSign.makSign(params);
+        params = await WbiSign.makSign(
+          params.map((k, v) => MapEntry(k, v as Object)),
+        );
       }
-      final response = await Request.dio.get<String>(
-        url,
-        queryParameters: params,
-        options: Options(
-          validateStatus: (_) => true,
-          responseType: ResponseType.plain,
-        ),
-      );
-      final raw = response.data;
-      if (raw == null) {
-        return {
-          'code': response.statusCode ?? -1,
-          'message': 'empty response',
-        };
-      }
-      final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) return decoded;
-      return {'code': 0, 'message': 'ok', 'data': decoded};
-    } on DioException catch (e) {
-      return {
-        'code': e.response?.statusCode ?? -1,
-        'message': e.toString(),
-      };
+      final res = await Request().get(url, queryParameters: params);
+      return _normalize(res.data);
     } catch (e) {
       return {'code': -1, 'message': e.toString()};
     }
@@ -136,31 +149,13 @@ abstract final class BiliApi {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      final response = await Request.dio.post<String>(
+      final res = await Request().post(
         url,
-        queryParameters: queryParameters,
         data: data,
-        options: Options(
-          validateStatus: (_) => true,
-          responseType: ResponseType.plain,
-          contentType: Headers.formUrlEncodedContentType,
-        ),
+        queryParameters: queryParameters,
+        options: Options(contentType: Headers.formUrlEncodedContentType),
       );
-      final raw = response.data;
-      if (raw == null) {
-        return {
-          'code': response.statusCode ?? -1,
-          'message': 'empty response',
-        };
-      }
-      final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) return decoded;
-      return {'code': 0, 'message': 'ok', 'data': decoded};
-    } on DioException catch (e) {
-      return {
-        'code': e.response?.statusCode ?? -1,
-        'message': e.toString(),
-      };
+      return _normalize(res.data);
     } catch (e) {
       return {'code': -1, 'message': e.toString()};
     }
@@ -300,6 +295,151 @@ abstract final class BiliApi {
   // ---------------------------------------------------------------------------
   // 具体 action 实现
   // ---------------------------------------------------------------------------
+
+  /// demo 前端所有发往 api.bilibili.com 的 fetch/XHR 都转发到这里，
+  /// 复用 PiliPlus 的原生网络栈（cookie / buvid / 签名）取真实数据。
+  static Future<Map<String, dynamic>> _proxy(Map<String, dynamic> p) async {
+    final raw = (p['url'] as String? ?? '').trim();
+    if (raw.isEmpty) return {'code': -1, 'message': '缺少 url'};
+
+    Uri uri;
+    try {
+      uri = Uri.parse(raw);
+    } catch (_) {
+      return {'code': -1, 'message': 'invalid url: $raw'};
+    }
+    final path = uri.path.isEmpty ? '/' : uri.path;
+    final qp = <String, dynamic>{};
+    uri.queryParameters.forEach((k, v) => qp[k] = v);
+
+    final method = (p['method'] as String? ?? 'GET').toUpperCase();
+    Map<String, dynamic> resp;
+    if (method == 'POST') {
+      final data = <String, dynamic>{};
+      final body = p['body'] as String?;
+      if (body != null && body.isNotEmpty) {
+        try {
+          Uri.splitQueryString(body).forEach((k, v) => data[k] = v);
+        } catch (_) {}
+      }
+      resp = await _post(path, data, queryParameters: qp.isEmpty ? null : qp);
+    } else {
+      resp = await _get(
+        path,
+        queryParameters: qp.isEmpty ? null : qp,
+        wbi: _needWbi(path),
+      );
+    }
+    // 净化过滤交由 demo 前端自带的引擎完成（其看板 / 拦截日志 / 规则设置
+    // 都基于未过滤的原始列表），此层只负责取真实数据，避免双重过滤。
+    return resp;
+  }
+
+  /// 需要 wbi 签名的接口（demo 直接裸调，由原生补上签名）
+  static bool _needWbi(String path) {
+    if (path.contains('/wbi/')) return true;
+    const wbiPaths = {
+      '/x/web-interface/search/type',
+      '/x/web-interface/search/all/v2',
+      '/x/web-interface/view',
+      '/x/space/arc/search',
+      '/x/space/acc/info',
+      '/x/v2/reply/wbi/main',
+    };
+    return wbiPaths.contains(path);
+  }
+
+  /// 当前登录用户信息（供 demo 账号层使用）
+  static Future<Map<String, dynamic>> _whoami() async {
+    final acc = Accounts.main;
+    if (!acc.isLogin) return {'isLogin': false};
+
+    final resp = await _get('/x/web-interface/nav');
+    var name = '';
+    var face = '';
+    var level = 0;
+    var vip = false;
+    num coin = 0;
+    final data = resp['data'];
+    if (data is Map) {
+      if (data['uname'] is String) name = data['uname'] as String;
+      if (data['face'] is String) face = data['face'] as String;
+      final li = data['level_info'];
+      if (li is Map && li['current_level'] is num) {
+        level = (li['current_level'] as num).toInt();
+      }
+      vip = data['vipStatus'] == 1;
+      if (data['money'] is num) coin = data['money'] as num;
+    }
+    return {
+      'isLogin': true,
+      'name': name,
+      'username': name,
+      'mid': acc.mid,
+      'face': face,
+      'level': level,
+      'vip': vip,
+      'coin': coin,
+    };
+  }
+
+  /// 登出当前主账号
+  static Future<Map<String, dynamic>> _logout() async {
+    try {
+      final main = Accounts.main;
+      if (main is LoginAccount) {
+        try {
+          await LoginHttp.logout(main);
+        } catch (_) {}
+      }
+      await Accounts.deleteAll({Accounts.main});
+    } catch (e) {
+      return {'ok': false, 'message': e.toString()};
+    }
+    return {'ok': true};
+  }
+
+  /// 生成扫码登录二维码（返回二维码内容与轮询用 authCode）
+  static Future<Map<String, dynamic>> _loginQr() async {
+    final res = await LoginHttp.getHDcode();
+    if (res case Success(:final response)) {
+      return {'url': response.url, 'authCode': response.authCode};
+    }
+    return {'code': -1, 'message': '二维码获取失败'};
+  }
+
+  /// 轮询扫码状态；成功时把账号写入原生并切为主账号
+  static Future<Map<String, dynamic>> _loginPoll(Map<String, dynamic> p) async {
+    final authCode = p['authCode'] as String? ?? '';
+    if (authCode.isEmpty) return {'code': -1, 'message': '缺少 authCode'};
+
+    final r = await LoginHttp.codePoll(authCode);
+    if (r['status'] == true) {
+      try {
+        final data = r['data'];
+        if (data is Map) {
+          final cookieInfo = data['cookie_info'];
+          final cookies = cookieInfo is Map ? cookieInfo['cookies'] : null;
+          if (cookies is List) {
+            final account = LoginAccount(
+              BiliCookieJar.fromList(cookies),
+              data['access_token'] as String?,
+              data['refresh_token'] as String?,
+            );
+            // 设为主账号：内部会同步 WebView cookie 并拉取用户信息
+            await Accounts.set(AccountType.main, account);
+          }
+        }
+      } catch (_) {}
+    }
+    return {'status': r['status'] == true, 'code': r['code'], 'msg': r['msg']};
+  }
+
+  /// 刘海/安全区：正文已由 Flutter 层整体下移，WebView 内无需再补，
+  /// 返回 0 防止与 demo 自带的 env(safe-area-inset-*) 重复叠加。
+  static Future<Map<String, dynamic>> _deviceInset() async {
+    return {'top': 0, 'bottom': 0};
+  }
 
   static Future<Map<String, dynamic>> _home(Map<String, dynamic> p) async {
     final pn = (p['pn'] as num?)?.toInt() ?? 1;
@@ -493,12 +633,11 @@ abstract final class BiliApi {
 
   static Future<Map<String, dynamic>> _history(Map<String, dynamic> p) async {
     final pn = (p['pn'] as num?)?.toInt() ?? 1;
-    final resp = await _get(
+    final ps = (p['ps'] as num?)?.toInt() ?? 20;
+    return await _get(
       '/x/v2/history',
-      queryParameters: {'ps': 20, 'pn': pn},
+      queryParameters: {'ps': ps, 'pn': pn},
     );
-    _purifyInPlace(resp);
-    return resp;
   }
 
   static Future<Map<String, dynamic>> _favFolders(Map<String, dynamic> p) async {
@@ -603,7 +742,8 @@ abstract final class BiliApi {
   }
 
   static Future<Map<String, dynamic>> _toast(Map<String, dynamic> p) async {
-    SmartDialog.showToast(p['msg']?.toString() ?? '');
+    final msg = p['msg']?.toString() ?? '';
+    if (msg.isNotEmpty) SmartDialog.showToast(msg);
     return {'ok': true};
   }
 }
