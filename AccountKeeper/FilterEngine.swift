@@ -18,15 +18,8 @@ final class FilterEngine {
     }
 
     /// Returns the block reason if the video should be filtered out, nil otherwise.
-    /// Priority order: bad data → insult → clickbait → exclamation spam → japanese title → japanese UP → duration
+    /// Priority order: insult → clickbait → exclamation spam → japanese title → japanese UP → duration
     func shouldBlock(_ video: Video) -> BlockReason? {
-        // 0. Bad data — no cover, no bvid, empty title → definitely broken, always filter
-        if video.cover.trimmingCharacters(in: .whitespaces).isEmpty
-            || video.id.trimmingCharacters(in: .whitespaces).isEmpty
-            || video.title.trimmingCharacters(in: .whitespaces).isEmpty {
-            return .badData
-        }
-
         // 1. Insult / derogatory word filtering (matches title & UP主 name)
         if settings.enableInsultWordFilter {
             let words = settings.activeInsultWords
@@ -48,7 +41,7 @@ final class FilterEngine {
                     return .clickbait
                 }
             }
-            // 2b. Exclamation spam: ≥2 consecutive !/？/！/？ → clickbait pattern
+            // 2b. 连续 2+ 个 !/？/！/？ 视为引导式标题
             if hasExclamationSpam(in: title) {
                 return .exclamationSpam
             }
@@ -78,12 +71,12 @@ final class FilterEngine {
 
     // MARK: - Exclamation spam detection
 
-    /// Titles with 2+ consecutive !/？/！/？ are nearly always clickbait ("震惊！！！")
+    /// 标题里连续出现 2 个及以上的 !/？/！/？ → 基本都是引导式标题
     private func hasExclamationSpam(in text: String) -> Bool {
         let target: CharacterSet = CharacterSet(charactersIn: "!?！？")
         var run = 0
-        for c in text {
-            if target.contains(UnicodeScalar(c)!) {
+        for scalar in text.unicodeScalars {
+            if target.contains(scalar) {
                 run += 1
                 if run >= 2 { return true }
             } else {

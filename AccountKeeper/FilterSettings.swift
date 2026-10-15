@@ -15,6 +15,7 @@ struct FilterStats: Codable, Hashable {
     var byJapaneseUP: Int = 0
     var byDuration: Int = 0
     var byInsultWord: Int = 0
+    var byExclamationSpam: Int = 0
 
     mutating func add(_ reason: BlockReason) {
         totalBlocked += 1
@@ -24,6 +25,7 @@ struct FilterStats: Codable, Hashable {
         case .japaneseUP: byJapaneseUP += 1
         case .duration: byDuration += 1
         case .insultWord: byInsultWord += 1
+        case .exclamationSpam: byExclamationSpam += 1
         }
     }
 }
