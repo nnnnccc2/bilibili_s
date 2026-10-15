@@ -223,10 +223,17 @@ struct SearchView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text("搜索")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("取消") { dismiss() }
                 }
             }
+            // 键盘弹出时不要把搜索框顶到导航栏区域（避免和"搜索"文字重叠）
+            .ignoresSafeArea(.keyboard, edges: .bottom)
             .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video)
                     .environmentObject(store)

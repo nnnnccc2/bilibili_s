@@ -164,7 +164,7 @@ final class BiliAPI {
 
     // MARK: - Generic request
 
-    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, referer: String? = nil, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
         let build: (Bool) -> Void = { [weak self] hasKeys in
             guard let self = self else { return }
             var url: URL?
@@ -186,6 +186,7 @@ final class BiliAPI {
             }
             var req = URLRequest(url: finalURL)
             for (k, v) in self.baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
+            if let referer = referer { req.setValue(referer, forHTTPHeaderField: "Referer") }
             if !self.cookieHeader.isEmpty {
                 req.setValue(self.cookieHeader, forHTTPHeaderField: "Cookie")
             }
@@ -643,7 +644,7 @@ final class BiliAPI {
     /// Fetch a UP主's profile info (name, avatar, bio, follower/following counts).
     func fetchUPSpaceInfo(mid: Int, completion: @escaping (UPSpaceInfo?) -> Void) {
         let params: [String: String] = ["mid": String(mid)]
-        request("https://api.bilibili.com/x/space/wbi/acc/info", params: params, useWBI: false) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/space/wbi/acc/info", params: params, useWBI: true, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
             let info = self?.parseUPSpaceInfo(data)
             DispatchQueue.main.async { completion(info) }
         }
@@ -658,7 +659,7 @@ final class BiliAPI {
             "order": "pubdate",
             "platform": "web"
         ]
-        request("https://api.bilibili.com/x/space/arc/search", params: params, useWBI: false) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
             DispatchQueue.main.async { completion(videos, total) }
         }
