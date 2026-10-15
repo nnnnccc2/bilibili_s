@@ -18,8 +18,15 @@ final class FilterEngine {
     }
 
     /// Returns the block reason if the video should be filtered out, nil otherwise.
-    /// Priority order: insult word > clickbait > japanese title > japanese UP > duration
+    /// Priority order: bad data → insult → clickbait → exclamation spam → japanese title → japanese UP → duration
     func shouldBlock(_ video: Video) -> BlockReason? {
+        // 0. Bad data — no cover, no bvid, empty title → definitely broken, always filter
+        if video.cover.trimmingCharacters(in: .whitespaces).isEmpty
+            || video.id.trimmingCharacters(in: .whitespaces).isEmpty
+            || video.title.trimmingCharacters(in: .whitespaces).isEmpty {
+            return .badData
+        }
+
         // 1. Insult / derogatory word filtering (matches title & UP主 name)
         if settings.enableInsultWordFilter {
             let words = settings.activeInsultWords
@@ -40,6 +47,10 @@ final class FilterEngine {
                 if title.contains(word) {
                     return .clickbait
                 }
+            }
+            // 2b. Exclamation spam: ≥2 consecutive !/？/！/？ → clickbait pattern
+            if hasExclamationSpam(in: title) {
+                return .exclamationSpam
             }
         }
 
@@ -63,6 +74,23 @@ final class FilterEngine {
         }
 
         return nil
+    }
+
+    // MARK: - Exclamation spam detection
+
+    /// Titles with 2+ consecutive !/？/！/？ are nearly always clickbait ("震惊！！！")
+    private func hasExclamationSpam(in text: String) -> Bool {
+        let target: CharacterSet = CharacterSet(charactersIn: "!?！？")
+        var run = 0
+        for c in text {
+            if target.contains(UnicodeScalar(c)!) {
+                run += 1
+                if run >= 2 { return true }
+            } else {
+                run = 0
+            }
+        }
+        return false
     }
 
     /// Search-result specific filter: applies the global rules plus the search min-duration filter.
