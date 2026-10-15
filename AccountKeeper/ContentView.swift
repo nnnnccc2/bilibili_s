@@ -36,7 +36,7 @@ struct ContentView: View {
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
-        .sheet(isPresented: $showingSearch) {
+        .fullScreenCover(isPresented: $showingSearch) {
             SearchView().environmentObject(store)
         }
     }

@@ -658,7 +658,7 @@ final class BiliAPI {
             "order": "pubdate",
             "platform": "web"
         ]
-        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: false) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/space/arc/search", params: params, useWBI: false) { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
             DispatchQueue.main.async { completion(videos, total) }
         }

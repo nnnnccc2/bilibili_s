@@ -71,7 +71,7 @@ struct FilterSettings: Codable, Hashable {
 // MARK: - Built-in word lists
 
 extension FilterSettings {
-    /// Clickbait / leading title keywords + 连续感叹号检测 (!! / !!!)
+    /// Clickbait / leading title keywords (含 ! / !! / !!! 连续感叹号)
     static let builtInClickbaitWords: [String] = [
         "疯了", "炸了", "屌爆了", "惊呆了", "吓尿了", "千万别看",
         "震惊", "卧槽", "绝了", "太牛了", "神了",
@@ -79,7 +79,9 @@ extension FilterSettings {
         "看完沉默", "不看后悔", "太可怕了", "太离谱了",
         "千万别买", "千万不要", "万万没想到",
         "99%的人", "所有人都", "强烈推荐",
-        "一秒入坑", "笑不活了", "人傻了", "直接封神"
+        "一秒入坑", "笑不活了", "人傻了", "直接封神",
+        // 感叹号垃圾标题（!!! / !! / ! 单独出现）
+        "!!!", "!!", "!"
     ]
 
     /// Insulting / derogatory word list (built-in core 32 words)
