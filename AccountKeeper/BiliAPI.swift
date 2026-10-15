@@ -231,7 +231,7 @@ final class BiliAPI {
     }
 
     /// Normalize a cover URL to an https:// URL that iOS can load under ATS.
-    private static func coverURL(_ raw: String) -> String {
+    internal static func coverURL(_ raw: String) -> String {
         if raw.hasPrefix("https://") { return raw }
         if raw.hasPrefix("http://") { return raw.replacingOccurrences(of: "http://", with: "https://") }
         if raw.hasPrefix("//") { return "https:" + raw }

@@ -253,12 +253,13 @@ struct VideoPlayerView: View {
                     if video.upMid > 0 { showingUPSpace = true }
                 } label: {
                     HStack(spacing: 10) {
-                        AsyncImage(url: URL(string: video.upAvatar)) { phase in
-                            if let img = phase.image {
-                                img.resizable().scaledToFill()
-                            } else {
-                                Circle().fill(Color.gray.opacity(0.3))
-                            }
+                        CachedAsyncImage(
+                            url: URL(string: BiliAPI.coverThumb(video.upAvatar, width: 80)),
+                            targetSize: CGSize(width: 40, height: 40)
+                        ) { img in
+                            img.resizable().scaledToFill()
+                        } placeholder: {
+                            Circle().fill(Color.gray.opacity(0.3))
                         }
                         .frame(width: 40, height: 40)
                         .clipShape(Circle())
@@ -588,12 +589,13 @@ struct CommentRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            AsyncImage(url: URL(string: comment.avatar)) { phase in
-                if let img = phase.image {
-                    img.resizable().scaledToFill()
-                } else {
-                    Circle().fill(Color.gray.opacity(0.3))
-                }
+            CachedAsyncImage(
+                url: URL(string: BiliAPI.coverThumb(comment.avatar, width: 64)),
+                targetSize: CGSize(width: 32, height: 32)
+            ) { img in
+                img.resizable().scaledToFill()
+            } placeholder: {
+                Circle().fill(Color.gray.opacity(0.3))
             }
             .frame(width: 32, height: 32)
             .clipShape(Circle())

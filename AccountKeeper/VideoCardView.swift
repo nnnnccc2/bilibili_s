@@ -16,26 +16,14 @@ struct VideoCardView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Cover (16:9) with duration badge
             ZStack(alignment: .bottomTrailing) {
-                AsyncImage(url: URL(string: video.cover)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure:
-                        Rectangle()
-                            .fill(Color.biliMutedSurface)
-                            .overlay(
-                                Image(systemName: "play.rectangle")
-                                    .foregroundStyle(.secondary)
-                            )
-                    case .empty:
-                        Rectangle()
-                            .fill(Color.biliMutedSurface)
-                            .overlay(ProgressView().scaleEffect(0.8))
-                    @unknown default:
-                        Rectangle().fill(Color.biliMutedSurface)
-                    }
+                CachedAsyncImage(
+                    url: URL(string: BiliAPI.coverThumb(video.cover, width: 360)),
+                    targetSize: CGSize(width: 180, height: 101)
+                ) { img in
+                    img.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.biliMutedSurface)
                 }
                 .aspectRatio(16.0/9.0, contentMode: .fit)
                 .frame(maxWidth: .infinity)
@@ -130,13 +118,13 @@ struct VideoCardView: View {
     @ViewBuilder
     private var upAvatar: some View {
         if !video.upAvatar.isEmpty {
-            AsyncImage(url: URL(string: video.upAvatar)) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().aspectRatio(contentMode: .fill)
-                default:
-                    Rectangle().fill(Color.biliMutedSurface)
-                }
+            CachedAsyncImage(
+                url: URL(string: BiliAPI.coverThumb(video.upAvatar, width: 64)),
+                targetSize: CGSize(width: 14, height: 14)
+            ) { img in
+                img.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle().fill(Color.biliMutedSurface)
             }
             .frame(width: 14, height: 14)
             .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))

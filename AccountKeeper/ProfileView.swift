@@ -137,13 +137,14 @@ struct ProfileView: View {
         if let user = store.currentUser {
             VStack(spacing: 16) {
                 HStack(spacing: 14) {
-                    if !user.avatar.isEmpty, let url = URL(string: user.avatar) {
-                        AsyncImage(url: url) { phase in
-                            if let img = phase.image {
-                                img.resizable().scaledToFill()
-                            } else {
-                                Circle().fill(Color.biliBlue.opacity(0.3))
-                            }
+                    if !user.avatar.isEmpty {
+                        CachedAsyncImage(
+                            url: URL(string: BiliAPI.coverThumb(user.avatar, width: 128)),
+                            targetSize: CGSize(width: 64, height: 64)
+                        ) { img in
+                            img.resizable().scaledToFill()
+                        } placeholder: {
+                            Circle().fill(Color.biliBlue.opacity(0.3))
                         }
                         .frame(width: 64, height: 64)
                         .clipShape(Circle())
@@ -412,12 +413,13 @@ struct ProfileView: View {
                                     showingHistory = false
                                 } label: {
                                     HStack(spacing: 10) {
-                                        AsyncImage(url: URL(string: item.cover)) { phase in
-                                            if let img = phase.image {
-                                                img.resizable().aspectRatio(contentMode: .fill)
-                                            } else {
-                                                Rectangle().fill(Color.gray.opacity(0.2))
-                                            }
+                                        CachedAsyncImage(
+                                            url: URL(string: BiliAPI.coverThumb(item.cover, width: 160)),
+                                            targetSize: CGSize(width: 80, height: 50)
+                                        ) { img in
+                                            img.resizable().aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Rectangle().fill(Color.gray.opacity(0.2))
                                         }
                                         .frame(width: 80, height: 50)
                                         .clipShape(RoundedRectangle(cornerRadius: 6))

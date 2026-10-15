@@ -65,12 +65,13 @@ struct UPSpaceView: View {
     private var headerSection: some View {
         VStack(spacing: 12) {
             HStack(spacing: 14) {
-                AsyncImage(url: URL(string: info?.avatar ?? "")) { phase in
-                    if let img = phase.image {
-                        img.resizable().scaledToFill()
-                    } else {
-                        Circle().fill(Color.gray.opacity(0.3))
-                    }
+                CachedAsyncImage(
+                    url: URL(string: BiliAPI.coverThumb(info?.avatar ?? "", width: 128)),
+                    targetSize: CGSize(width: 72, height: 72)
+                ) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Circle().fill(Color.gray.opacity(0.3))
                 }
                 .frame(width: 72, height: 72)
                 .clipShape(Circle())
