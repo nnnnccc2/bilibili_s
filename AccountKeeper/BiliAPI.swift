@@ -173,7 +173,11 @@ final class BiliAPI {
 
     // MARK: - Generic request
 
-    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, referer: String? = nil, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+    /// Android-app-style user agent. Space endpoints accept this without WBI
+    /// and return code=0 reliably (same approach PiliPlus uses).
+    private static let appUserAgent = "Mozilla/5.0 BiliDroid/7.54.0 (bbcallen@gmail.com) os/android model/Pixel mobi_app/android build/7540000"
+
+    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, useAppUA: Bool = false, referer: String? = nil, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
         let build: (Bool) -> Void = { [weak self] hasKeys in
             guard let self = self else { return }
             var url: URL?
@@ -194,7 +198,12 @@ final class BiliAPI {
                 return
             }
             var req = URLRequest(url: finalURL)
-            for (k, v) in self.baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
+            if useAppUA {
+                req.setValue(Self.appUserAgent, forHTTPHeaderField: "User-Agent")
+                req.setValue("cronet", forHTTPHeaderField: "bili-http-engine")
+            } else {
+                for (k, v) in self.baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
+            }
             if let referer = referer { req.setValue(referer, forHTTPHeaderField: "Referer") }
             if !self.cookieHeader.isEmpty {
                 req.setValue(self.cookieHeader, forHTTPHeaderField: "Cookie")
@@ -668,10 +677,10 @@ final class BiliAPI {
     // MARK: - UP主 space & relation
 
     /// Fetch a UP主's profile info (name, avatar, bio, follower/following counts).
-    /// Uses /x/web-interface/card which does NOT require WBI signing (stable).
+    /// Uses /x/web-interface/card with Android app UA (no WBI, stable).
     func fetchUPSpaceInfo(mid: Int, completion: @escaping (UPSpaceInfo?) -> Void) {
         let params: [String: String] = ["mid": String(mid), "photo": "true"]
-        request("https://api.bilibili.com/x/web-interface/card", params: params, useWBI: false, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/web-interface/card", params: params, useWBI: false, useAppUA: true, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
             let info = self?.parseUPSpaceInfo(data)
             DispatchQueue.main.async { completion(info) }
         }
@@ -691,7 +700,7 @@ final class BiliAPI {
     }
 
     private func fetchUPVideosOnce(mid: Int, params: [String: String], retry: Int, completion: @escaping ([Video], Int) -> Void) {
-        request("https://api.bilibili.com/x/space/arc/search", params: params, useWBI: false, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/space/arc/search", params: params, useWBI: false, useAppUA: true, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
             // -799 = rate limit; retry once after 1s
             if videos.isEmpty, retry > 0, let json = self?.parseJSON(data), (json["code"] as? Int) == -799 {

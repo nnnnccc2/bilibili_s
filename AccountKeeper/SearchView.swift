@@ -66,7 +66,7 @@ struct SearchView: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.top, 12)
+                .padding(.top, 20)
 
                 // Content type tabs
                 ScrollView(.horizontal, showsIndicators: false) {
