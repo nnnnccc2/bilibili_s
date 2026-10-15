@@ -182,73 +182,7 @@ struct SearchView: View {
 
                     ScrollView {
                         if searchType == .user {
-                            // 用户列表：卡片式布局，与 App 整体风格统一，用户间明显区分
-                            LazyVStack(spacing: 10) {
-                                ForEach(results) { user in
-                                    Button {
-                                        if user.upMid > 0 {
-                                            selectedUPMid = user.upMid
-                                            selectedUPName = user.upName
-                                            showingUPSpace = true
-                                        }
-                                    } label: {
-                                        HStack(spacing: 12) {
-                                            CachedAsyncImage(
-                                                url: URL(string: BiliAPI.coverThumb(user.upAvatar, width: 120)),
-                                                targetSize: CGSize(width: 56, height: 56)
-                                            ) { img in
-                                                img.resizable().scaledToFill()
-                                            } placeholder: {
-                                                Circle().fill(Color.gray.opacity(0.2))
-                                            }
-                                            .frame(width: 56, height: 56)
-                                            .clipShape(Circle())
-                                            .overlay(Circle().stroke(Color.white.opacity(0.8), lineWidth: 2))
-                                            .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
-
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(user.title)
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundStyle(.primary)
-                                                    .lineLimit(1)
-                                                if !user.desc.isEmpty {
-                                                    Text(user.desc)
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                        .lineLimit(1)
-                                                }
-                                                HStack(spacing: 5) {
-                                                    Image(systemName: "person.2.fill")
-                                                        .font(.caption2)
-                                                        .foregroundStyle(.biliBlue)
-                                                    Text("\(user.viewsText) 粉丝")
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                }
-                                            }
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
-                                                .font(.caption)
-                                                .foregroundStyle(.tertiary)
-                                        }
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 14)
-                                        .background(Color.biliCard)
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .onAppear {
-                                        if user.id == results.last?.id, hasMore, !isLoadingMore {
-                                            loadMore()
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.top, 8)
-                            .padding(.bottom, 20)
+                            userList
                         } else {
                             // 视频/番剧/直播：双列卡片网格
                             LazyVGrid(columns: columns, spacing: 12) {
@@ -305,6 +239,80 @@ struct SearchView: View {
             }
             .onAppear { loadHotKeywords() }
         }
+    }
+
+    // MARK: - User search results (extracted to reduce type-check complexity)
+    private var userList: some View {
+        LazyVStack(spacing: 10) {
+            ForEach(results) { user in
+                userRow(user)
+                    .onAppear {
+                        if user.id == results.last?.id, hasMore, !isLoadingMore {
+                            loadMore()
+                        }
+                    }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 20)
+    }
+
+    private func userRow(_ user: Video) -> some View {
+        Button {
+            if user.upMid > 0 {
+                selectedUPMid = user.upMid
+                selectedUPName = user.upName
+                showingUPSpace = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                CachedAsyncImage(
+                    url: URL(string: BiliAPI.coverThumb(user.upAvatar, width: 120)),
+                    targetSize: CGSize(width: 56, height: 56)
+                ) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Circle().fill(Color.gray.opacity(0.2))
+                }
+                .frame(width: 56, height: 56)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.8), lineWidth: 2))
+                .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(user.title)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if !user.desc.isEmpty {
+                        Text(user.desc)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    HStack(spacing: 5) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.biliBlue)
+                        Text("\(user.viewsText) 粉丝")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .background(Color.biliCard)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func loadHotKeywords() {
