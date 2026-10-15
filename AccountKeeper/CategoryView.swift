@@ -13,6 +13,9 @@ struct CategoryView: View {
     @State private var selectedPartition: Partition?
     @State private var partitionVideos: [Video] = []
     @State private var isLoading = false
+    @State private var isLoadingMore = false
+    @State private var page = 1
+    @State private var hasMore = true
     @State private var selectedVideo: Video?
     @State private var selectedUPMid: Int = 0
     @State private var selectedUPName: String = ""
@@ -105,11 +108,20 @@ struct CategoryView: View {
                                     }
                                         .contentShape(Rectangle())
                                         .onTapGesture { selectedVideo = video }
+                                        .onAppear {
+                                            if video.id == partitionVideos.last?.id, hasMore, !isLoadingMore {
+                                                loadPartition(selectedPartition, reset: false)
+                                            }
+                                        }
                                 }
                             }
                             .padding(.horizontal, 8)
                             .padding(.top, 8)
                             .padding(.bottom, 24)
+
+                            if isLoadingMore {
+                                ProgressView().padding(.vertical, 12)
+                            }
                         }
                     }
                 }
@@ -121,6 +133,8 @@ struct CategoryView: View {
                         Button {
                             selectedPartition = nil
                             partitionVideos = []
+                            page = 1
+                            hasMore = true
                         } label: {
                             Image(systemName: "chevron.left")
                                 .foregroundColor(.biliBlue)
@@ -155,14 +169,34 @@ struct CategoryView: View {
         }
     }
 
-    private func loadPartition(_ p: Partition) {
-        isLoading = true
-        partitionVideos = []
-        BiliAPI.shared.fetchPartition(p) { raw in
+    private func loadPartition(_ p: Partition?, reset: Bool = true) {
+        guard let p = p else { return }
+        if reset {
+            page = 1
+            hasMore = true
+            isLoading = true
+            partitionVideos = []
+        } else {
+            guard hasMore, !isLoadingMore else { return }
+            isLoadingMore = true
+        }
+        BiliAPI.shared.fetchPartition(p, page: page) { raw in
             DispatchQueue.main.async {
                 let filtered = store.applyFilter(raw)
-                partitionVideos = filtered
-                isLoading = false
+                if reset {
+                    partitionVideos = filtered
+                    isLoading = false
+                } else {
+                    for v in filtered where !partitionVideos.contains(where: { $0.id == v.id }) {
+                        partitionVideos.append(v)
+                    }
+                    isLoadingMore = false
+                }
+                if filtered.isEmpty {
+                    hasMore = false
+                } else {
+                    page += 1
+                }
             }
         }
     }

@@ -3,10 +3,11 @@
 //  BiliBili
 //
 //  Video player & detail page. Pure playback, NO danmaku.
+//  Custom controls: play/pause bottom-left, fullscreen bottom-right, NO AirPlay.
 //
 
 import SwiftUI
-import AVKit
+import AVFoundation
 
 struct VideoPlayerView: View {
     @EnvironmentObject var store: AppStore
@@ -32,6 +33,11 @@ struct VideoPlayerView: View {
     @State private var isSendingComment = false
     @State private var upFans: Int = 0
 
+    // Playback controls UI state
+    @State private var isPlaying = false
+    @State private var showControls = true
+    @State private var controlsTimer: Timer?
+
     var body: some View {
         ZStack(alignment: .top) {
             // Dark background so letterbox areas are black, not white
@@ -39,31 +45,15 @@ struct VideoPlayerView: View {
 
             if showFullScreen {
                 // True full-screen: only the player, edge-to-edge
-                if let p = player {
-                    VideoPlayer(player: p)
+                ZStack {
+                    PlayerLayerView(player: player)
                         .ignoresSafeArea()
-                        .onAppear { p.play() }
-                } else {
-                    Color.black.ignoresSafeArea()
-                }
-                // Top controls overlay
-                VStack {
-                    HStack {
-                        Button { showFullScreen = false } label: {
-                            Image(systemName: "xmark")
-                                .font(.title2)
-                                .foregroundStyle(.white)
-                                .padding(12)
-                        }
-                        Spacer()
-                    }
-                    .padding(.top, 4)
-                    Spacer()
+                    fullScreenControls
                 }
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Player (16:9, edge-to-edge, no white bar above)
+                        // Player (16:9, edge-to-edge)
                         playerSection
                             .aspectRatio(16.0/9.0, contentMode: .fit)
                             .frame(maxWidth: .infinity)
@@ -98,14 +88,6 @@ struct VideoPlayerView: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-                    Button { showFullScreen = true } label: {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(Color.black.opacity(0.35))
-                            .clipShape(Circle())
-                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
@@ -123,6 +105,14 @@ struct VideoPlayerView: View {
                 BiliAPI.shared.checkRelation(mid: video.upMid) { following in
                     DispatchQueue.main.async { isFollowing = following }
                 }
+            }
+        }
+        .onDisappear {
+            // Pause & release this player when leaving; PlayerManager ensures
+            // switching to another video pauses the previous one.
+            if let p = player {
+                p.pause()
+                PlayerManager.shared.deactivate(p)
             }
         }
         .sheet(isPresented: $showingUPSpace) {
@@ -150,6 +140,148 @@ struct VideoPlayerView: View {
         .statusBarHidden(showFullScreen)
     }
 
+    // MARK: - Full-screen controls (play/pause bottom-left, fullscreen bottom-right)
+
+    private var fullScreenControls: some View {
+        ZStack {
+            // Tap anywhere to toggle controls
+            Color.black.opacity(0.001)
+                .onTapGesture { toggleControls() }
+
+            if showControls {
+                VStack {
+                    // Top: close button
+                    HStack {
+                        Button { showFullScreen = false } label: {
+                            Image(systemName: "xmark")
+                                .font(.title2)
+                                .foregroundStyle(.white)
+                                .padding(12)
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+
+                    Spacer()
+
+                    // Bottom bar: play/pause (left) + fullscreen exit (right)
+                    HStack {
+                        Button { togglePlay() } label: {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 28, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 52, height: 52)
+                                .background(Color.black.opacity(0.4))
+                                .clipShape(Circle())
+                        }
+                        Spacer()
+                        Button { showFullScreen = false } label: {
+                            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.black.opacity(0.4))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
+                }
+                .transition(.opacity)
+            }
+        }
+        .onAppear { scheduleHideControls() }
+    }
+
+    // MARK: - Inline player section (also custom controls: play/pause bottom-left, fullscreen bottom-right)
+
+    @ViewBuilder
+    private var playerSection: some View {
+        ZStack {
+            Color.black
+            if let player = player {
+                PlayerLayerView(player: player)
+            } else {
+                VStack(spacing: 8) {
+                    if isBuffering {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.2)
+                        Text("视频加载中...")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                    } else {
+                        Image(systemName: "play.rectangle.fill")
+                            .font(.system(size: 64))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+            }
+
+            // Tap to toggle controls
+            Color.black.opacity(0.001)
+                .onTapGesture { toggleControls() }
+
+            if showControls {
+                // Bottom-left: play/pause ; Bottom-right: fullscreen
+                VStack {
+                    Spacer()
+                    HStack(alignment: .bottom) {
+                        Button { togglePlay() } label: {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.black.opacity(0.4))
+                                .clipShape(Circle())
+                        }
+                        Spacer()
+                        Button { showFullScreen = true } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.black.opacity(0.4))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+                }
+                .transition(.opacity)
+            }
+        }
+    }
+
+    // MARK: - Controls helpers
+
+    private func toggleControls() {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            showControls.toggle()
+        }
+        if showControls { scheduleHideControls() }
+    }
+
+    private func scheduleHideControls() {
+        controlsTimer?.invalidate()
+        controlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.2)) { showControls = false }
+            }
+        }
+    }
+
+    private func togglePlay() {
+        guard let p = player else { return }
+        if isPlaying {
+            p.pause()
+            isPlaying = false
+        } else {
+            p.play()
+            isPlaying = true
+        }
+    }
+
     // MARK: - Tabs
 
     private func tabButton(title: String, index: Int) -> some View {
@@ -169,63 +301,10 @@ struct VideoPlayerView: View {
         }
     }
 
-    // MARK: - Player section
-
-    @ViewBuilder
-    private var playerSection: some View {
-        ZStack {
-            Color.black
-            if let player = player {
-                VideoPlayer(player: player)
-                    .onAppear {
-                        player.play()
-                        writeHistoryOnce()
-                    }
-            } else {
-                VStack(spacing: 8) {
-                    if isBuffering {
-                        ProgressView()
-                            .tint(.white)
-                            .scaleEffect(1.2)
-                        Text("视频加载中...")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.7))
-                    } else {
-                        // B站 TV logo placeholder
-                        Image(systemName: "play.rectangle.fill")
-                            .font(.system(size: 64))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
-                }
-            }
-            // "B站官方播放器(无弹幕)" pill — top right
-            VStack {
-                HStack {
-                    Spacer()
-                    HStack(spacing: 4) {
-                        Image(systemName: "tv.fill")
-                            .font(.caption2)
-                        Text("B站官方播放器(无弹幕)")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.biliBlue)
-                    .clipShape(Capsule())
-                    .padding(12)
-                }
-                Spacer()
-            }
-        }
-    }
-
     // MARK: - Intro section
 
     private var introSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Title
             Text(video.title)
                 .font(.title3)
                 .fontWeight(.bold)
@@ -233,7 +312,6 @@ struct VideoPlayerView: View {
                 .padding(.horizontal)
                 .padding(.top, 8)
 
-            // Stats row
             HStack(spacing: 12) {
                 Text("\(video.viewsText) 播放")
                 Text(video.publishTime)
@@ -247,7 +325,6 @@ struct VideoPlayerView: View {
 
             Divider().padding(.horizontal)
 
-            // UP主 info (tap to open space)
             HStack(spacing: 10) {
                 Button {
                     if video.upMid > 0 { showingUPSpace = true }
@@ -299,7 +376,6 @@ struct VideoPlayerView: View {
             }
             .padding(.horizontal)
 
-            // Description box
             if !video.desc.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(video.desc)
@@ -323,7 +399,6 @@ struct VideoPlayerView: View {
 
             Divider().padding(.horizontal)
 
-            // Interaction bar
             HStack(spacing: 0) {
                 interactionButton(icon: isLiked ? "hand.thumbsup.fill" : "hand.thumbsup",
                                   count: video.likes + (isLiked ? 1 : 0),
@@ -342,7 +417,6 @@ struct VideoPlayerView: View {
 
             Divider().padding(.horizontal)
 
-            // Tags area reserved (not returned by basic view API)
             if !video.desc.isEmpty {
                 Spacer().frame(height: 8)
             }
@@ -353,7 +427,6 @@ struct VideoPlayerView: View {
 
     private var commentsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Comment input
             HStack {
                 TextField("发一条友善的评论...", text: $commentText)
                     .padding(10)
@@ -395,18 +468,16 @@ struct VideoPlayerView: View {
         }
     }
 
-    // MARK: - Player setup (optimized for fast start)
+    // MARK: - Player setup
 
     private func setupPlayer() {
         isBuffering = true
-        // Activate playback audio session so audio plays even with the silent switch on.
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
             try AVAudioSession.sharedInstance().setActive(true, options: [])
         } catch {
             print("[BiliBili] AVAudioSession setup failed: \(error)")
         }
-        // Prefetch stream URL; once we have it, build an AVPlayerItem tuned for fast start.
         BiliAPI.shared.streamURL(for: video) { url in
             DispatchQueue.main.async {
                 isBuffering = false
@@ -417,19 +488,21 @@ struct VideoPlayerView: View {
                 ]
                 let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
                 let item = AVPlayerItem(asset: asset)
-                // Reduce initial buffering wait and pre-buffer ahead for snappy playback
                 item.preferredForwardBufferDuration = 5.0
                 if #available(iOS 16.0, *) {
                     item.preferredPeakBitRate = 2_000_000
                 }
                 let p = AVPlayer(playerItem: item)
                 p.automaticallyWaitsToMinimizeStalling = true
-                p.isMuted = false
                 p.volume = 1.0
                 p.rate = 1.0
                 self.player = p
-                // Start loading immediately
+                // Pause any previously-playing video, then play this one.
+                PlayerManager.shared.activate(p)
                 p.play()
+                isPlaying = true
+                showControls = true
+                scheduleHideControls()
                 writeHistoryOnce()
             }
         }
@@ -481,7 +554,7 @@ struct VideoPlayerView: View {
         }
     }
 
-    // MARK: - Real actions (follow / like / coin / favorite)
+    // MARK: - Real actions
 
     private func toggleFollow() {
         guard store.currentUser != nil else {
@@ -559,8 +632,6 @@ struct VideoPlayerView: View {
         }
     }
 
-    // MARK: - Helpers
-
     private func interactionButton(icon: String, count: Int?, label: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
@@ -621,33 +692,5 @@ struct CommentRow: View {
             }
             Spacer()
         }
-    }
-}
-
-// MARK: - Full screen player
-
-struct FullScreenPlayer: View {
-    let player: AVPlayer
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            VideoPlayer(player: player)
-                .onAppear { player.play() }
-            VStack {
-                HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                            .padding()
-                    }
-                    Spacer()
-                }
-                Spacer()
-            }
-        }
-        .statusBarHidden(true)
     }
 }

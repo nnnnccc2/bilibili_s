@@ -66,7 +66,7 @@ struct SearchView: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.top, 8)
+                .padding(.top, 6)
 
                 // Content type tabs
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -182,8 +182,8 @@ struct SearchView: View {
 
                     ScrollView {
                         if searchType == .user {
-                            // 用户列表：卡片式布局，宽松间距，易区分
-                            LazyVStack(spacing: 10) {
+                            // 用户列表：简洁清朗，头像 + 名字 + 签名 + 粉丝数
+                            LazyVStack(spacing: 0) {
                                 ForEach(results) { user in
                                     Button {
                                         if user.upMid > 0 {
@@ -192,23 +192,22 @@ struct SearchView: View {
                                             showingUPSpace = true
                                         }
                                     } label: {
-                                        HStack(spacing: 14) {
+                                        HStack(spacing: 12) {
                                             CachedAsyncImage(
                                                 url: URL(string: BiliAPI.coverThumb(user.upAvatar, width: 96)),
-                                                targetSize: CGSize(width: 52, height: 52)
+                                                targetSize: CGSize(width: 48, height: 48)
                                             ) { img in
                                                 img.resizable().scaledToFill()
                                             } placeholder: {
                                                 Circle().fill(Color.gray.opacity(0.2))
                                             }
-                                            .frame(width: 52, height: 52)
+                                            .frame(width: 48, height: 48)
                                             .clipShape(Circle())
-                                            .overlay(Circle().stroke(Color.biliBlue.opacity(0.15), lineWidth: 1.5))
 
-                                            VStack(alignment: .leading, spacing: 5) {
+                                            VStack(alignment: .leading, spacing: 3) {
                                                 Text(user.title)
                                                     .font(.subheadline)
-                                                    .fontWeight(.semibold)
+                                                    .fontWeight(.medium)
                                                     .foregroundStyle(.primary)
                                                     .lineLimit(1)
                                                 if !user.desc.isEmpty {
@@ -221,10 +220,7 @@ struct SearchView: View {
                                                     Image(systemName: "person.2.fill")
                                                         .font(.caption2)
                                                         .foregroundStyle(.secondary)
-                                                    Text(user.viewsText)
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                    Text("粉丝")
+                                                    Text("\(user.viewsText) 粉丝")
                                                         .font(.caption)
                                                         .foregroundStyle(.secondary)
                                                 }
@@ -232,15 +228,15 @@ struct SearchView: View {
                                             Spacer()
                                             Image(systemName: "chevron.right")
                                                 .font(.caption)
-                                                .foregroundStyle(.tertiary)
+                                                .foregroundStyle(.quaternary)
                                         }
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 14)
-                                        .background(Color.biliCard)
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 11)
                                         .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
+                                    Divider()
+                                        .padding(.leading, 76)
                                     .onAppear {
                                         if user.id == results.last?.id, hasMore, !isLoadingMore {
                                             loadMore()
@@ -248,8 +244,7 @@ struct SearchView: View {
                                     }
                                 }
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.top, 8)
+                            .padding(.top, 4)
                             .padding(.bottom, 20)
                         } else {
                             // 视频/番剧/直播：双列卡片网格
@@ -284,14 +279,17 @@ struct SearchView: View {
                     }
                 }
             }
-            .navigationTitle("搜索")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text("搜索")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("取消") { dismiss() }
                 }
             }
-            .ignoresSafeArea(.keyboard, edges: .bottom)
             .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video)
                     .environmentObject(store)

@@ -146,10 +146,11 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         ZStack {
             placeholder()
                 .opacity(phase == .loaded ? 0 : 1)
+                .animation(.none, value: phase == .loaded)
 
             if let img = image {
                 content(Image(uiImage: img))
-                    .transition(.opacity.animation(.easeIn(duration: 0.18)))
+                    .transition(.opacity)
                     .id(img.hashValue)
             }
         }

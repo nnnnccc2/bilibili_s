@@ -400,7 +400,7 @@ final class BiliAPI {
 
     // MARK: - Partition
 
-    func fetchPartition(_ partition: Partition, completion: @escaping ([Video]) -> Void) {
+    func fetchPartition(_ partition: Partition, page: Int = 1, completion: @escaping ([Video]) -> Void) {
         // Map partitions to Bilibili rid
         let ridMap: [Partition: Int] = [
             .anime: 1, .music: 3, .dance: 129, .game: 4, .knowledge: 36,
@@ -408,15 +408,19 @@ final class BiliAPI {
             .auto: 202, .cinema: 181, .entertainment: 5
         ]
         let rid = ridMap[partition] ?? 1
-        // ranking/region returns the top videos of a partition directly as a list
-        // under `data` (the old dynamic/region endpoint now returns -404).
+        // ranking/region only returns ~11 videos (weekly top). To get a full,
+        // paginated category feed we use the search API with the `tids` filter,
+        // which returns hundreds of results.
         let params: [String: String] = [
-            "rid": String(rid),
-            "day": "7",
-            "ps": "30"
+            "search_type": "video",
+            "keyword": partition.rawValue,
+            "tids": String(rid),
+            "page": String(page),
+            "ps": "50",
+            "order": "pubdate"
         ]
-        request("https://api.bilibili.com/x/web-interface/ranking/region", params: params) { [weak self] data, _, _ in
-            let videos = self?.parseRegion(data) ?? []
+        request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: false) { [weak self] data, _, _ in
+            let videos = self?.parseSearch(data, type: .video) ?? []
             DispatchQueue.main.async { completion(videos) }
         }
     }
@@ -734,6 +738,10 @@ final class BiliAPI {
     /// Uses web endpoint /x/space/wbi/arc/search with WBI signing + buvid3 cookie.
     /// Stable code=0 and supports pn pagination.
     func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
+        fetchUPVideos(mid: mid, page: page, pageSize: pageSize, retry: 3, completion: completion)
+    }
+
+    private func fetchUPVideos(mid: Int, page: Int, pageSize: Int, retry: Int, completion: @escaping ([Video], Int) -> Void) {
         let params: [String: String] = [
             "mid": String(mid),
             "ps": String(pageSize),
@@ -745,7 +753,14 @@ final class BiliAPI {
         ]
         request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true, useAppUA: false, referer: "https://space.bilibili.com/\(mid)/video") { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
-            DispatchQueue.main.async { completion(videos, total) }
+            if videos.isEmpty && retry > 0 {
+                // Transient failure (WBI key/风控/网络) — retry after short delay
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.8) {
+                    self?.fetchUPVideos(mid: mid, page: page, pageSize: pageSize, retry: retry - 1, completion: completion)
+                }
+            } else {
+                DispatchQueue.main.async { completion(videos, total) }
+            }
         }
     }
 
