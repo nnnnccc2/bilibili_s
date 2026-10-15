@@ -16,6 +16,7 @@ struct FilterStats: Codable, Hashable {
     var byDuration: Int = 0
     var byInsultWord: Int = 0
     var byExclamationSpam: Int = 0
+    var byBadData: Int = 0
 
     mutating func add(_ reason: BlockReason) {
         totalBlocked += 1
@@ -26,6 +27,7 @@ struct FilterStats: Codable, Hashable {
         case .duration: byDuration += 1
         case .insultWord: byInsultWord += 1
         case .exclamationSpam: byExclamationSpam += 1
+        case .badData: byBadData += 1
         }
     }
 }
@@ -69,37 +71,15 @@ struct FilterSettings: Codable, Hashable {
 // MARK: - Built-in word lists
 
 extension FilterSettings {
-    /// Clickbait / leading title keywords (e.g. 疯了、炸了、屌爆了、！、惊呆了 etc.)
+    /// Clickbait / leading title keywords + 连续感叹号检测 (!! / !!!)
     static let builtInClickbaitWords: [String] = [
-        // 情绪极端型
-        "疯了", "炸了", "屌爆了", "惊呆了", "吓尿了", "吓尿",
-        "震惊", "卧槽", "绝了", "太牛了", "神了", "牛逼",
+        "疯了", "炸了", "屌爆了", "惊呆了", "吓尿了", "千万别看",
+        "震惊", "卧槽", "绝了", "太牛了", "神了",
         "逆天", "离谱", "破防了", "泪目", "绷不住了",
-        "太离谱了", "太可怕了", "太夸张了",
-        // 劝退/劝进型
-        "千万别看", "千万别买", "千万不要", "千万别",
-        "不看后悔", "看完沉默", "看完哭了", "看完直接",
-        "万万没想到", "谁能想到", "简直不敢信",
-        // 数字套路型
-        "99%的人", "99%", "所有人都", "所有人", "100%",
-        "强烈推荐", "强烈建议", "必看", "必收藏", "必看",
-        // 情绪引导型
-        "一秒入坑", "笑不活了", "人傻了", "直接封神",
-        "破防", "泪崩", "破大防", "沉默",
-        "看完哭", "看完傻了", "看完愣了",
-        // 自我贬低/强行拉踩
-        "我哭死", "我破防", "我傻了", "我麻了", "哭死", "麻了", "破防",
-        "看完我哭了", "看完我傻了",
-        // 夸张程度副词
-        "离谱到家", "离大谱", "离谱他妈",
-        "绝绝子", "yyds", "YYDS",
-        // 强行拉仇恨
-        "千万别", "别进", "别买",
-        // 诱导点击
-        "点进来", "点开看看", "点开就",
-        // 套路化结构
-        "居然是", "原来竟然", "真相竟然",
-        "万万没", "你敢信", "你敢想"
+        "看完沉默", "不看后悔", "太可怕了", "太离谱了",
+        "千万别买", "千万不要", "万万没想到",
+        "99%的人", "所有人都", "强烈推荐",
+        "一秒入坑", "笑不活了", "人傻了", "直接封神"
     ]
 
     /// Insulting / derogatory word list (built-in core 32 words)

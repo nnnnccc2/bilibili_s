@@ -111,6 +111,7 @@ enum BlockReason: String, Codable, CaseIterable {
     case duration = "时长过短"
     case insultWord = "命中侮辱贬低词"
     case exclamationSpam = "标题感叹号过多"
+    case badData = "无封面/无视频"
 
     var icon: String {
         switch self {
@@ -120,6 +121,7 @@ enum BlockReason: String, Codable, CaseIterable {
         case .duration: return "timer"
         case .insultWord: return "hand.raised"
         case .exclamationSpam: return "text.badge.exclamationmark"
+        case .badData: return "photo.badge.exclamationmark"
         }
     }
 }

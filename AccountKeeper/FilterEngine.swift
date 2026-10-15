@@ -18,8 +18,15 @@ final class FilterEngine {
     }
 
     /// Returns the block reason if the video should be filtered out, nil otherwise.
-    /// Priority order: insult → clickbait → exclamation spam → japanese title → japanese UP → duration
+    /// Priority order: badData (必拦) → insult → clickbait → !!连续 → japanese → duration
     func shouldBlock(_ video: Video) -> BlockReason? {
+        // 0. 空白视频硬拦截 — 没有封面/没有 bvid 的卡片肯定打不开，直接过滤
+        if video.cover.trimmingCharacters(in: .whitespaces).isEmpty
+            || video.id.trimmingCharacters(in: .whitespaces).isEmpty
+            || video.title.trimmingCharacters(in: .whitespaces).isEmpty {
+            return .badData
+        }
+
         // 1. Insult / derogatory word filtering (matches title & UP主 name)
         if settings.enableInsultWordFilter {
             let words = settings.activeInsultWords
@@ -33,7 +40,7 @@ final class FilterEngine {
             }
         }
 
-        // 2. Clickbait / leading-title keyword filtering
+        // 2. Clickbait / leading-title keyword filtering + 连续 !!/!!! 拦截
         if settings.enableClickbaitFilter {
             let title = video.title
             for word in FilterSettings.builtInClickbaitWords {
@@ -41,7 +48,7 @@ final class FilterEngine {
                     return .clickbait
                 }
             }
-            // 2b. 连续 2+ 个 !/？/！/？ 视为引导式标题
+            // 2b. 连续 2+ 个 !/？/！/？ → 引导式标题 (!! / !!! / ?? / ???)
             if hasExclamationSpam(in: title) {
                 return .exclamationSpam
             }
