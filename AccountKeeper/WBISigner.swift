@@ -24,6 +24,10 @@ final class WBISigner {
     private var mixinKey: String = ""
     private var lastUpdate: Date = .distantPast
 
+    /// Cookies to send when fetching WBI keys (buvid3 etc.).
+    /// Set by BiliAPI on launch so the nav request isn't rejected.
+    var cookieHeader: String = ""
+
     private init() {}
 
     // MARK: - Public
@@ -71,8 +75,11 @@ final class WBISigner {
             return
         }
         var req = URLRequest(url: url)
-        req.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
         req.setValue("https://www.bilibili.com/", forHTTPHeaderField: "Referer")
+        if !cookieHeader.isEmpty {
+            req.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
+        }
         URLSession.shared.dataTask(with: req) { [weak self] data, _, error in
             guard let self = self else { return }
             if error != nil {

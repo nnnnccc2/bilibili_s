@@ -71,7 +71,16 @@ final class BiliAPI {
     }
 
     /// Visitor cookies (buvid3, buvid4, b_nut) fetched on launch; not persisted.
-    private var visitorCookies: [String: String] = [:]
+    private var visitorCookies: [String: String] = [:] {
+        didSet { syncWBISignerCookie() }
+    }
+
+    /// Keep WBISigner's cookie in sync so its nav/key fetch carries buvid3.
+    private func syncWBISignerCookie() {
+        var all = visitorCookies
+        for (k, v) in cookies { all[k] = v }
+        WBISigner.shared.cookieHeader = all.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
+    }
 
     /// Cache of resolved stream URLs keyed by bvid, to make playback near-instant on tap.
     private var streamURLCache: [String: URL] = [:]
@@ -196,7 +205,24 @@ final class BiliAPI {
         }
 
         if useWBI {
-            WBISigner.shared.refreshKeysIfNeeded { _ in build(true) }
+            WBISigner.shared.refreshKeysIfNeeded { success in
+                if success {
+                    build(true)
+                } else {
+                    // WBI key fetch failed (network / nav blocked); retry once more
+                    // after a short delay, then give up so the caller gets an error
+                    // instead of a silently-bad signature.
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.6) {
+                        WBISigner.shared.refreshKeysIfNeeded { retrySuccess in
+                            if retrySuccess {
+                                build(true)
+                            } else {
+                                completion(nil, nil, NSError(domain: "BiliAPI", code: -10, userInfo: [NSLocalizedDescriptionKey: "WBI 密钥获取失败"]))
+                            }
+                        }
+                    }
+                }
+            }
         } else {
             build(false)
         }
