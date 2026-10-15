@@ -687,25 +687,28 @@ final class BiliAPI {
     }
 
     /// Fetch a UP主's video list (paginated).
-    /// Uses /x/space/arc/search (no WBI). May hit -799 rate-limit; retries once.
+    /// Uses /x/space/arc/search (no WBI). May hit -799 rate-limit; retries up to 3x.
     func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
         let params: [String: String] = [
             "mid": String(mid),
             "ps": String(pageSize),
             "pn": String(page),
             "order": "pubdate",
-            "platform": "web"
+            "platform": "web",
+            "_": String(Int(Date().timeIntervalSince1970 * 1000))
         ]
-        fetchUPVideosOnce(mid: mid, params: params, retry: 1, completion: completion)
+        fetchUPVideosOnce(mid: mid, params: params, retry: 3, completion: completion)
     }
 
     private func fetchUPVideosOnce(mid: Int, params: [String: String], retry: Int, completion: @escaping ([Video], Int) -> Void) {
         request("https://api.bilibili.com/x/space/arc/search", params: params, useWBI: false, useAppUA: true, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
-            // -799 = rate limit; retry once after 1s
+            // -799 = rate limit; retry up to 3 times with 1.5s delay
             if videos.isEmpty, retry > 0, let json = self?.parseJSON(data), (json["code"] as? Int) == -799 {
-                DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
-                    self?.fetchUPVideosOnce(mid: mid, params: params, retry: retry - 1, completion: completion)
+                DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
+                    var p = params
+                    p["_"] = String(Int(Date().timeIntervalSince1970 * 1000))
+                    self?.fetchUPVideosOnce(mid: mid, params: p, retry: retry - 1, completion: completion)
                 }
                 return
             }

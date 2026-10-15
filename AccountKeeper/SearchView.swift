@@ -221,13 +221,9 @@ struct SearchView: View {
                     }
                 }
             }
+            .navigationTitle("搜索")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text("搜索")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("取消") { dismiss() }
                 }
