@@ -19,29 +19,33 @@ enum HomeCategory: String, CaseIterable, Identifiable {
 }
 
 enum Partition: String, CaseIterable, Identifiable {
-    case anime = "动画"
-    case music = "音乐"
-    case dance = "舞蹈"
-    case game = "游戏"
-    case knowledge = "知识"
-    case tech = "科技"
-    case life = "生活"
-    case guichu = "鬼畜"
-    case fashion = "时尚"
-    case news = "资讯"
+    case anime = "番剧动画"
+    case music = "音乐现场"
+    case dance = "舞蹈特区"
+    case game = "游戏中心"
+    case knowledge = "知识学堂"
+    case tech = "科技数码"
+    case life = "日常生活"
+    case guichu = "鬼畜搞笑"
+    case fashion = "时尚美妆"
+    case auto = "汽车出行"
+    case cinema = "影视剧场"
+    case entertainment = "娱乐综艺"
     var id: String { rawValue }
     var icon: String {
         switch self {
-        case .anime: return "tv"
+        case .anime: return "film"
         case .music: return "music.note"
-        case .dance: return "figure.dance"
+        case .dance: return "sparkles"
         case .game: return "gamecontroller"
         case .knowledge: return "book"
         case .tech: return "cpu"
         case .life: return "cup.and.saucer"
-        case .guichu: return "wand.and.stars"
+        case .guichu: return "face.smiling"
         case .fashion: return "tshirt"
-        case .news: return "newspaper"
+        case .auto: return "car"
+        case .cinema: return "tv"
+        case .entertainment: return "smiley"
         }
     }
 }
@@ -321,7 +325,8 @@ final class BiliAPI {
             }
         case .live:
             // Live rooms (home page index returns recommend_room_list + room_list modules)
-            request("https://api.live.bilibili.com/xlive/web-interface/v1/index/getList?platform=web&parent_area_id=0") { [weak self] data, _, _ in
+            let params: [String: String] = ["platform": "web", "parent_area_id": "0"]
+            request("https://api.live.bilibili.com/xlive/web-interface/v1/index/getList", params: params) { [weak self] data, _, _ in
                 let videos = self?.parseLive(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
             }
@@ -337,7 +342,12 @@ final class BiliAPI {
 
     // MARK: - Search
 
-    func search(keyword: String, type: SearchType, page: Int = 1, completion: @escaping ([Video]) -> Void) {
+    /// Search Bilibili content.
+    /// - Parameter minDurationSeconds: optional minimum duration in seconds. When set,
+    ///   the request passes Bilibili's server-side `duration` bucket so the API returns
+    ///   only videos in that range (dramatically more results for long-video filters
+    ///   like "1小时以上" than client-side filtering of an all-duration page).
+    func search(keyword: String, type: SearchType, page: Int = 1, minDurationSeconds: Int? = nil, completion: @escaping ([Video]) -> Void) {
         guard !keyword.trimmingCharacters(in: .whitespaces).isEmpty else {
             completion([])
             return
@@ -351,12 +361,20 @@ final class BiliAPI {
         case .live: searchType = "live"
         case .article: searchType = "article"
         }
-        let params: [String: String] = [
+        var params: [String: String] = [
             "search_type": searchType,
             "keyword": keyword,
             "page": String(page),
             "ps": "50"
         ]
+        // Bilibili server-side duration buckets:
+        //   0=全部, 1=<10分钟, 2=10-30分钟, 3=30-60分钟, 4=>60分钟
+        // Only the 60+ bucket is a clean "minimum"; other buckets are ranges.
+        // For thresholds >= 3600s we use bucket 4 (server returns only 60+ min videos).
+        // For shorter thresholds we fetch all (0) and filter client-side.
+        if type == .video, let sec = minDurationSeconds, sec >= 3600 {
+            params["duration"] = "4"
+        }
         request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: false) { [weak self] data, _, _ in
             let videos = self?.parseSearch(data, type: type) ?? []
             DispatchQueue.main.async { completion(videos) }
@@ -386,15 +404,18 @@ final class BiliAPI {
         // Map partitions to Bilibili rid
         let ridMap: [Partition: Int] = [
             .anime: 1, .music: 3, .dance: 129, .game: 4, .knowledge: 36,
-            .tech: 188, .life: 160, .guichu: 119, .fashion: 155, .news: 202
+            .tech: 188, .life: 160, .guichu: 119, .fashion: 155,
+            .auto: 202, .cinema: 181, .entertainment: 5
         ]
         let rid = ridMap[partition] ?? 1
+        // ranking/region returns the top videos of a partition directly as a list
+        // under `data` (the old dynamic/region endpoint now returns -404).
         let params: [String: String] = [
             "rid": String(rid),
-            "ps": "20",
-            "pn": "1"
+            "day": "7",
+            "ps": "30"
         ]
-        request("https://api.bilibili.com/x/web-interface/dynamic/region", params: params) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/web-interface/ranking/region", params: params) { [weak self] data, _, _ in
             let videos = self?.parseRegion(data) ?? []
             DispatchQueue.main.async { completion(videos) }
         }
@@ -1093,6 +1114,27 @@ private extension BiliAPI {
                     likes: 0, coins: 0, favorites: 0, shares: 0
                 )
             }
+        case .live:
+            return result.compactMap { item in
+                guard let title = item["title"] as? String,
+                      let roomid = item["roomid"] as? Int, roomid > 0 else { return nil }
+                let cleanTitle = title.replacingOccurrences(of: "<em class=\"keyword\">", with: "").replacingOccurrences(of: "</em>", with: "")
+                return Video(
+                    id: "\(roomid)",
+                    title: cleanTitle,
+                    cover: BiliAPI.coverURL(item["cover"] as? String ?? item["pic"] as? String ?? ""),
+                    duration: 0,
+                    upName: item["uname"] as? String ?? item["author"] as? String ?? "",
+                    upMid: item["uid"] as? Int ?? item["mid"] as? Int ?? 0,
+                    upAvatar: BiliAPI.coverURL(item["uface"] as? String ?? ""),
+                    views: item["online"] as? Int ?? 0,
+                    danmaku: 0,
+                    publishTime: "直播中",
+                    category: "直播",
+                    desc: item["area_v2_name"] as? String ?? "",
+                    likes: 0, coins: 0, favorites: 0, shares: 0
+                )
+            }
         default:
             return result.compactMap { item in
                 guard let id = item["bvid"] as? String,
@@ -1120,8 +1162,18 @@ private extension BiliAPI {
 
     func parseRegion(_ data: Data?) -> [Video] {
         guard let json = parseJSON(data),
-              let d = json["data"] as? [String: Any],
-              let archives = d["archives"] as? [[String: Any]] else { return [] }
+              let d = json["data"] else { return [] }
+        // ranking/region returns data as a flat list; dynamic/region returned
+        // data.archives. Support both for robustness.
+        let archives: [[String: Any]]
+        if let list = d as? [[String: Any]] {
+            archives = list
+        } else if let dict = d as? [String: Any],
+                  let list = dict["archives"] as? [[String: Any]] {
+            archives = list
+        } else {
+            return []
+        }
         return archives.compactMap { item in
             guard let id = item["bvid"] as? String,
                   let title = item["title"] as? String else { return nil }
@@ -1131,17 +1183,17 @@ private extension BiliAPI {
                 title: title,
                 cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
                 duration: item["duration"] as? Int ?? 0,
-                upName: (item["owner"] as? [String: Any])?["name"] as? String ?? "",
-                upMid: (item["owner"] as? [String: Any])?["mid"] as? Int ?? 0,
+                upName: (item["owner"] as? [String: Any])?["name"] as? String ?? (item["author"] as? String ?? ""),
+                upMid: (item["owner"] as? [String: Any])?["mid"] as? Int ?? (item["mid"] as? Int ?? 0),
                 upAvatar: BiliAPI.coverURL((item["owner"] as? [String: Any])?["face"] as? String ?? ""),
-                views: stat?["view"] as? Int ?? 0,
-                danmaku: stat?["danmaku"] as? Int ?? 0,
-                publishTime: formatTime(item["pubdate"] as? Int ?? 0),
+                views: stat?["view"] as? Int ?? (item["play"] as? Int ?? 0),
+                danmaku: stat?["danmaku"] as? Int ?? (item["video_review"] as? Int ?? 0),
+                publishTime: formatTime(item["pubdate"] as? Int ?? (item["created"] as? Int ?? 0)),
                 category: "",
-                desc: "",
+                desc: item["desc"] as? String ?? (item["description"] as? String ?? ""),
                 likes: stat?["like"] as? Int ?? 0,
                 coins: stat?["coin"] as? Int ?? 0,
-                favorites: stat?["favorite"] as? Int ?? 0,
+                favorites: stat?["favorite"] as? Int ?? (item["favorites"] as? Int ?? 0),
                 shares: stat?["share"] as? Int ?? 0,
                 cid: item["cid"] as? Int ?? 0
             )

@@ -18,7 +18,7 @@ struct CategoryView: View {
     @State private var selectedUPName: String = ""
     @State private var showingUPSpace = false
 
-    let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+    private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
         NavigationStack {
@@ -26,35 +26,73 @@ struct CategoryView: View {
                 biliBackgroundGradient.ignoresSafeArea()
                 ScrollView {
                     if selectedPartition == nil {
-                        // Partition grid
-                        LazyVGrid(columns: columns, spacing: 20) {
+                        // Header: 全站分区 + subtitle + badge
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("全站分区")
+                                        .font(.system(size: 28, weight: .bold))
+                                        .foregroundStyle(.primary)
+                                    Text("Bilibili 官方分类频道 · 实时净化过滤")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                HStack(spacing: 4) {
+                                    Image(systemName: "dot.radiowaves.left.and.right")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(Color(red: 16/255, green: 185/255, blue: 129/255))
+                                    Text("官方分区接口")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(.secondarySystemBackground).opacity(0.7))
+                                .clipShape(Capsule())
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                        }
+
+                        // Partition grid — rounded square cards with icon + label
+                        LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(Partition.allCases) { p in
                                 Button {
                                     selectedPartition = p
                                     loadPartition(p)
                                 } label: {
-                                    VStack(spacing: 6) {
+                                    VStack(spacing: 8) {
                                         ZStack {
-                                            Circle()
-                                                .fill(Color.biliBlue.opacity(0.12))
-                                                .frame(width: 50, height: 50)
+                                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                                .fill(Color.white.opacity(0.85))
+                                                .frame(height: 72)
                                             Image(systemName: p.icon)
-                                                .font(.title2)
+                                                .font(.system(size: 26, weight: .medium))
                                                 .foregroundStyle(Color.biliBlue)
                                         }
                                         Text(p.rawValue)
-                                            .font(.caption)
+                                            .font(.system(size: 12, weight: .medium))
                                             .foregroundStyle(.primary)
+                                            .lineLimit(1)
                                     }
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 16)
                         .padding(.top, 16)
                     } else {
                         // Partition video list
                         if isLoading {
-                            ProgressView().padding(.top, 40)
+                            ProgressView().padding(.top, 60)
+                        } else if partitionVideos.isEmpty {
+                            ContentUnavailableView(
+                                "暂无内容",
+                                systemImage: "tray",
+                                description: Text("该分区暂无视频，试试其他分区")
+                            )
+                            .padding(.top, 60)
                         } else {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(partitionVideos) { video in
@@ -71,6 +109,7 @@ struct CategoryView: View {
                             }
                             .padding(.horizontal, 8)
                             .padding(.top, 8)
+                            .padding(.bottom, 24)
                         }
                     }
                 }
@@ -81,6 +120,7 @@ struct CategoryView: View {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
                             selectedPartition = nil
+                            partitionVideos = []
                         } label: {
                             Image(systemName: "chevron.left")
                                 .foregroundColor(.biliBlue)
@@ -117,6 +157,7 @@ struct CategoryView: View {
 
     private func loadPartition(_ p: Partition) {
         isLoading = true
+        partitionVideos = []
         BiliAPI.shared.fetchPartition(p) { raw in
             DispatchQueue.main.async {
                 let filtered = store.applyFilter(raw)

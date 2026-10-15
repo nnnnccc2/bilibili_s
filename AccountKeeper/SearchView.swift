@@ -66,7 +66,7 @@ struct SearchView: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.top, 12)
+                .padding(.top, 8)
 
                 // Content type tabs
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -182,8 +182,8 @@ struct SearchView: View {
 
                     ScrollView {
                         if searchType == .user {
-                            // 用户列表样式：头像 + 名字 + 签名 + 粉丝数
-                            LazyVStack(spacing: 0) {
+                            // 用户列表：卡片式布局，宽松间距，易区分
+                            LazyVStack(spacing: 10) {
                                 ForEach(results) { user in
                                     Button {
                                         if user.upMid > 0 {
@@ -192,33 +192,39 @@ struct SearchView: View {
                                             showingUPSpace = true
                                         }
                                     } label: {
-                                        HStack(spacing: 12) {
+                                        HStack(spacing: 14) {
                                             CachedAsyncImage(
-                                                url: URL(string: user.upAvatar),
-                                                targetSize: CGSize(width: 48, height: 48)
+                                                url: URL(string: BiliAPI.coverThumb(user.upAvatar, width: 96)),
+                                                targetSize: CGSize(width: 52, height: 52)
                                             ) { img in
                                                 img.resizable().scaledToFill()
                                             } placeholder: {
-                                                Circle().fill(Color.gray.opacity(0.3))
+                                                Circle().fill(Color.gray.opacity(0.2))
                                             }
-                                            .frame(width: 48, height: 48)
+                                            .frame(width: 52, height: 52)
                                             .clipShape(Circle())
-                                            VStack(alignment: .leading, spacing: 4) {
+                                            .overlay(Circle().stroke(Color.biliBlue.opacity(0.15), lineWidth: 1.5))
+
+                                            VStack(alignment: .leading, spacing: 5) {
                                                 Text(user.title)
-                                                    .font(.headline)
+                                                    .font(.subheadline)
+                                                    .fontWeight(.semibold)
                                                     .foregroundStyle(.primary)
                                                     .lineLimit(1)
                                                 if !user.desc.isEmpty {
                                                     Text(user.desc)
                                                         .font(.caption)
                                                         .foregroundStyle(.secondary)
-                                                        .lineLimit(2)
+                                                        .lineLimit(1)
                                                 }
                                                 HStack(spacing: 4) {
                                                     Image(systemName: "person.2.fill")
                                                         .font(.caption2)
                                                         .foregroundStyle(.secondary)
-                                                    Text("\(user.views) 粉丝")
+                                                    Text(user.viewsText)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                    Text("粉丝")
                                                         .font(.caption)
                                                         .foregroundStyle(.secondary)
                                                 }
@@ -228,13 +234,13 @@ struct SearchView: View {
                                                 .font(.caption)
                                                 .foregroundStyle(.tertiary)
                                         }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 14)
+                                        .background(Color.biliCard)
+                                        .clipShape(RoundedRectangle(cornerRadius: 14))
                                         .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
-                                    Divider()
-                                        .padding(.leading, 76)
                                     .onAppear {
                                         if user.id == results.last?.id, hasMore, !isLoadingMore {
                                             loadMore()
@@ -242,6 +248,8 @@ struct SearchView: View {
                                     }
                                 }
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.top, 8)
                             .padding(.bottom, 20)
                         } else {
                             // 视频/番剧/直播：双列卡片网格
@@ -276,13 +284,9 @@ struct SearchView: View {
                     }
                 }
             }
+            .navigationTitle("搜索")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text("搜索")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("取消") { dismiss() }
                 }
@@ -327,19 +331,22 @@ struct SearchView: View {
         } else {
             selectedDurationIndex = 0
         }
-        // Fetch 2 pages in parallel for more results (Bilibili caps at 20/page)
+        let minDur = store.settings.searchMinDurationSeconds
+        // Fetch 2 pages in parallel for more results (Bilibili caps at 50/page).
+        // The API request carries the server-side duration bucket (for 1h+ filters)
+        // so we get many more matching videos than client-side filtering alone.
         var page1: [Video] = []
         var page2: [Video] = []
         let group = DispatchGroup()
         group.enter()
-        BiliAPI.shared.search(keyword: keyword, type: searchType, page: 1) { raw in
+        BiliAPI.shared.search(keyword: keyword, type: searchType, page: 1, minDurationSeconds: minDur) { raw in
             DispatchQueue.main.async {
                 page1 = store.applySearchFilter(raw)
             }
             group.leave()
         }
         group.enter()
-        BiliAPI.shared.search(keyword: keyword, type: searchType, page: 2) { raw in
+        BiliAPI.shared.search(keyword: keyword, type: searchType, page: 2, minDurationSeconds: minDur) { raw in
             DispatchQueue.main.async {
                 page2 = store.applySearchFilter(raw)
             }
@@ -360,7 +367,8 @@ struct SearchView: View {
     private func loadMore() {
         guard hasMore, !isLoadingMore else { return }
         isLoadingMore = true
-        BiliAPI.shared.search(keyword: keyword, type: searchType, page: page) { raw in
+        let minDur = store.settings.searchMinDurationSeconds
+        BiliAPI.shared.search(keyword: keyword, type: searchType, page: page, minDurationSeconds: minDur) { raw in
             DispatchQueue.main.async {
                 let filtered = store.applySearchFilter(raw)
                 if filtered.isEmpty {
