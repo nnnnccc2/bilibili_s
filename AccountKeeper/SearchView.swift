@@ -66,7 +66,7 @@ struct SearchView: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.top, 20)
+                .padding(.top, 12)
 
                 // Content type tabs
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -181,39 +181,87 @@ struct SearchView: View {
                     }
 
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(results) { video in
-                                VideoCardView(video: video) {
-                                    if video.upMid > 0 {
-                                        selectedUPMid = video.upMid
-                                        selectedUPName = video.upName
-                                        showingUPSpace = true
-                                    }
-                                }
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        // In the 用户 tab the result IS an account — open
-                                        // the UP主 space instead of trying to play a video.
-                                        if searchType == .user {
-                                            if video.upMid > 0 {
-                                                selectedUPMid = video.upMid
-                                                selectedUPName = video.upName
-                                                showingUPSpace = true
-                                            }
-                                        } else {
-                                            selectedVideo = video
+                        if searchType == .user {
+                            // 用户列表样式：头像 + 名字 + 签名 + 粉丝数
+                            LazyVStack(spacing: 0) {
+                                ForEach(results) { user in
+                                    Button {
+                                        if user.upMid > 0 {
+                                            selectedUPMid = user.upMid
+                                            selectedUPName = user.upName
+                                            showingUPSpace = true
                                         }
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            CachedAsyncImage(url: user.upAvatar, width: 48)
+                                                .frame(width: 48, height: 48)
+                                                .clipShape(Circle())
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(user.title)
+                                                    .font(.headline)
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(1)
+                                                if !user.desc.isEmpty {
+                                                    Text(user.desc)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(2)
+                                                }
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: "person.2.fill")
+                                                        .font(.caption2)
+                                                        .foregroundStyle(.secondary)
+                                                    Text("\(user.views) 粉丝")
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .contentShape(Rectangle())
                                     }
+                                    .buttonStyle(.plain)
+                                    Divider()
+                                        .padding(.leading, 76)
                                     .onAppear {
-                                        if video.id == results.last?.id, hasMore, !isLoadingMore {
+                                        if user.id == results.last?.id, hasMore, !isLoadingMore {
                                             loadMore()
                                         }
                                     }
+                                }
                             }
+                            .padding(.bottom, 20)
+                        } else {
+                            // 视频/番剧/直播：双列卡片网格
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(results) { video in
+                                    VideoCardView(video: video) {
+                                        if video.upMid > 0 {
+                                            selectedUPMid = video.upMid
+                                            selectedUPName = video.upName
+                                            showingUPSpace = true
+                                        }
+                                    }
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            selectedVideo = video
+                                        }
+                                        .onAppear {
+                                            if video.id == results.last?.id, hasMore, !isLoadingMore {
+                                                loadMore()
+                                            }
+                                        }
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.top, 8)
+                            .padding(.bottom, 20)
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.top, 8)
-                        .padding(.bottom, 20)
 
                         if isLoadingMore {
                             ProgressView().padding(.vertical, 12)
@@ -225,15 +273,14 @@ struct SearchView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Text("搜索")
-                        .font(.headline)
+                        .font(.title3)
                         .fontWeight(.bold)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("取消") { dismiss() }
                 }
             }
-            // 键盘弹出时不要让搜索框上移到导航栏区域（与"搜索"文字保持距离）
-            .ignoresSafeArea(.keyboard)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
             .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video)
                     .environmentObject(store)
