@@ -66,7 +66,7 @@ struct SearchView: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.top, 24)
+                .padding(.top, 12)
 
                 // Content type tabs
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -232,8 +232,8 @@ struct SearchView: View {
                     Button("取消") { dismiss() }
                 }
             }
-            // 键盘弹出时不要把搜索框顶到导航栏区域（避免和"搜索"文字重叠）
-            .ignoresSafeArea(.keyboard, edges: .bottom)
+            // 键盘弹出时不要让搜索框上移到导航栏区域（与"搜索"文字保持距离）
+            .ignoresSafeArea(.keyboard)
             .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video)
                     .environmentObject(store)

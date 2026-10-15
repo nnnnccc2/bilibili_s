@@ -668,15 +668,17 @@ final class BiliAPI {
     // MARK: - UP主 space & relation
 
     /// Fetch a UP主's profile info (name, avatar, bio, follower/following counts).
+    /// Uses /x/web-interface/card which does NOT require WBI signing (stable).
     func fetchUPSpaceInfo(mid: Int, completion: @escaping (UPSpaceInfo?) -> Void) {
-        let params: [String: String] = ["mid": String(mid)]
-        request("https://api.bilibili.com/x/space/wbi/acc/info", params: params, useWBI: true, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
+        let params: [String: String] = ["mid": String(mid), "photo": "true"]
+        request("https://api.bilibili.com/x/web-interface/card", params: params, useWBI: false, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
             let info = self?.parseUPSpaceInfo(data)
             DispatchQueue.main.async { completion(info) }
         }
     }
 
     /// Fetch a UP主's video list (paginated).
+    /// Uses /x/space/arc/search (no WBI). May hit -799 rate-limit; retries once.
     func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
         let params: [String: String] = [
             "mid": String(mid),
@@ -685,8 +687,19 @@ final class BiliAPI {
             "order": "pubdate",
             "platform": "web"
         ]
-        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
+        fetchUPVideosOnce(mid: mid, params: params, retry: 1, completion: completion)
+    }
+
+    private func fetchUPVideosOnce(mid: Int, params: [String: String], retry: Int, completion: @escaping ([Video], Int) -> Void) {
+        request("https://api.bilibili.com/x/space/arc/search", params: params, useWBI: false, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
+            // -799 = rate limit; retry once after 1s
+            if videos.isEmpty, retry > 0, let json = self?.parseJSON(data), (json["code"] as? Int) == -799 {
+                DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+                    self?.fetchUPVideosOnce(mid: mid, params: params, retry: retry - 1, completion: completion)
+                }
+                return
+            }
             DispatchQueue.main.async { completion(videos, total) }
         }
     }
@@ -1172,22 +1185,19 @@ private extension BiliAPI {
 
     func parseUPSpaceInfo(_ data: Data?) -> UPSpaceInfo? {
         guard let json = parseJSON(data),
-              let d = json["data"] as? [String: Any] else { return nil }
-        let cards = d["cards"] as? [String: Any]
-        let fans = cards?["fans"] as? Int ?? d["fans"] as? Int ?? 0
-        let following = d["following"] as? Int ?? 0
-        let likes = d["likes"] as? Int ?? 0
-        let archiveCount = (cards?["archive_count"] as? Int) ?? (d["archive_count"] as? Int) ?? 0
+              let d = json["data"] as? [String: Any],
+              let card = d["card"] as? [String: Any] else { return nil }
+        let levelInfo = card["level_info"] as? [String: Any]
         return UPSpaceInfo(
-            mid: d["mid"] as? Int ?? 0,
-            name: d["name"] as? String ?? "",
-            avatar: BiliAPI.coverURL(d["face"] as? String ?? ""),
-            sign: d["sign"] as? String ?? "",
-            level: d["level"] as? Int ?? 0,
-            fans: fans,
-            following: following,
-            likes: likes,
-            archiveCount: archiveCount
+            mid: (card["mid"] as? Int) ?? (Int(card["mid"] as? String ?? "0") ?? 0),
+            name: card["name"] as? String ?? "",
+            avatar: BiliAPI.coverURL(card["face"] as? String ?? ""),
+            sign: card["sign"] as? String ?? "",
+            level: levelInfo?["current_level"] as? Int ?? 0,
+            fans: (card["fans"] as? Int) ?? (d["follower"] as? Int) ?? 0,
+            following: card["friend"] as? Int ?? 0,
+            likes: d["like_num"] as? Int ?? 0,
+            archiveCount: d["archive_count"] as? Int ?? 0
         )
     }
 
