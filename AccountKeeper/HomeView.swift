@@ -180,8 +180,8 @@ struct HomeView: View {
         page = 1
         hasMore = true
         BiliAPI.shared.fetchHome(category: category, page: page) { raw in
-            let filtered = store.applyFilter(raw)
             DispatchQueue.main.async {
+                let filtered = store.applyFilter(raw)
                 videos = filtered
                 isLoading = false
                 hasLoadedOnce = true
@@ -199,8 +199,8 @@ struct HomeView: View {
         guard hasMore, !isLoadingMore else { return }
         isLoadingMore = true
         BiliAPI.shared.fetchHome(category: category, page: page) { raw in
-            let filtered = store.applyFilter(raw)
             DispatchQueue.main.async {
+                let filtered = store.applyFilter(raw)
                 if filtered.isEmpty {
                     hasMore = false
                 } else {
@@ -216,8 +216,8 @@ struct HomeView: View {
     private func loadVideosAsync(force: Bool = false) async {
         await withCheckedContinuation { continuation in
             BiliAPI.shared.fetchHome(category: category, page: 1) { raw in
-                let filtered = store.applyFilter(raw)
                 DispatchQueue.main.async {
+                    let filtered = store.applyFilter(raw)
                     videos = filtered
                     isLoading = false
                     hasLoadedOnce = true

@@ -130,8 +130,8 @@ struct FollowingView: View {
     private func load() {
         isLoading = true
         BiliAPI.shared.fetchFollowing { raw in
-            let filtered = store.applyFilter(raw)
             DispatchQueue.main.async {
+                let filtered = store.applyFilter(raw)
                 videos = filtered
                 isLoading = false
             }

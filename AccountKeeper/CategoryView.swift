@@ -118,8 +118,8 @@ struct CategoryView: View {
     private func loadPartition(_ p: Partition) {
         isLoading = true
         BiliAPI.shared.fetchPartition(p) { raw in
-            let filtered = store.applyFilter(raw)
             DispatchQueue.main.async {
+                let filtered = store.applyFilter(raw)
                 partitionVideos = filtered
                 isLoading = false
             }

@@ -277,12 +277,16 @@ struct SearchView: View {
         let group = DispatchGroup()
         group.enter()
         BiliAPI.shared.search(keyword: keyword, type: searchType, page: 1) { raw in
-            page1 = store.applySearchFilter(raw)
+            DispatchQueue.main.async {
+                page1 = store.applySearchFilter(raw)
+            }
             group.leave()
         }
         group.enter()
         BiliAPI.shared.search(keyword: keyword, type: searchType, page: 2) { raw in
-            page2 = store.applySearchFilter(raw)
+            DispatchQueue.main.async {
+                page2 = store.applySearchFilter(raw)
+            }
             group.leave()
         }
         group.notify(queue: .main) {
@@ -301,8 +305,8 @@ struct SearchView: View {
         guard hasMore, !isLoadingMore else { return }
         isLoadingMore = true
         BiliAPI.shared.search(keyword: keyword, type: searchType, page: page) { raw in
-            let filtered = store.applySearchFilter(raw)
             DispatchQueue.main.async {
+                let filtered = store.applySearchFilter(raw)
                 if filtered.isEmpty {
                     hasMore = false
                 } else {

@@ -250,7 +250,7 @@ final class BiliAPI {
                 "ps": "20",
                 "fresh_idx": String(page)
             ]
-            request("https://api.bilibili.com/x/web-interface/wbi/index/top/feed/rcmd", params: params, useWBI: true) { [weak self] data, _, _ in
+            request("https://api.bilibili.com/x/web-interface/wbi/index/top/feed/rcmd", params: params, useWBI: false) { [weak self] data, _, _ in
                 let videos = self?.parseRecommend(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
             }
@@ -298,7 +298,7 @@ final class BiliAPI {
             "page": String(page),
             "ps": "50"
         ]
-        request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: true) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: false) { [weak self] data, _, _ in
             let videos = self?.parseSearch(data, type: type) ?? []
             DispatchQueue.main.async { completion(videos) }
         }
@@ -345,7 +345,7 @@ final class BiliAPI {
 
     func fetchFollowing(completion: @escaping ([Video]) -> Void) {
         let params: [String: String] = ["type": "8", "ps": "20", "pn": "1"]
-        request("https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all", params: params, useWBI: true) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all", params: params, useWBI: false) { [weak self] data, _, _ in
             let videos = self?.parseDynamic(data) ?? []
             DispatchQueue.main.async { completion(videos) }
         }
@@ -643,7 +643,7 @@ final class BiliAPI {
     /// Fetch a UP主's profile info (name, avatar, bio, follower/following counts).
     func fetchUPSpaceInfo(mid: Int, completion: @escaping (UPSpaceInfo?) -> Void) {
         let params: [String: String] = ["mid": String(mid)]
-        request("https://api.bilibili.com/x/space/wbi/acc/info", params: params, useWBI: true) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/space/wbi/acc/info", params: params, useWBI: false) { [weak self] data, _, _ in
             let info = self?.parseUPSpaceInfo(data)
             DispatchQueue.main.async { completion(info) }
         }
@@ -658,7 +658,7 @@ final class BiliAPI {
             "order": "pubdate",
             "platform": "web"
         ]
-        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: false) { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
             DispatchQueue.main.async { completion(videos, total) }
         }
