@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreImage
 import CoreImage.CIFilterBuiltins
+import WebKit
 
 struct LoginView: View {
     @EnvironmentObject var store: AppStore
@@ -18,7 +19,7 @@ struct LoginView: View {
 
     enum LoginTab: String, CaseIterable {
         case qr = "扫码登录"
-        case sms = "验证码登录"
+        case sms = "手机号登录"
     }
 
     // MARK: - QR state
@@ -29,14 +30,9 @@ struct LoginView: View {
     @State private var isPolling = false
     private let pollTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
-    // MARK: - SMS state
-    @State private var phone: String = ""
-    @State private var smsCode: String = ""
-    @State private var smsError: String?
-    @State private var isSendingCode = false
-    @State private var isLoggingIn = false
-    @State private var countdown: Int = 0
-    private let countdownTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+    // MARK: - Phone login state
+    @State private var webLoginError: String?
+    @State private var isCompletingLogin = false
 
     var body: some View {
         NavigationStack {
@@ -109,9 +105,6 @@ struct LoginView: View {
             .onReceive(pollTimer) { _ in
                 guard isPolling, let key = qrKey else { return }
                 poll(key: key)
-            }
-            .onReceive(countdownTimer) { _ in
-                if countdown > 0 { countdown -= 1 }
             }
         }
     }
@@ -191,81 +184,57 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - SMS login section
+    // MARK: - Phone / SMS login section
+    //
+    // Bilibili's SMS endpoints require a geetest captcha that can only be solved
+    // inside a browser context, and the plain passport endpoints reject native
+    // requests (-400). So phone + verification-code login is performed on
+    // Bilibili's own login page inside a WKWebView; we harvest the session
+    // cookies once the page signs the account in.
 
     private var smsLoginSection: some View {
-        VStack(spacing: 16) {
-            // Phone input
-            HStack {
-                Text("+86")
-                    .font(.subheadline)
+        VStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
                     .foregroundStyle(.secondary)
-                    .padding(.trailing, 8)
-                TextField("请输入手机号", text: $phone)
-                    .keyboardType(.numberPad)
-                    .onChange(of: phone) { _, newValue in
-                        phone = String(newValue.prefix(11)).filter { $0.isNumber }
-                    }
+                Text("在下方页面使用「短信登录」输入手机号与验证码，登录成功后会自动返回")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Code input + send button
-            HStack {
-                TextField("请输入验证码", text: $smsCode)
-                    .keyboardType(.numberPad)
-                    .onChange(of: smsCode) { _, newValue in
-                        smsCode = String(newValue.prefix(6)).filter { $0.isNumber }
-                    }
-                Button {
-                    sendCode()
-                } label: {
-                    Text(countdown > 0 ? "\(countdown)s 后重发" : "获取验证码")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(countdown > 0 || phone.count != 11 ? .secondary : .biliBlue)
+            BiliWebLoginView(
+                onCookies: { cookies in handleWebLoginCookies(cookies) },
+                onError: { message in webLoginError = message }
+            )
+            .frame(height: 430)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.biliBorder, lineWidth: 1)
+            )
+
+            if isCompletingLogin {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("正在获取账号信息…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .disabled(countdown > 0 || phone.count != 11 || isSendingCode)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            if let error = smsError {
+            } else if let error = webLoginError {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Login button
-            Button {
-                loginWithSMS()
-            } label: {
-                HStack {
-                    if isLoggingIn {
-                        ProgressView().tint(.white)
-                    }
-                    Text("登录")
-                        .fontWeight(.semibold)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .foregroundStyle(.white)
-                .background(phone.count == 11 && smsCode.count == 6 ? Color.biliBlue : Color.biliBlue.opacity(0.4))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .disabled(phone.count != 11 || smsCode.count != 6 || isLoggingIn)
-
             Text("登录即表示同意《哔哩哔哩用户协议》和《隐私政策》")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 16)
     }
 
     // MARK: - QR generation & polling
@@ -313,46 +282,22 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - SMS actions
+    // MARK: - Web login result
 
-    private func sendCode() {
-        guard phone.count == 11 else {
-            smsError = "请输入正确的手机号"
-            return
-        }
-        smsError = nil
-        isSendingCode = true
-        BiliAPI.shared.sendSMSCode(phone: phone) { success, msg in
+    /// Called once the web login page has signed the account in and its
+    /// session cookies (SESSDATA / bili_jct / DedeUserID) were harvested.
+    private func handleWebLoginCookies(_ cookies: [String: String]) {
+        guard !isCompletingLogin else { return }
+        webLoginError = nil
+        isCompletingLogin = true
+        BiliAPI.shared.setLoginCookies(cookies)
+        store.loginAfterQRSuccess { ok in
             DispatchQueue.main.async {
-                isSendingCode = false
-                if success {
-                    countdown = 60
+                isCompletingLogin = false
+                if ok {
+                    dismiss()
                 } else {
-                    smsError = msg ?? "验证码发送失败"
-                }
-            }
-        }
-    }
-
-    private func loginWithSMS() {
-        guard phone.count == 11, smsCode.count == 6 else { return }
-        smsError = nil
-        isLoggingIn = true
-        BiliAPI.shared.loginWithSMS(phone: phone, code: smsCode) { success, msg in
-            DispatchQueue.main.async {
-                self.isLoggingIn = false
-                if success {
-                    self.store.loginAfterQRSuccess { ok in
-                        DispatchQueue.main.async {
-                            if ok {
-                                dismiss()
-                            } else {
-                                self.smsError = "登录成功但获取用户信息失败，请重试"
-                            }
-                        }
-                    }
-                } else {
-                    self.smsError = msg ?? "登录失败，请检查验证码"
+                    webLoginError = "登录成功但获取用户信息失败，请重试"
                 }
             }
         }
@@ -375,4 +320,92 @@ struct LoginView: View {
 #Preview {
     LoginView()
         .environmentObject(AppStore())
+}
+
+// MARK: - Bilibili web login (WKWebView)
+
+/// Hosts Bilibili's official login page (二维码 / 手机号验证码, including the
+/// geetest slider captcha) and reports the session cookies the moment the page
+/// signs the account in. This is the only reliable SMS login path because the
+/// native passport endpoints reject non-browser requests.
+struct BiliWebLoginView: UIViewRepresentable {
+    /// Called once SESSDATA is present in the cookie store.
+    let onCookies: ([String: String]) -> Void
+    /// Called when the page itself fails to load.
+    let onError: (String) -> Void
+
+    private static let harvestedNames: Set<String> = [
+        "SESSDATA", "bili_jct", "DedeUserID", "DedeUserID__ckMd5", "sid"
+    ]
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        // Non-persistent store: the login session does not leak into other web views.
+        config.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = context.coordinator
+        webView.allowsBackForwardNavigationGestures = true
+        // Mobile Safari UA so Bilibili serves its touch login page.
+        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+        context.coordinator.webView = webView
+        config.websiteDataStore.httpCookieStore.add(context.coordinator)
+        if let url = URL(string: "https://passport.bilibili.com/login") {
+            webView.load(URLRequest(url: url))
+        }
+        return webView
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
+        uiView.configuration.websiteDataStore.httpCookieStore.remove(coordinator)
+        uiView.navigationDelegate = nil
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate, WKHTTPCookieStoreObserver {
+        private let parent: BiliWebLoginView
+        weak var webView: WKWebView?
+        private var didFinish = false
+
+        init(_ parent: BiliWebLoginView) { self.parent = parent }
+
+        func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
+            harvest(from: cookieStore)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            harvest(from: webView.configuration.websiteDataStore.httpCookieStore)
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            report(error)
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            report(error)
+        }
+
+        private func report(_ error: Error) {
+            let nsError = error as NSError
+            // -999 cancellations happen on every redirect; ignore them.
+            guard nsError.code != NSURLErrorCancelled else { return }
+            DispatchQueue.main.async { self.parent.onError("无法加载登录页：\(nsError.localizedDescription)") }
+        }
+
+        private func harvest(from store: WKHTTPCookieStore) {
+            guard !didFinish else { return }
+            store.getAllCookies { [weak self] cookies in
+                guard let self = self, !self.didFinish else { return }
+                var dict: [String: String] = [:]
+                for cookie in cookies where BiliWebLoginView.harvestedNames.contains(cookie.name) {
+                    dict[cookie.name] = cookie.value
+                }
+                guard let sessData = dict["SESSDATA"], !sessData.isEmpty else { return }
+                self.didFinish = true
+                DispatchQueue.main.async { self.parent.onCookies(dict) }
+            }
+        }
+    }
 }

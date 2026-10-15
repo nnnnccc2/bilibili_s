@@ -121,9 +121,6 @@ struct VideoCardView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.5), lineWidth: 1)
         )
-        // Rasterize each card so the rounded clip + overlay don't re-render
-        // on every scroll frame. Cheap, static visual surface.
-        .drawingGroup()
         .onAppear {
             // Prefetch stream URL when card becomes visible so playback starts instantly on tap
             BiliAPI.shared.prefetchStreamURL(for: video)

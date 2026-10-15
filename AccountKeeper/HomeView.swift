@@ -13,7 +13,8 @@ struct HomeView: View {
     @Binding var showingSearch: Bool
     @State private var category: HomeCategory = .recommend
     @State private var videos: [Video] = []
-    @State private var isLoading = false
+    @State private var isLoading = true
+    @State private var hasLoadedOnce = false
     @State private var isLoadingMore = false
     @State private var page = 1
     @State private var hasMore = true
@@ -121,7 +122,7 @@ struct HomeView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            if isLoading {
+            if isLoading || !hasLoadedOnce {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if videos.isEmpty {
@@ -172,8 +173,6 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.biliBackground)
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24, style: .continuous))
-        // Rasterize the rounded board so it doesn't re-clip every scroll frame.
-        .drawingGroup()
     }
 
     private func loadVideos(force: Bool = false) {
@@ -185,6 +184,7 @@ struct HomeView: View {
             DispatchQueue.main.async {
                 videos = filtered
                 isLoading = false
+                hasLoadedOnce = true
                 lastRefreshDate = Date()
                 if filtered.isEmpty {
                     hasMore = false
@@ -220,6 +220,7 @@ struct HomeView: View {
                 DispatchQueue.main.async {
                     videos = filtered
                     isLoading = false
+                    hasLoadedOnce = true
                     lastRefreshDate = Date()
                     page = 2
                     hasMore = !filtered.isEmpty

@@ -192,7 +192,17 @@ struct SearchView: View {
                                 }
                                     .contentShape(Rectangle())
                                     .onTapGesture {
-                                        selectedVideo = video
+                                        // In the 用户 tab the result IS an account — open
+                                        // the UP主 space instead of trying to play a video.
+                                        if searchType == .user {
+                                            if video.upMid > 0 {
+                                                selectedUPMid = video.upMid
+                                                selectedUPName = video.upName
+                                                showingUPSpace = true
+                                            }
+                                        } else {
+                                            selectedVideo = video
+                                        }
                                     }
                                     .onAppear {
                                         if video.id == results.last?.id, hasMore, !isLoadingMore {

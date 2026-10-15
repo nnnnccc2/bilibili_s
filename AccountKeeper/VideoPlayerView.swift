@@ -86,7 +86,6 @@ struct VideoPlayerView: View {
                 }
                 .background(Color.biliBackground)
                 .scrollIndicators(.hidden)
-                .ignoresSafeArea(edges: .top)
 
                 // Top controls overlaid on the player
                 HStack {

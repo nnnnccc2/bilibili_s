@@ -77,7 +77,19 @@ final class AppStore: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: settingsKey),
            let decoded = try? JSONDecoder().decode(FilterSettings.self, from: data) {
             self.settings = decoded
+            migrateSettingsIfNeeded()
         }
+    }
+
+    /// Older builds defaulted the global duration block to 10s/28s/30s, which
+    /// hid a large part of the normal feed. Migrate persisted settings to the
+    /// lighter default once, then stamp the current schema version.
+    private func migrateSettingsIfNeeded() {
+        guard (settings.schemaVersion ?? 0) < FilterSettings.currentSchemaVersion else { return }
+        if settings.blockedDurationSeconds == [10, 28, 30] {
+            settings.blockedDurationSeconds = [10]
+        }
+        settings.schemaVersion = FilterSettings.currentSchemaVersion
     }
 
     private func saveSettings() {

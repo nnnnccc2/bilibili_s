@@ -79,29 +79,24 @@ final class FilterEngine {
     // MARK: - Japanese character detection
 
     /// Returns true if the string contains Japanese-specific scripts.
-    /// IMPORTANT: Do NOT include CJK Unified Ideographs (U+4E00–U+9FFF) — they
-    /// are shared with Chinese and would falsely flag every Chinese video.
-    /// Only detects kana and Japanese-only punctuation/symbols.
+    /// IMPORTANT: only kana are checked. CJK Unified Ideographs (U+4E00–U+9FFF)
+    /// are shared with Chinese, and CJK punctuation (U+3000–U+303F: 、。《》【】「」)
+    /// is used by Chinese too — flagging those blocked nearly every Chinese title
+    /// containing brackets or an ideographic comma.
     private func containsJapanese(_ text: String) -> Bool {
         for scalar in text.unicodeScalars {
             let v = scalar.value
             // Hiragana
-            if v >= 0x3040 && v <= 0x309F { return true }
-            // Katakana
-            if v >= 0x30A0 && v <= 0x30FF { return true }
+            if v >= 0x3041 && v <= 0x3096 { return true }
+            // Katakana letters (skip U+30FB middle dot / U+30FC prolonged mark,
+            // which are also used as decorative separators in Chinese titles)
+            if v >= 0x30A1 && v <= 0x30FA { return true }
             // Katakana Phonetic Extensions
             if v >= 0x31F0 && v <= 0x31FF { return true }
             // Hiragana/Katakana small letter ranges
             if v >= 0x1B000 && v <= 0x1B12F { return true }
             // Kana Supplement
             if v >= 0x1B130 && v <= 0x1B16F { return true }
-            // Small Kana Extension
-            if v >= 0x1B170 && v <= 0x1B2FF { return true }
-            // Enclosed Ideographic Supplement (contains 🈁 etc., Japanese-specific)
-            if v >= 0x1F200 && v <= 0x1F2FF { return true }
-            // Japanese-specific punctuation (「」『』、。 etc.) — U+3000–U+303F
-            // Exclude ideographic space (U+3000) itself but keep the rest
-            if v > 0x3000 && v <= 0x303F { return true }
         }
         return false
     }

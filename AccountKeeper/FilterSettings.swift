@@ -45,8 +45,8 @@ struct FilterSettings: Codable, Hashable {
     // Duration filtering (global, applies to home/feed/category/dynamic)
     // Multi-select: videos whose duration is <= ANY selected threshold are blocked.
     // If empty, no duration filtering.
-    // Default: 10s / 28s / 30s pre-selected to filter out ultra-short content.
-    var blockedDurationSeconds: Set<Int> = [10, 28, 30]
+    // Default: only 10s pre-selected — wider defaults hid too much normal content.
+    var blockedDurationSeconds: Set<Int> = [10]
 
     // Search-specific duration filter (min duration for search results)
     var searchMinDurationSeconds: Int? = nil
@@ -54,7 +54,14 @@ struct FilterSettings: Codable, Hashable {
     // UI
     var showFilteredBanner: Bool = true
 
+    /// Schema version used to migrate previously-persisted aggressive defaults.
+    /// Optional so that settings saved by older builds (without this key) still decode.
+    var schemaVersion: Int? = nil
+
     var stats: FilterStats = FilterStats()
+
+    /// Current filter-settings schema version.
+    static let currentSchemaVersion = 2
 }
 
 // MARK: - Built-in word lists
@@ -63,12 +70,11 @@ extension FilterSettings {
     /// Clickbait / leading title keywords (e.g. 疯了、炸了、屌爆了、！、惊呆了 etc.)
     static let builtInClickbaitWords: [String] = [
         "疯了", "炸了", "屌爆了", "惊呆了", "吓尿了", "千万别看",
-        "震惊", "卧槽", "我去", "绝了", "太牛了", "神了",
+        "震惊", "卧槽", "绝了", "太牛了", "神了",
         "逆天", "离谱", "破防了", "泪目", "绷不住了",
-        "！！！", "！！", "！",
         "看完沉默", "不看后悔", "太可怕了", "太离谱了",
-        "千万别买", "千万不要", "竟然", "居然", "万万没想到",
-        "99%的人", "所有人都", "必看", "强烈推荐",
+        "千万别买", "千万不要", "万万没想到",
+        "99%的人", "所有人都", "强烈推荐",
         "一秒入坑", "笑不活了", "人傻了", "直接封神"
     ]
 

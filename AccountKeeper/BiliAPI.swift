@@ -230,37 +230,6 @@ final class BiliAPI {
         }.resume()
     }
 
-    /// Extract login cookies from a login response (Set-Cookie headers + url field).
-    private func extractLoginCookies(from data: Data?, response: URLResponse?) {
-        if let httpResponse = response as? HTTPURLResponse, let url = httpResponse.url {
-            var fields: [String: String] = [:]
-            for (key, value) in httpResponse.allHeaderFields {
-                if let k = key as? String, let v = value as? String {
-                    fields[k] = v
-                }
-            }
-            for c in HTTPCookie.cookies(withResponseHeaderFields: fields, for: url) {
-                cookies[c.name] = c.value
-            }
-        }
-        if let json = parseJSON(data),
-           let d = json["data"] as? [String: Any] {
-            // Primary source: cookie_info.cookies array returned in the JSON body
-            if let cookieInfo = d["cookie_info"] as? [String: Any],
-               let cookieList = cookieInfo["cookies"] as? [[String: Any]] {
-                for c in cookieList {
-                    if let name = c["name"] as? String, let value = c["value"] as? String {
-                        cookies[name] = value
-                    }
-                }
-            }
-            // Fallback: parse from url field if present
-            if let cookieUrl = d["url"] as? String, cookieUrl.contains("SESSDATA") {
-                extractCookies(from: cookieUrl)
-            }
-        }
-    }
-
     /// Normalize a cover URL to an https:// URL that iOS can load under ATS.
     private static func coverURL(_ raw: String) -> String {
         if raw.hasPrefix("https://") { return raw }
@@ -658,57 +627,14 @@ final class BiliAPI {
         }
     }
 
-    // MARK: - Login (SMS verification code)
+    // MARK: - Login (SMS via web view)
 
-    /// Send an SMS verification code to the given phone number.
-    /// - Parameters:
-    ///   - phone: 11-digit Chinese mobile number
-    ///   - completion: success flag + optional message
-    func sendSMSCode(phone: String, completion: @escaping (Bool, String?) -> Void) {
-        let form: [String: String] = [
-            "tel": phone,
-            "cid": "86",
-            "source": "main_web",
-            "keep": "1"
-        ]
-        postRequest("https://passport.bilibili.com/x/passport-login/web/sms/send", form: form) { [weak self] data, _, _ in
-            guard let json = self?.parseJSON(data) else {
-                DispatchQueue.main.async { completion(false, "网络错误") }
-                return
-            }
-            let code = json["code"] as? Int ?? -1
-            let msg = json["message"] as? String ?? "发送失败"
-            if code == 0 {
-                DispatchQueue.main.async { completion(true, nil) }
-            } else {
-                DispatchQueue.main.async { completion(false, msg) }
-            }
-        }
-    }
-
-    /// Login with phone number + SMS verification code.
-    /// On success, cookies are extracted and stored; user info must be fetched separately.
-    func loginWithSMS(phone: String, code: String, completion: @escaping (Bool, String?) -> Void) {
-        let form: [String: String] = [
-            "tel": phone,
-            "cid": "86",
-            "code": code,
-            "source": "main_web",
-            "keep": "1"
-        ]
-        postRequest("https://passport.bilibili.com/x/passport-login/web/sms/login", form: form) { [weak self] data, response, _ in
-            guard let self = self, let json = self.parseJSON(data) else {
-                DispatchQueue.main.async { completion(false, "网络错误") }
-                return
-            }
-            let code = json["code"] as? Int ?? -1
-            let msg = json["message"] as? String ?? "登录失败"
-            if code == 0 {
-                self.extractLoginCookies(from: data, response: response)
-                DispatchQueue.main.async { completion(true, nil) }
-            } else {
-                DispatchQueue.main.async { completion(false, msg) }
-            }
+    /// Store the session cookies harvested from the in-app web login (WKWebView).
+    /// Bilibili's native SMS endpoints require a geetest captcha and reject
+    /// non-browser requests (-400), so phone login runs on Bilibili's own page.
+    func setLoginCookies(_ newCookies: [String: String]) {
+        for (name, value) in newCookies where !value.isEmpty {
+            cookies[name] = value
         }
     }
 
@@ -1086,12 +1012,14 @@ private extension BiliAPI {
         case .user:
             return result.compactMap { item in
                 guard let uname = item["uname"] as? String else { return nil }
+                let mid = item["mid"] as? Int ?? 0
                 return Video(
-                    id: "\(item["mid"] as? Int ?? 0)",
+                    id: "\(mid)",
                     title: uname,
                     cover: BiliAPI.coverURL(item["upic"] as? String ?? ""),
                     duration: 0,
                     upName: uname,
+                    upMid: mid,
                     upAvatar: BiliAPI.coverURL(item["upic"] as? String ?? ""),
                     views: item["fans"] as? Int ?? 0,
                     danmaku: 0,
