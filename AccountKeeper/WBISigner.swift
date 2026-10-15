@@ -28,7 +28,16 @@ final class WBISigner {
     /// Set by BiliAPI on launch so the nav request isn't rejected.
     var cookieHeader: String = ""
 
-    private init() {}
+    /// Dedicated ephemeral session for WBI key fetching — avoids URLSession.shared's
+    /// long timeouts and connection reuse that can hang the nav request.
+    private let session: URLSession
+
+    private init() {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 10
+        config.timeoutIntervalForResource = 15
+        session = URLSession(configuration: config)
+    }
 
     // MARK: - Public
 
@@ -80,7 +89,7 @@ final class WBISigner {
         if !cookieHeader.isEmpty {
             req.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
         }
-        URLSession.shared.dataTask(with: req) { [weak self] data, _, error in
+        session.dataTask(with: req) { [weak self] data, _, error in
             guard let self = self else { return }
             if error != nil {
                 if retry > 0 {

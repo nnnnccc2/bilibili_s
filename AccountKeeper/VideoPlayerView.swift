@@ -38,6 +38,17 @@ struct VideoPlayerView: View {
     @State private var showControls = true
     @State private var controlsTimer: Timer?
 
+    // Swipe gesture state
+    @State private var gestureStartX: CGFloat = 0
+    @State private var gestureStartY: CGFloat = 0
+    @State private var gestureStartVolume: Float = 1.0
+    @State private var gestureStartBrightness: CGFloat = UIScreen.main.brightness
+    @State private var gestureDirection: GestureDirection = .none
+    @State private var showGestureIndicator: Bool = false
+    @State private var gestureIndicatorText: String = ""
+
+    private enum GestureDirection { case none, horizontal, verticalLeft, verticalRight }
+
     var body: some View {
         ZStack(alignment: .top) {
             // Dark background so letterbox areas are black, not white
@@ -48,6 +59,26 @@ struct VideoPlayerView: View {
                 ZStack {
                     PlayerLayerView(player: player)
                         .ignoresSafeArea()
+                    // Gesture indicator
+                    if showGestureIndicator {
+                        VStack(spacing: 6) {
+                            Image(systemName: gestureIcon)
+                                .font(.system(size: 40, weight: .semibold))
+                            Text(gestureIndicatorText)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 18)
+                        .background(Color.black.opacity(0.55))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .transition(.opacity)
+                    }
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .onTapGesture { toggleControls() }
+                        .gesture(playerGesture)
                     fullScreenControls
                 }
             } else {
@@ -115,10 +146,12 @@ struct VideoPlayerView: View {
                 PlayerManager.shared.deactivate(p)
             }
         }
-        .sheet(isPresented: $showingUPSpace) {
-            if video.upMid > 0 {
+        .overlay {
+            if showingUPSpace, video.upMid > 0 {
                 UPSpaceView(mid: video.upMid, initialName: video.upName)
                     .environmentObject(store)
+                    .ignoresSafeArea()
+                    .zIndex(30)
             }
         }
         .overlay(alignment: .bottom) {
@@ -131,7 +164,7 @@ struct VideoPlayerView: View {
                     .background(Color.black.opacity(0.75))
                     .clipShape(Capsule())
                     .padding(.bottom, 20)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.opacity)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { self.toast = nil }
                     }
@@ -218,12 +251,29 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // Tap to toggle controls
+            // Gesture indicator (seek / brightness / volume)
+            if showGestureIndicator {
+                VStack(spacing: 6) {
+                    Image(systemName: gestureIcon)
+                        .font(.system(size: 36, weight: .semibold))
+                    Text(gestureIndicatorText)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .background(Color.black.opacity(0.55))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .transition(.opacity)
+            }
+
+            // Tap + swipe gestures
             Color.black.opacity(0.001)
                 .onTapGesture { toggleControls() }
+                .gesture(playerGesture)
 
             if showControls {
-                // Bottom-left: play/pause ; Bottom-right: fullscreen
                 VStack {
                     Spacer()
                     HStack(alignment: .bottom) {
@@ -251,6 +301,81 @@ struct VideoPlayerView: View {
                 .transition(.opacity)
             }
         }
+    }
+
+    private var gestureIcon: String {
+        switch gestureDirection {
+        case .horizontal: return "goforward.10"
+        case .verticalLeft: return "sun.max.fill"
+        case .verticalRight: return "speaker.wave.3.fill"
+        default: return ""
+        }
+    }
+
+    private var playerGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                if gestureDirection == .none {
+                    // Determine direction on first significant movement
+                    let dx = value.translation.width
+                    let dy = value.translation.height
+                    if abs(dx) > abs(dy) {
+                        gestureDirection = .horizontal
+                        gestureStartX = value.startLocation.x
+                    } else {
+                        let isLeft = value.startLocation.x < UIScreen.main.bounds.width / 2
+                        gestureDirection = isLeft ? .verticalLeft : .verticalRight
+                        gestureStartY = value.startLocation.y
+                        gestureStartVolume = player?.volume ?? 1.0
+                        gestureStartBrightness = UIScreen.main.brightness
+                    }
+                    showGestureIndicator = true
+                }
+
+                switch gestureDirection {
+                case .horizontal:
+                    // Seek: 1px ≈ 0.5s
+                    let delta = value.translation.width
+                    let seekSeconds = delta * 0.5
+                    gestureIndicatorText = "\(seekSeconds >= 0 ? "+" : "")\(Int(seekSeconds))s"
+                case .verticalLeft:
+                    // Brightness: full screen height = full brightness range
+                    let height = UIScreen.main.bounds.height
+                    let delta = (gestureStartY - value.location.y) / height
+                    let newBrightness = min(max(gestureStartBrightness + delta, 0), 1)
+                    UIScreen.main.brightness = newBrightness
+                    gestureIndicatorText = "\(Int(newBrightness * 100))%"
+                case .verticalRight:
+                    // Volume: full screen height = full volume range
+                    let height = UIScreen.main.bounds.height
+                    let delta = Float((gestureStartY - value.location.y) / height)
+                    let newVolume = min(max(gestureStartVolume + delta, 0), 1)
+                    player?.volume = newVolume
+                    gestureIndicatorText = "\(Int(newVolume * 100))%"
+                case .none:
+                    break
+                }
+            }
+            .onEnded { value in
+                switch gestureDirection {
+                case .horizontal:
+                    if let p = player, let item = p.currentItem {
+                        let seekSeconds = value.translation.width * 0.5
+                        let newTime = p.currentTime().seconds + Double(seekSeconds)
+                        let duration = item.duration.seconds
+                        if duration > 0, !duration.isNaN {
+                            let clamped = min(max(newTime, 0), duration)
+                            p.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
+                        }
+                    }
+                default:
+                    break
+                }
+                gestureDirection = .none
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showGestureIndicator = false
+                }
+            }
     }
 
     // MARK: - Controls helpers

@@ -182,7 +182,7 @@ struct SearchView: View {
 
                     ScrollView {
                         if searchType == .user {
-                            // 用户列表：简洁清朗，头像 + 名字 + 签名 + 粉丝数
+                            // 用户列表：简洁清朗，头像 + 名字 + 签名 + 粉丝数，行间距宽松
                             LazyVStack(spacing: 0) {
                                 ForEach(results) { user in
                                     Button {
@@ -231,11 +231,12 @@ struct SearchView: View {
                                                 .foregroundStyle(.quaternary)
                                         }
                                         .padding(.horizontal, 16)
-                                        .padding(.vertical, 11)
+                                        .padding(.vertical, 14)
                                         .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
-                                    Divider()
+                                    Color(.separator)
+                                        .frame(height: 1)
                                         .padding(.leading, 76)
                                     .onAppear {
                                         if user.id == results.last?.id, hasMore, !isLoadingMore {
@@ -290,14 +291,20 @@ struct SearchView: View {
                     Button("取消") { dismiss() }
                 }
             }
-            .fullScreenCover(item: $selectedVideo) { video in
-                VideoPlayerView(video: video)
-                    .environmentObject(store)
+            .overlay {
+                if let video = selectedVideo {
+                    VideoPlayerView(video: video)
+                        .environmentObject(store)
+                        .ignoresSafeArea()
+                        .zIndex(10)
+                }
             }
-            .sheet(isPresented: $showingUPSpace) {
-                if selectedUPMid > 0 {
+            .overlay {
+                if showingUPSpace, selectedUPMid > 0 {
                     UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
                         .environmentObject(store)
+                        .ignoresSafeArea()
+                        .zIndex(20)
                 }
             }
             .onAppear { loadHotKeywords() }

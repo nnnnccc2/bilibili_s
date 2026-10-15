@@ -36,8 +36,12 @@ struct ContentView: View {
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
-        .fullScreenCover(isPresented: $showingSearch) {
-            SearchView().environmentObject(store)
+        .overlay {
+            if showingSearch {
+                SearchView().environmentObject(store)
+                    .ignoresSafeArea()
+                    .zIndex(10)
+            }
         }
     }
 
