@@ -295,7 +295,7 @@ struct SearchView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "person.2.fill")
                             .font(.caption2)
-                            .foregroundStyle(.biliBlue)
+                            .foregroundColor(Color.biliBlue)
                         Text("\(user.viewsText) 粉丝")
                             .font(.caption)
                             .foregroundStyle(.secondary)
