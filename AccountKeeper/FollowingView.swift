@@ -114,20 +114,13 @@ struct FollowingView: View {
                     }
                 }
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video)
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(10)
-                }
+            .fullScreenCover(item: $selectedVideo) { video in
+                VideoPlayerView(video: video).environmentObject(store)
             }
-            .overlay {
-                if showingUPSpace, selectedUPMid > 0 {
+            .sheet(isPresented: $showingUPSpace) {
+                if selectedUPMid > 0 {
                     UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
                         .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(20)
                 }
             }
         }

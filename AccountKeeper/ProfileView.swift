@@ -76,28 +76,14 @@ struct ProfileView: View {
                     }
                 }
             }
-            .overlay {
-                if showingLogin {
-                    LoginView().environmentObject(store)
-                        .ignoresSafeArea().zIndex(30)
-                } else if showingSettings {
-                    FilterSettingsView().environmentObject(store)
-                        .ignoresSafeArea().zIndex(30)
-                } else if showingHistory {
-                    historySheet
-                        .ignoresSafeArea().zIndex(30)
-                } else if showingAbout {
-                    SettingsView()
-                        .ignoresSafeArea().zIndex(30)
-                } else if showingFavorites {
-                    FavoritesListView().environmentObject(store)
-                        .ignoresSafeArea().zIndex(30)
-                } else if let video = selectedVideo {
-                    VideoPlayerView(video: video)
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(10)
-                }
+            .sheet(isPresented: $showingLogin) {
+                LoginView().environmentObject(store)
+            }
+            .sheet(isPresented: $showingSettings) {
+                FilterSettingsView().environmentObject(store)
+            }
+            .fullScreenCover(item: $selectedVideo) { video in
+                VideoPlayerView(video: video).environmentObject(store)
             }
             .alert("退出登录", isPresented: $showingLogoutAlert) {
                 Button("取消", role: .cancel) {}
@@ -107,6 +93,15 @@ struct ProfileView: View {
                 }
             } message: {
                 Text("确定要退出当前账号吗？")
+            }
+            .sheet(isPresented: $showingHistory) {
+                historySheet
+            }
+            .sheet(isPresented: $showingAbout) {
+                SettingsView()
+            }
+            .sheet(isPresented: $showingFavorites) {
+                FavoritesListView().environmentObject(store)
             }
         }
         .onAppear {

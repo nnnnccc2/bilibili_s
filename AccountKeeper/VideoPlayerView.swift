@@ -146,12 +146,10 @@ struct VideoPlayerView: View {
                 PlayerManager.shared.deactivate(p)
             }
         }
-        .overlay {
-            if showingUPSpace, video.upMid > 0 {
+        .sheet(isPresented: $showingUPSpace) {
+            if video.upMid > 0 {
                 UPSpaceView(mid: video.upMid, initialName: video.upName)
                     .environmentObject(store)
-                    .ignoresSafeArea()
-                    .zIndex(30)
             }
         }
         .overlay(alignment: .bottom) {

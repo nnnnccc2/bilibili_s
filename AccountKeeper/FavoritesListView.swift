@@ -47,13 +47,8 @@ struct FavoritesListView: View {
                     Button("完成") { dismiss() }.foregroundColor(.biliBlue)
                 }
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video)
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(10)
-                }
+            .fullScreenCover(item: $selectedVideo) { video in
+                VideoPlayerView(video: video).environmentObject(store)
             }
             .onAppear { loadFolders() }
         }

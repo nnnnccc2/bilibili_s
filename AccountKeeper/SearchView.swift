@@ -182,8 +182,8 @@ struct SearchView: View {
 
                     ScrollView {
                         if searchType == .user {
-                            // 用户列表：简洁清朗，头像 + 名字 + 签名 + 粉丝数，行间距宽松
-                            LazyVStack(spacing: 0) {
+                            // 用户列表：卡片式布局，与 App 整体风格统一，用户间明显区分
+                            LazyVStack(spacing: 10) {
                                 ForEach(results) { user in
                                     Button {
                                         if user.upMid > 0 {
@@ -194,20 +194,22 @@ struct SearchView: View {
                                     } label: {
                                         HStack(spacing: 12) {
                                             CachedAsyncImage(
-                                                url: URL(string: BiliAPI.coverThumb(user.upAvatar, width: 96)),
-                                                targetSize: CGSize(width: 48, height: 48)
+                                                url: URL(string: BiliAPI.coverThumb(user.upAvatar, width: 120)),
+                                                targetSize: CGSize(width: 56, height: 56)
                                             ) { img in
                                                 img.resizable().scaledToFill()
                                             } placeholder: {
                                                 Circle().fill(Color.gray.opacity(0.2))
                                             }
-                                            .frame(width: 48, height: 48)
+                                            .frame(width: 56, height: 56)
                                             .clipShape(Circle())
+                                            .overlay(Circle().stroke(Color.white.opacity(0.8), lineWidth: 2))
+                                            .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
 
-                                            VStack(alignment: .leading, spacing: 3) {
+                                            VStack(alignment: .leading, spacing: 4) {
                                                 Text(user.title)
                                                     .font(.subheadline)
-                                                    .fontWeight(.medium)
+                                                    .fontWeight(.semibold)
                                                     .foregroundStyle(.primary)
                                                     .lineLimit(1)
                                                 if !user.desc.isEmpty {
@@ -216,10 +218,10 @@ struct SearchView: View {
                                                         .foregroundStyle(.secondary)
                                                         .lineLimit(1)
                                                 }
-                                                HStack(spacing: 4) {
+                                                HStack(spacing: 5) {
                                                     Image(systemName: "person.2.fill")
                                                         .font(.caption2)
-                                                        .foregroundStyle(.secondary)
+                                                        .foregroundStyle(.biliBlue)
                                                     Text("\(user.viewsText) 粉丝")
                                                         .font(.caption)
                                                         .foregroundStyle(.secondary)
@@ -228,16 +230,15 @@ struct SearchView: View {
                                             Spacer()
                                             Image(systemName: "chevron.right")
                                                 .font(.caption)
-                                                .foregroundStyle(.quaternary)
+                                                .foregroundStyle(.tertiary)
                                         }
-                                        .padding(.horizontal, 16)
+                                        .padding(.horizontal, 14)
                                         .padding(.vertical, 14)
+                                        .background(Color.biliCard)
+                                        .clipShape(RoundedRectangle(cornerRadius: 14))
                                         .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
-                                    Color(.separator)
-                                        .frame(height: 1)
-                                        .padding(.leading, 76)
                                     .onAppear {
                                         if user.id == results.last?.id, hasMore, !isLoadingMore {
                                             loadMore()
@@ -245,7 +246,8 @@ struct SearchView: View {
                                     }
                                 }
                             }
-                            .padding(.top, 4)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 8)
                             .padding(.bottom, 20)
                         } else {
                             // 视频/番剧/直播：双列卡片网格
@@ -291,20 +293,14 @@ struct SearchView: View {
                     Button("取消") { dismiss() }
                 }
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video)
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(10)
-                }
+            .fullScreenCover(item: $selectedVideo) { video in
+                VideoPlayerView(video: video)
+                    .environmentObject(store)
             }
-            .overlay {
-                if showingUPSpace, selectedUPMid > 0 {
+            .sheet(isPresented: $showingUPSpace) {
+                if selectedUPMid > 0 {
                     UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
                         .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(20)
                 }
             }
             .onAppear { loadHotKeywords() }
