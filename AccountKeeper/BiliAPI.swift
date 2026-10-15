@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CommonCrypto
 
 // MARK: - Shared enums
 
@@ -176,8 +177,29 @@ final class BiliAPI {
     /// Android-app-style user agent. Space endpoints accept this without WBI
     /// and return code=0 reliably (same approach PiliPlus uses).
     private static let appUserAgent = "Mozilla/5.0 BiliDroid/7.54.0 (bbcallen@gmail.com) os/android model/Pixel mobi_app/android build/7540000"
+    
+    /// Bilibili Android appkey/appsec (same pair PiliPlus uses for app signing).
+    private static let appKey = "1d8b6e7d45233436"
+    private static let appSec = "560c52ccd288fed045859ed18bffd973"
+    
+    /// App-side signature: add appkey + ts, sort by key, URL-encode, append
+    /// appsec, MD5 — produces the `sign` field. Mirrors PiliPlus's AppSign.
+    private static func appSign(_ params: [String: String]) -> [String: String] {
+        var p = params
+        p["appkey"] = appKey
+        p["ts"] = String(Int(Date().timeIntervalSince1970))
+        let sorted = p.sorted { $0.key < $1.key }
+        let query = sorted.map {
+            let k = $0.key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.key
+            let v = $0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.value
+            return "\(k)=\(v)"
+        }.joined(separator: "&")
+        let sign = (query + appSec).data(using: .utf8)?.md5() ?? ""
+        p["sign"] = sign
+        return p
+    }
 
-    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, useAppUA: Bool = false, referer: String? = nil, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, useAppUA: Bool = false, useAppSign: Bool = false, referer: String? = nil, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
         let build: (Bool) -> Void = { [weak self] hasKeys in
             guard let self = self else { return }
             var url: URL?
@@ -189,8 +211,9 @@ final class BiliAPI {
                 comps?.percentEncodedQuery = signed
                 url = comps?.url
             } else {
+                let finalParams = useAppSign ? Self.appSign(params) : params
                 var comps = URLComponents(string: urlString)
-                comps?.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
+                comps?.queryItems = finalParams.map { URLQueryItem(name: $0.key, value: $0.value) }
                 url = comps?.url
             }
             guard let finalURL = url else {
@@ -687,31 +710,25 @@ final class BiliAPI {
     }
 
     /// Fetch a UP主's video list (paginated).
-    /// Uses /x/space/arc/search (no WBI). May hit -799 rate-limit; retries up to 3x.
+    /// Uses app-side endpoint /x/v2/space/archive/cursor with Android appkey
+    /// signing (same approach PiliPlus uses). Stable code=0, no -799 limit.
     func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
         let params: [String: String] = [
-            "mid": String(mid),
-            "ps": String(pageSize),
+            "vmid": String(mid),
             "pn": String(page),
+            "ps": String(pageSize),
             "order": "pubdate",
-            "platform": "web",
-            "_": String(Int(Date().timeIntervalSince1970 * 1000))
+            "build": "8430300",
+            "version": "8.43.0",
+            "mobi_app": "android",
+            "platform": "android",
+            "c_locale": "zh_CN",
+            "s_locale": "zh_CN",
+            "qn": "80",
+            "channel": "master"
         ]
-        fetchUPVideosOnce(mid: mid, params: params, retry: 3, completion: completion)
-    }
-
-    private func fetchUPVideosOnce(mid: Int, params: [String: String], retry: Int, completion: @escaping ([Video], Int) -> Void) {
-        request("https://api.bilibili.com/x/space/arc/search", params: params, useWBI: false, useAppUA: true, referer: "https://space.bilibili.com/\(mid)") { [weak self] data, _, _ in
+        request("https://app.bilibili.com/x/v2/space/archive/cursor", params: params, useWBI: false, useAppUA: true, useAppSign: true) { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
-            // -799 = rate limit; retry up to 3 times with 1.5s delay
-            if videos.isEmpty, retry > 0, let json = self?.parseJSON(data), (json["code"] as? Int) == -799 {
-                DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
-                    var p = params
-                    p["_"] = String(Int(Date().timeIntervalSince1970 * 1000))
-                    self?.fetchUPVideosOnce(mid: mid, params: p, retry: retry - 1, completion: completion)
-                }
-                return
-            }
             DispatchQueue.main.async { completion(videos, total) }
         }
     }
@@ -1216,27 +1233,26 @@ private extension BiliAPI {
     func parseUPVideos(_ data: Data?) -> ([Video], Int) {
         guard let json = parseJSON(data),
               let d = json["data"] as? [String: Any],
-              let list = d["list"] as? [String: Any],
-              let vlist = list["vlist"] as? [[String: Any]] else { return ([], 0) }
-        let total = (d["page"] as? [String: Any])?["count"] as? Int ?? vlist.count
-        let videos = vlist.compactMap { item -> Video? in
+              let items = d["item"] as? [[String: Any]] else { return ([], 0) }
+        let total = d["count"] as? Int ?? items.count
+        let videos = items.compactMap { item -> Video? in
             guard let bvid = item["bvid"] as? String,
                   let title = item["title"] as? String else { return nil }
             return Video(
                 id: bvid,
                 title: title,
-                cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
-                duration: parseDuration(item["length"] as? String ?? "0"),
+                cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
+                duration: item["duration"] as? Int ?? 0,
                 upName: item["author"] as? String ?? "",
                 upMid: item["mid"] as? Int ?? 0,
                 upAvatar: "",
                 views: item["play"] as? Int ?? 0,
-                danmaku: item["video_review"] as? Int ?? 0,
-                publishTime: formatTime(item["created"] as? Int ?? 0),
-                category: "",
-                desc: item["description"] as? String ?? "",
+                danmaku: 0,
+                publishTime: "",
+                category: item["tname"] as? String ?? "",
+                desc: "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
-                cid: item["cid"] as? Int ?? 0
+                cid: 0
             )
         }
         return (videos, total > 0 ? total : videos.count)
@@ -1437,5 +1453,17 @@ extension Video {
                   publishTime: publishTime, category: category, desc: desc,
                   likes: likes, coins: coins, favorites: favorites, shares: shares)
         self.cid = cid
+    }
+}
+
+// MARK: - Data md5 helper (for app-side signing)
+
+extension Data {
+    func md5() -> String {
+        var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
+        self.withUnsafeBytes { bytes in
+            _ = CC_MD5(bytes.baseAddress, CC_LONG(self.count), &digest)
+        }
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
