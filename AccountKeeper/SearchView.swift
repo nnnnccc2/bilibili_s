@@ -193,9 +193,16 @@ struct SearchView: View {
                                         }
                                     } label: {
                                         HStack(spacing: 12) {
-                                            CachedAsyncImage(url: user.upAvatar, width: 48)
-                                                .frame(width: 48, height: 48)
-                                                .clipShape(Circle())
+                                            CachedAsyncImage(
+                                                url: URL(string: user.upAvatar),
+                                                targetSize: CGSize(width: 48, height: 48)
+                                            ) { img in
+                                                img.resizable().scaledToFill()
+                                            } placeholder: {
+                                                Circle().fill(Color.gray.opacity(0.3))
+                                            }
+                                            .frame(width: 48, height: 48)
+                                            .clipShape(Circle())
                                             VStack(alignment: .leading, spacing: 4) {
                                                 Text(user.title)
                                                     .font(.headline)
