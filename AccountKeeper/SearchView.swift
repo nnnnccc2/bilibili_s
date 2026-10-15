@@ -227,9 +227,13 @@ struct SearchView: View {
                     Button("取消") { dismiss() }
                 }
             }
-            .fullScreenCover(item: $selectedVideo) { video in
-                VideoPlayerView(video: video)
-                    .environmentObject(store)
+            .overlay {
+                if let video = selectedVideo {
+                    VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                        .environmentObject(store)
+                        .ignoresSafeArea()
+                        .zIndex(10)
+                }
             }
             .sheet(isPresented: $showingUPSpace) {
                 if selectedUPMid > 0 {
@@ -243,7 +247,7 @@ struct SearchView: View {
 
     // MARK: - User search results (extracted to reduce type-check complexity)
     private var userList: some View {
-        LazyVStack(spacing: 10) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             ForEach(results) { user in
                 userRow(user)
                     .onAppear {
@@ -266,48 +270,61 @@ struct SearchView: View {
                 showingUPSpace = true
             }
         } label: {
-            HStack(spacing: 12) {
+            VStack(spacing: 0) {
+                // 顶部 1/3：头像
                 CachedAsyncImage(
                     url: URL(string: BiliAPI.coverThumb(user.upAvatar, width: 120)),
-                    targetSize: CGSize(width: 56, height: 56)
+                    targetSize: CGSize(width: 64, height: 64)
                 ) { img in
                     img.resizable().scaledToFill()
                 } placeholder: {
                     Circle().fill(Color.gray.opacity(0.2))
                 }
-                .frame(width: 56, height: 56)
+                .frame(width: 52, height: 52)
                 .clipShape(Circle())
-                .overlay(Circle().stroke(Color.white.opacity(0.8), lineWidth: 2))
-                .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+                .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 2))
+                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
 
-                VStack(alignment: .leading, spacing: 4) {
+                // 中部 1/3：名称 + 简介
+                VStack(spacing: 3) {
                     Text(user.title)
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     if !user.desc.isEmpty {
                         Text(user.desc)
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                    }
-                    HStack(spacing: 5) {
-                        Image(systemName: "person.2.fill")
-                            .font(.caption2)
-                            .foregroundColor(Color.biliBlue)
-                        Text("\(user.viewsText) 粉丝")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8)
+
+                Spacer(minLength: 0)
+
+                // 底部 1/3：粉丝数
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption2)
+                        .foregroundColor(Color.biliBlue)
+                    Text("\(user.viewsText)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("粉丝")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 10)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
+            .frame(height: 156)
             .background(Color.biliCard)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .contentShape(Rectangle())

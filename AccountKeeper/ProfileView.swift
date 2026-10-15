@@ -82,8 +82,13 @@ struct ProfileView: View {
             .sheet(isPresented: $showingSettings) {
                 FilterSettingsView().environmentObject(store)
             }
-            .fullScreenCover(item: $selectedVideo) { video in
-                VideoPlayerView(video: video).environmentObject(store)
+            .overlay {
+                if let video = selectedVideo {
+                    VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                        .environmentObject(store)
+                        .ignoresSafeArea()
+                        .zIndex(10)
+                }
             }
             .alert("退出登录", isPresented: $showingLogoutAlert) {
                 Button("取消", role: .cancel) {}

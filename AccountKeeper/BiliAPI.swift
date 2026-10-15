@@ -203,7 +203,7 @@ final class BiliAPI {
         return p
     }
 
-    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, useAppUA: Bool = false, useAppSign: Bool = false, referer: String? = nil, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+    private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, useAppUA: Bool = false, useAppSign: Bool = false, forceWBIRefresh: Bool = false, referer: String? = nil, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
         let build: (Bool) -> Void = { [weak self] hasKeys in
             guard let self = self else { return }
             var url: URL?
@@ -241,7 +241,7 @@ final class BiliAPI {
         }
 
         if useWBI {
-            WBISigner.shared.refreshKeysIfNeeded { success in
+            WBISigner.shared.refreshKeysIfNeeded(force: forceWBIRefresh) { success in
                 if success {
                     build(true)
                 } else {
@@ -249,7 +249,7 @@ final class BiliAPI {
                     // after a short delay, then give up so the caller gets an error
                     // instead of a silently-bad signature.
                     DispatchQueue.global().asyncAfter(deadline: .now() + 0.6) {
-                        WBISigner.shared.refreshKeysIfNeeded { retrySuccess in
+                        WBISigner.shared.refreshKeysIfNeeded(force: true) { retrySuccess in
                             if retrySuccess {
                                 build(true)
                             } else {
@@ -736,9 +736,9 @@ final class BiliAPI {
 
     /// Fetch a UP主's video list (paginated).
     /// Uses web endpoint /x/space/wbi/arc/search with WBI signing + buvid3 cookie.
-    /// Stable code=0 and supports pn pagination.
+    /// Stable code=0 and supports pn pagination. Forces WBI key refresh on retries.
     func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
-        fetchUPVideos(mid: mid, page: page, pageSize: pageSize, retry: 3, completion: completion)
+        fetchUPVideos(mid: mid, page: page, pageSize: pageSize, retry: 4, completion: completion)
     }
 
     private func fetchUPVideos(mid: Int, page: Int, pageSize: Int, retry: Int, completion: @escaping ([Video], Int) -> Void) {
@@ -751,11 +751,13 @@ final class BiliAPI {
             "web_location": "1550101",
             "order_avoided": "true"
         ]
-        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true, useAppUA: false, referer: "https://space.bilibili.com/\(mid)/video") { [weak self] data, _, _ in
+        // On retries, force a fresh WBI key fetch in case the cached keys are stale.
+        let forceRefresh = retry < 4
+        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true, useAppUA: false, forceWBIRefresh: forceRefresh, referer: "https://space.bilibili.com/\(mid)/video") { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
             if videos.isEmpty && retry > 0 {
                 // Transient failure (WBI key/风控/网络) — retry after short delay
-                DispatchQueue.global().asyncAfter(deadline: .now() + 0.8) {
+                DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
                     self?.fetchUPVideos(mid: mid, page: page, pageSize: pageSize, retry: retry - 1, completion: completion)
                 }
             } else {

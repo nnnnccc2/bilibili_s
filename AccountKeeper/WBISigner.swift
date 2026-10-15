@@ -42,9 +42,9 @@ final class WBISigner {
     // MARK: - Public
 
     /// Fetch fresh img_key/sub_key from nav endpoint and compute mixin_key.
-    /// Keys are cached for 1 hour.
-    func refreshKeysIfNeeded(completion: @escaping (Bool) -> Void) {
-        if !mixinKey.isEmpty, Date().timeIntervalSince(lastUpdate) < 3600 {
+    /// Keys are cached for 1 hour. Set force=true to skip cache.
+    func refreshKeysIfNeeded(force: Bool = false, completion: @escaping (Bool) -> Void) {
+        if !force, !mixinKey.isEmpty, Date().timeIntervalSince(lastUpdate) < 3600 {
             completion(true)
             return
         }

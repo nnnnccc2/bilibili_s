@@ -48,8 +48,13 @@ struct UPSpaceView: View {
                         .lineLimit(1)
                 }
             }
-            .fullScreenCover(item: $selectedVideo) { video in
-                VideoPlayerView(video: video).environmentObject(store)
+            .overlay {
+                if let video = selectedVideo {
+                    VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                        .environmentObject(store)
+                        .ignoresSafeArea()
+                        .zIndex(10)
+                }
             }
             .onAppear {
                 if info == nil {

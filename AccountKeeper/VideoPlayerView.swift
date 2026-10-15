@@ -14,6 +14,7 @@ struct VideoPlayerView: View {
     @Environment(\.dismiss) private var dismiss
 
     let video: Video
+    var onDismiss: (() -> Void)? = nil
 
     @State private var player: AVPlayer?
     @State private var comments: [Comment] = []
@@ -110,7 +111,9 @@ struct VideoPlayerView: View {
 
                 // Top controls overlaid on the player
                 HStack {
-                    Button { dismiss() } label: {
+                    Button {
+                        if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
+                    } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
