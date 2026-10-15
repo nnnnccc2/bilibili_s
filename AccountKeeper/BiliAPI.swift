@@ -710,24 +710,19 @@ final class BiliAPI {
     }
 
     /// Fetch a UP主's video list (paginated).
-    /// Uses app-side endpoint /x/v2/space/archive/cursor with Android appkey
-    /// signing (same approach PiliPlus uses). Stable code=0, no -799 limit.
+    /// Uses web endpoint /x/space/wbi/arc/search with WBI signing + buvid3 cookie.
+    /// Stable code=0 and supports pn pagination.
     func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
         let params: [String: String] = [
-            "vmid": String(mid),
-            "pn": String(page),
+            "mid": String(mid),
             "ps": String(pageSize),
+            "pn": String(page),
             "order": "pubdate",
-            "build": "8430300",
-            "version": "8.43.0",
-            "mobi_app": "android",
-            "platform": "android",
-            "c_locale": "zh_CN",
-            "s_locale": "zh_CN",
-            "qn": "80",
-            "channel": "master"
+            "platform": "web",
+            "web_location": "1550101",
+            "order_avoided": "true"
         ]
-        request("https://app.bilibili.com/x/v2/space/archive/cursor", params: params, useWBI: false, useAppUA: true, useAppSign: true) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true, useAppUA: false, referer: "https://space.bilibili.com/\(mid)/video") { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
             DispatchQueue.main.async { completion(videos, total) }
         }
@@ -1233,26 +1228,27 @@ private extension BiliAPI {
     func parseUPVideos(_ data: Data?) -> ([Video], Int) {
         guard let json = parseJSON(data),
               let d = json["data"] as? [String: Any],
-              let items = d["item"] as? [[String: Any]] else { return ([], 0) }
-        let total = d["count"] as? Int ?? items.count
-        let videos = items.compactMap { item -> Video? in
+              let list = d["list"] as? [String: Any],
+              let vlist = list["vlist"] as? [[String: Any]] else { return ([], 0) }
+        let total = (d["page"] as? [String: Any])?["count"] as? Int ?? vlist.count
+        let videos = vlist.compactMap { item -> Video? in
             guard let bvid = item["bvid"] as? String,
                   let title = item["title"] as? String else { return nil }
             return Video(
                 id: bvid,
                 title: title,
-                cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
-                duration: item["duration"] as? Int ?? 0,
+                cover: BiliAPI.coverURL(item["pic"] as? String ?? ""),
+                duration: parseDuration(item["length"] as? String ?? "0"),
                 upName: item["author"] as? String ?? "",
                 upMid: item["mid"] as? Int ?? 0,
                 upAvatar: "",
                 views: item["play"] as? Int ?? 0,
-                danmaku: 0,
-                publishTime: "",
-                category: item["tname"] as? String ?? "",
-                desc: "",
+                danmaku: item["video_review"] as? Int ?? 0,
+                publishTime: formatTime(item["created"] as? Int ?? 0),
+                category: "",
+                desc: item["description"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
-                cid: 0
+                cid: item["cid"] as? Int ?? 0
             )
         }
         return (videos, total > 0 ? total : videos.count)
