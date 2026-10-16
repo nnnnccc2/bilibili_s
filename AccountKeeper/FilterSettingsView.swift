@@ -10,6 +10,8 @@ import SwiftUI
 struct FilterSettingsView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
+
+    var onDismiss: (() -> Void)? = nil
     @State private var newWord: String = ""
     @State private var showWordError: String? = nil
 
@@ -62,14 +64,14 @@ struct FilterSettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        dismiss()
+                        if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
                     } label: {
                         Image(systemName: "chevron.left")
                             .foregroundColor(.biliBlue)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button("完成") { if let onDismiss = onDismiss { onDismiss() } else { dismiss() } }
                         .foregroundColor(.biliBlue)
                 }
             }

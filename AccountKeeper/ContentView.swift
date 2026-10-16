@@ -2,8 +2,7 @@
 //  ContentView.swift
 //  BiliBili
 //
-//  Main container with a floating pill bottom navigation
-//  (matches the reference design: 首页 / 关注 / 分区 / 我的 + search)
+//  Main container with a floating pill bottom navigation (4 tabs).
 //
 
 import SwiftUI
@@ -23,12 +22,8 @@ struct ContentView: View {
                 .tag(1)
                 .toolbar(.hidden, for: .tabBar)
 
-            CategoryView(showingSearch: $showingSearch)
-                .tag(2)
-                .toolbar(.hidden, for: .tabBar)
-
             ProfileView(showingSearch: $showingSearch)
-                .tag(3)
+                .tag(2)
                 .toolbar(.hidden, for: .tabBar)
         }
         .tint(.biliBlue)
@@ -36,25 +31,29 @@ struct ContentView: View {
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
-        .fullScreenCover(isPresented: $showingSearch) {
-            SearchView().environmentObject(store)
+        .overlay {
+            if showingSearch {
+                SearchView(onDismiss: { showingSearch = false })
+                    .environmentObject(store)
+                    .ignoresSafeArea()
+                    .zIndex(50)
+            }
         }
     }
 
-    // MARK: - Floating pill navigation
+    // MARK: - Floating pill navigation (首页 / 关注 / 我的 + 搜索)
     private var bottomBar: some View {
         HStack(spacing: 0) {
             tabButton(index: 0, icon: "house", selectedIcon: "house.fill", title: "首页")
             tabButton(index: 1, icon: "safari", selectedIcon: "safari.fill", title: "关注")
-            tabButton(index: 2, icon: "square.grid.2x2", selectedIcon: "square.grid.2x2.fill", title: "分区")
-            tabButton(index: 3, icon: "person", selectedIcon: "person.fill", title: "我的")
+            tabButton(index: 2, icon: "person", selectedIcon: "person.fill", title: "我的")
 
             Button {
                 showingSearch = true
             } label: {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 18))
-                    .foregroundStyle(Color.biliTabText)
+                    .foregroundStyle(selectedTab == -1 ? Color.biliBlue : Color.biliTabText)
                     .frame(width: 40, height: 40)
                     .background(Circle().fill(Color.black.opacity(0.05)))
                     .overlay(Circle().stroke(Color.black.opacity(0.05), lineWidth: 1))

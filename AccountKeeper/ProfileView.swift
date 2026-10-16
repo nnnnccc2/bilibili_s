@@ -76,11 +76,19 @@ struct ProfileView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingLogin) {
-                LoginView().environmentObject(store)
+            .overlay {
+                if showingLogin {
+                    LoginView(onDismiss: { showingLogin = false })
+                        .environmentObject(store)
+                        .ignoresSafeArea().zIndex(30)
+                }
             }
-            .sheet(isPresented: $showingSettings) {
-                FilterSettingsView().environmentObject(store)
+            .overlay {
+                if showingSettings {
+                    FilterSettingsView(onDismiss: { showingSettings = false })
+                        .environmentObject(store)
+                        .ignoresSafeArea().zIndex(30)
+                }
             }
             .overlay {
                 if let video = selectedVideo {
@@ -99,14 +107,24 @@ struct ProfileView: View {
             } message: {
                 Text("确定要退出当前账号吗？")
             }
-            .sheet(isPresented: $showingHistory) {
-                historySheet
+            .overlay {
+                if showingHistory {
+                    historySheet
+                        .ignoresSafeArea().zIndex(30)
+                }
             }
-            .sheet(isPresented: $showingAbout) {
-                SettingsView()
+            .overlay {
+                if showingAbout {
+                    SettingsView(onDismiss: { showingAbout = false })
+                        .ignoresSafeArea().zIndex(30)
+                }
             }
-            .sheet(isPresented: $showingFavorites) {
-                FavoritesListView().environmentObject(store)
+            .overlay {
+                if showingFavorites {
+                    FavoritesListView(onDismiss: { showingFavorites = false })
+                        .environmentObject(store)
+                        .ignoresSafeArea().zIndex(30)
+                }
             }
         }
         .onAppear {

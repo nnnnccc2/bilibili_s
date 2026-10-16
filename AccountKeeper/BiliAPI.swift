@@ -52,11 +52,7 @@ enum Partition: String, CaseIterable, Identifiable {
 
 enum SearchType: String, CaseIterable, Identifiable {
     case video = "视频"
-    case bangumi = "番剧"
-    case cinema = "影视"
     case user = "用户"
-    case live = "直播"
-    case article = "专栏"
     var id: String { rawValue }
 }
 
@@ -754,9 +750,9 @@ final class BiliAPI {
         // On retries, force a fresh WBI key fetch in case the cached keys are stale.
         let forceRefresh = retry < 4
         request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true, useAppUA: false, forceWBIRefresh: forceRefresh, referer: "https://space.bilibili.com/\(mid)/video") { [weak self] data, _, _ in
-            let (videos, total) = self?.parseUPVideos(data) ?? ([], 0)
+            let (videos, total, code, msg) = self?.parseUPVideosDebug(data) ?? ([], 0, -1, "parse failed")
+            print("[BiliBili] fetchUPVideos mid=\(mid) page=\(page) retry=\(retry) code=\(code) msg=\(msg) count=\(videos.count)")
             if videos.isEmpty && retry > 0 {
-                // Transient failure (WBI key/风控/网络) — retry after short delay
                 DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
                     self?.fetchUPVideos(mid: mid, page: page, pageSize: pageSize, retry: retry - 1, completion: completion)
                 }
@@ -1294,11 +1290,15 @@ private extension BiliAPI {
         )
     }
 
-    func parseUPVideos(_ data: Data?) -> ([Video], Int) {
-        guard let json = parseJSON(data),
-              let d = json["data"] as? [String: Any],
+    func parseUPVideosDebug(_ data: Data?) -> ([Video], Int, Int, String) {
+        guard let json = parseJSON(data) else { return ([], 0, -1, "parseJSON nil") }
+        let code = json["code"] as? Int ?? -1
+        let msg = json["message"] as? String ?? ""
+        guard let d = json["data"] as? [String: Any],
               let list = d["list"] as? [String: Any],
-              let vlist = list["vlist"] as? [[String: Any]] else { return ([], 0) }
+              let vlist = list["vlist"] as? [[String: Any]] else {
+            return ([], 0, code, msg)
+        }
         let total = (d["page"] as? [String: Any])?["count"] as? Int ?? vlist.count
         let videos = vlist.compactMap { item -> Video? in
             guard let bvid = item["bvid"] as? String,
@@ -1320,7 +1320,12 @@ private extension BiliAPI {
                 cid: item["cid"] as? Int ?? 0
             )
         }
-        return (videos, total > 0 ? total : videos.count)
+        return (videos, total > 0 ? total : videos.count, code, msg)
+    }
+
+    func parseUPVideos(_ data: Data?) -> ([Video], Int) {
+        let (v, t, _, _) = parseUPVideosDebug(data)
+        return (v, t)
     }
 
     func parsePlayURL(_ data: Data?) -> URL? {

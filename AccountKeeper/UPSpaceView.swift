@@ -2,17 +2,18 @@
 //  UPSpaceView.swift
 //  BiliBili
 //
-//  UP主个人空间：资料、关注按钮、视频列表
+//  UP主个人空间：资料、关注按钮、视频列表。
+//  overlay 呈现，无粘滞动画。
 //
 
 import SwiftUI
 
 struct UPSpaceView: View {
     @EnvironmentObject var store: AppStore
-    @Environment(\.dismiss) private var dismiss
 
     let mid: Int
     let initialName: String
+    var onDismiss: (() -> Void)? = nil
 
     @State private var info: UPSpaceInfo?
     @State private var videos: [Video] = []
@@ -37,7 +38,9 @@ struct UPSpaceView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
+                    Button {
+                        if let onDismiss = onDismiss { onDismiss() }
+                    } label: {
                         Image(systemName: "chevron.left")
                             .foregroundColor(.biliBlue)
                     }
@@ -109,7 +112,6 @@ struct UPSpaceView: View {
             .padding(.horizontal, 16)
             .padding(.top, 16)
 
-            // Follow button
             Button {
                 toggleFollow()
             } label: {
@@ -165,26 +167,47 @@ struct UPSpaceView: View {
 
     @ViewBuilder
     private var videoGridSection: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            ForEach(videos) { video in
-                VideoCardView(video: video)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedVideo = video
-                    }
-                    .onAppear {
-                        // Load more when nearing the end
-                        if video.id == videos.last?.id, hasMore, !isLoadingMore {
-                            loadVideos(reset: false)
-                        }
-                    }
+        if isLoading {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+        } else if videos.isEmpty {
+            VStack(spacing: 8) {
+                Image(systemName: "video.slash")
+                    .font(.system(size: 30))
+                    .foregroundStyle(.tertiary)
+                Text("暂无视频")
+                    .foregroundStyle(.secondary)
+                Button("点击重试") {
+                    loadVideos(reset: true)
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .foregroundStyle(Color.biliBlue)
             }
-        }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 20)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
+        } else {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(videos) { video in
+                    VideoCardView(video: video)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedVideo = video
+                        }
+                        .onAppear {
+                            if video.id == videos.last?.id, hasMore, !isLoadingMore {
+                                loadVideos(reset: false)
+                            }
+                        }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 20)
 
-        if isLoadingMore {
-            ProgressView().padding(.vertical, 12)
+            if isLoadingMore {
+                ProgressView().padding(.vertical, 12)
+            }
         }
     }
 
@@ -229,10 +252,7 @@ struct UPSpaceView: View {
     }
 
     private func toggleFollow() {
-        guard store.currentUser != nil else {
-            // Prompt login — for now just no-op silently
-            return
-        }
+        guard store.currentUser != nil else { return }
         isFollowBusy = true
         let action = isFollowing ? 2 : 1
         BiliAPI.shared.modifyRelation(mid: mid, action: action) { success, _ in

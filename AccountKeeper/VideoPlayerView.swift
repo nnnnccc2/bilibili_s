@@ -38,6 +38,8 @@ struct VideoPlayerView: View {
     @State private var isPlaying = false
     @State private var showControls = true
     @State private var controlsTimer: Timer?
+    @State private var currentTime: Double = 0
+    @State private var duration: Double = 0
 
     // Swipe gesture state
     @State private var gestureStartX: CGFloat = 0
@@ -109,22 +111,22 @@ struct VideoPlayerView: View {
                 .background(Color.biliBackground)
                 .scrollIndicators(.hidden)
 
-                // Top controls overlaid on the player
+                // Top controls overlaid on the player (safe-area aware)
                 HStack {
                     Button {
                         if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(Color.black.opacity(0.35))
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .frame(width: 30, height: 30)
+                            .background(Color.black.opacity(0.3))
                             .clipShape(Circle())
                     }
                     Spacer()
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
             }
         }
         .onAppear {
@@ -149,10 +151,12 @@ struct VideoPlayerView: View {
                 PlayerManager.shared.deactivate(p)
             }
         }
-        .sheet(isPresented: $showingUPSpace) {
-            if video.upMid > 0 {
-                UPSpaceView(mid: video.upMid, initialName: video.upName)
+        .overlay {
+            if showingUPSpace, video.upMid > 0 {
+                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { showingUPSpace = false })
                     .environmentObject(store)
+                    .ignoresSafeArea()
+                    .zIndex(30)
             }
         }
         .overlay(alignment: .bottom) {
@@ -174,52 +178,81 @@ struct VideoPlayerView: View {
         .statusBarHidden(showFullScreen)
     }
 
-    // MARK: - Full-screen controls (play/pause bottom-left, fullscreen bottom-right)
+    // MARK: - Full-screen controls with progress bar
 
     private var fullScreenControls: some View {
         ZStack {
-            // Tap anywhere to toggle controls
             Color.black.opacity(0.001)
                 .onTapGesture { toggleControls() }
 
             if showControls {
                 VStack {
-                    // Top: close button
+                    // Top bar: back button (safe-area padding)
                     HStack {
-                        Button { showFullScreen = false } label: {
-                            Image(systemName: "xmark")
-                                .font(.title2)
-                                .foregroundStyle(.white)
-                                .padding(12)
+                        Button {
+                            if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .frame(width: 30, height: 30)
+                                .background(Color.black.opacity(0.3))
+                                .clipShape(Circle())
                         }
                         Spacer()
                     }
-                    .padding(.top, 8)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 6)
 
                     Spacer()
 
-                    // Bottom bar: play/pause (left) + fullscreen exit (right)
-                    HStack {
-                        Button { togglePlay() } label: {
-                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 28, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 52, height: 52)
-                                .background(Color.black.opacity(0.4))
-                                .clipShape(Circle())
+                    // Bottom controls: play + progress bar + time + fullscreen
+                    VStack(spacing: 6) {
+                        // Progress bar — tappable for seek
+                        Slider(
+                            value: Binding(
+                                get: { duration > 0 ? currentTime / duration : 0 },
+                                set: { fraction in
+                                    let newTime = fraction * duration
+                                    if let p = player {
+                                        p.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+                                    }
+                                }
+                            ),
+                            in: 0...1
+                        )
+                        .tint(.white)
+                        .padding(.horizontal, 16)
+
+                        HStack(spacing: 14) {
+                            Button { togglePlay() } label: {
+                                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.black.opacity(0.3))
+                                    .clipShape(Circle())
+                            }
+
+                            Text("\(formatTime(currentTime)) / \(formatTime(duration))")
+                                .font(.caption2)
+                                .foregroundStyle(.white.opacity(0.8))
+
+                            Spacer()
+
+                            Button { showFullScreen = false } label: {
+                                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                    .frame(width: 30, height: 30)
+                                    .background(Color.black.opacity(0.3))
+                                    .clipShape(Circle())
+                            }
                         }
-                        Spacer()
-                        Button { showFullScreen = false } label: {
-                            Image(systemName: "arrow.down.right.and.arrow.up.left")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 44, height: 44)
-                                .background(Color.black.opacity(0.4))
-                                .clipShape(Circle())
-                        }
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 8)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 10)
                 }
                 .transition(.opacity)
             }
@@ -405,6 +438,18 @@ struct VideoPlayerView: View {
         } else {
             p.play()
             isPlaying = true
+        }
+    }
+
+    private func formatTime(_ seconds: Double) -> String {
+        let s = max(0, Int(seconds))
+        let h = s / 3600
+        let m = (s % 3600) / 60
+        let sec = s % 60
+        if h > 0 {
+            return String(format: "%d:%02d:%02d", h, m, sec)
+        } else {
+            return String(format: "%d:%02d", m, sec)
         }
     }
 
@@ -630,6 +675,20 @@ struct VideoPlayerView: View {
                 showControls = true
                 scheduleHideControls()
                 writeHistoryOnce()
+
+                // Observe playback progress (update duration + currentTime)
+                let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
+                p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+                    guard let self = self else { return }
+                    self.currentTime = time.seconds
+                    if let d = p.currentItem?.duration.seconds, !d.isNaN {
+                        self.duration = d
+                    }
+                }
+                // Duration observer
+                NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
+                    self.isPlaying = false
+                }
             }
         }
     }

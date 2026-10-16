@@ -10,6 +10,8 @@ import SwiftUI
 struct FavoritesListView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
+
+    var onDismiss: (() -> Void)? = nil
     @State private var folders: [FavoriteFolder] = []
     @State private var selectedFolder: FavoriteFolder?
     @State private var videos: [Video] = []
@@ -44,7 +46,7 @@ struct FavoritesListView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }.foregroundColor(.biliBlue)
+                    Button("完成") { if let onDismiss = onDismiss { onDismiss() } else { dismiss() } }.foregroundColor(.biliBlue)
                 }
             }
             .overlay {

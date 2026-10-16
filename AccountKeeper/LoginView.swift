@@ -14,6 +14,8 @@ struct LoginView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
 
+    var onDismiss: (() -> Void)? = nil
+
     // MARK: - Tab
     @State private var selectedTab: LoginTab = .qr
 
@@ -95,7 +97,7 @@ struct LoginView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") { dismiss() }
+                    Button("取消") { if let onDismiss = onDismiss { onDismiss() } else { dismiss() } }
                         .foregroundColor(.biliBlue)
                 }
             }
@@ -267,7 +269,7 @@ struct LoginView: View {
                     self.store.loginAfterQRSuccess { ok in
                         DispatchQueue.main.async {
                             if ok {
-                                dismiss()
+                                if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
                             } else {
                                 self.qrError = "登录成功但获取用户信息失败，请重试"
                             }
@@ -295,7 +297,7 @@ struct LoginView: View {
             DispatchQueue.main.async {
                 isCompletingLogin = false
                 if ok {
-                    dismiss()
+                    if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
                 } else {
                     webLoginError = "登录成功但获取用户信息失败，请重试"
                 }

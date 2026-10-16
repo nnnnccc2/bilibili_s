@@ -10,6 +10,8 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
+    var onDismiss: (() -> Void)? = nil
+
     var body: some View {
         NavigationStack {
             List {
@@ -55,7 +57,7 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button("完成") { if let onDismiss = onDismiss { onDismiss() } else { dismiss() } }
                 }
             }
         }

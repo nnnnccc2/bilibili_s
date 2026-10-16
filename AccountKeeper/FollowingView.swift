@@ -122,10 +122,12 @@ struct FollowingView: View {
                         .zIndex(10)
                 }
             }
-            .sheet(isPresented: $showingUPSpace) {
-                if selectedUPMid > 0 {
-                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
+            .overlay {
+                if showingUPSpace, selectedUPMid > 0 {
+                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
                         .environmentObject(store)
+                        .ignoresSafeArea()
+                        .zIndex(20)
                 }
             }
         }

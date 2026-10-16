@@ -2,14 +2,14 @@
 //  SearchView.swift
 //  BiliBili
 //
-//  Search page with content type tabs and duration filters
+//  Search page — overlay presentation, no sticky animation.
+//  Only 视频 / 用户 tabs. Hot keywords: 哔哩哔哩热搜 in tiny gray.
 //
 
 import SwiftUI
 
 struct SearchView: View {
     @EnvironmentObject var store: AppStore
-    @Environment(\.dismiss) private var dismiss
     @State private var keyword: String = ""
     @State private var searchType: SearchType = .video
     @State private var results: [Video] = []
@@ -26,6 +26,9 @@ struct SearchView: View {
     @State private var hotKeywords: [String] = []
     @State private var isLoadingKeywords = false
 
+    /// Callback when user taps the cancel button (overlay presentation).
+    var onDismiss: (() -> Void)? = nil
+
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
@@ -36,7 +39,7 @@ struct SearchView: View {
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(.secondary)
-                        TextField("搜索视频、番剧、UP主", text: $keyword)
+                        TextField("搜索视频、UP主", text: $keyword)
                             .submitLabel(.search)
                             .onSubmit { performSearch() }
                         if !keyword.isEmpty {
@@ -68,7 +71,7 @@ struct SearchView: View {
                 .padding(.horizontal)
                 .padding(.top, 6)
 
-                // Content type tabs
+                // Content type tabs — only 视频 / 用户 now
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(SearchType.allCases) { type in
@@ -121,99 +124,16 @@ struct SearchView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if !hasSearched {
-                    // Hot search suggestions (real-time from Bilibili)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("大家都在搜")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        if isLoadingKeywords && hotKeywords.isEmpty {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 20)
-                        } else if hotKeywords.isEmpty {
-                            Text("暂无热搜数据")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal)
-                        } else {
-                            FlowLayout(spacing: 8) {
-                                ForEach(hotKeywords, id: \.self) { kw in
-                                    Button {
-                                        keyword = kw
-                                        performSearch()
-                                    } label: {
-                                        Text(kw)
-                                            .font(.subheadline)
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 7)
-                                            .background(Color(.secondarySystemBackground))
-                                            .clipShape(Capsule())
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        Spacer()
-                    }
-                    .padding(.top)
+                    hotKeywordsView
+                        .padding(.top)
                 } else if results.isEmpty {
                     ContentUnavailableView(
                         "没有匹配的内容",
                         systemImage: "magnifyingglass",
-                        description: Text("部分结果可能已被过滤规则净化，试试其他关键词")
+                        description: Text("试试其他关键词")
                     )
                 } else {
-                    // Result count + filtered banner
-                    VStack(spacing: 4) {
-                        HStack {
-                            Text("找到 \(results.count) 个结果")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            if store.lastBlockedCount > 0 {
-                                Text("· 已净化 \(store.lastBlockedCount) 条")
-                                    .font(.caption)
-                                    .foregroundStyle(.green)
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                    }
-
-                    ScrollView {
-                        if searchType == .user {
-                            userList
-                        } else {
-                            // 视频/番剧/直播：双列卡片网格
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(results) { video in
-                                    VideoCardView(video: video) {
-                                        if video.upMid > 0 {
-                                            selectedUPMid = video.upMid
-                                            selectedUPName = video.upName
-                                            showingUPSpace = true
-                                        }
-                                    }
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            selectedVideo = video
-                                        }
-                                        .onAppear {
-                                            if video.id == results.last?.id, hasMore, !isLoadingMore {
-                                                loadMore()
-                                            }
-                                        }
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.top, 8)
-                            .padding(.bottom, 20)
-                        }
-
-                        if isLoadingMore {
-                            ProgressView().padding(.vertical, 12)
-                        }
-                    }
+                    resultScrollView
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -224,7 +144,9 @@ struct SearchView: View {
                         .fontWeight(.bold)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("取消") { dismiss() }
+                    Button("取消") {
+                        if let onDismiss = onDismiss { onDismiss() }
+                    }
                 }
             }
             .overlay {
@@ -235,19 +157,112 @@ struct SearchView: View {
                         .zIndex(10)
                 }
             }
-            .sheet(isPresented: $showingUPSpace) {
-                if selectedUPMid > 0 {
-                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
+            .overlay {
+                if showingUPSpace {
+                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
                         .environmentObject(store)
+                        .ignoresSafeArea()
+                        .zIndex(20)
                 }
             }
             .onAppear { loadHotKeywords() }
         }
     }
 
-    // MARK: - User search results (extracted to reduce type-check complexity)
+    // MARK: - Hot keywords (哔哩哔哩热搜, tiny gray, not prominent)
+
+    private var hotKeywordsView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("哔哩哔哩热搜")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal)
+            if isLoadingKeywords && hotKeywords.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+            } else if hotKeywords.isEmpty {
+                Text("暂无热搜数据")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal)
+            } else {
+                FlowLayout(spacing: 8) {
+                    ForEach(hotKeywords, id: \.self) { kw in
+                        Button {
+                            keyword = kw
+                            performSearch()
+                        } label: {
+                            Text(kw)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Results
+
+    private var resultScrollView: some View {
+        ScrollView {
+            VStack(spacing: 4) {
+                HStack {
+                    Text("找到 \(results.count) 个结果")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if store.lastBlockedCount > 0 {
+                        Text("· 已净化 \(store.lastBlockedCount) 条")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+
+            if searchType == .user {
+                userList
+            } else {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(results) { video in
+                        VideoCardView(video: video) {
+                            if video.upMid > 0 {
+                                selectedUPMid = video.upMid
+                                selectedUPName = video.upName
+                                showingUPSpace = true
+                            }
+                        }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedVideo = video
+                            }
+                            .onAppear {
+                                if video.id == results.last?.id, hasMore, !isLoadingMore {
+                                    loadMore()
+                                }
+                            }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
+            }
+
+            if isLoadingMore {
+                ProgressView().padding(.vertical, 12)
+            }
+        }
+    }
+
+    // MARK: - User search results
+
     private var userList: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+        LazyVStack(spacing: 8) {
             ForEach(results) { user in
                 userRow(user)
                     .onAppear {
@@ -270,67 +285,58 @@ struct SearchView: View {
                 showingUPSpace = true
             }
         } label: {
-            VStack(spacing: 0) {
-                // 顶部 1/3：头像
+            HStack(spacing: 10) {
                 CachedAsyncImage(
                     url: URL(string: BiliAPI.coverThumb(user.upAvatar, width: 120)),
-                    targetSize: CGSize(width: 64, height: 64)
+                    targetSize: CGSize(width: 44, height: 44)
                 ) { img in
                     img.resizable().scaledToFill()
                 } placeholder: {
                     Circle().fill(Color.gray.opacity(0.2))
                 }
-                .frame(width: 52, height: 52)
+                .frame(width: 44, height: 44)
                 .clipShape(Circle())
-                .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 2))
-                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
 
-                // 中部 1/3：名称 + 简介
-                VStack(spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(user.title)
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(.medium)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .center)
                     if !user.desc.isEmpty {
                         Text(user.desc)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                    HStack(spacing: 3) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text("\(user.viewsText) 粉丝")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8)
-
-                Spacer(minLength: 0)
-
-                // 底部 1/3：粉丝数
-                HStack(spacing: 4) {
-                    Image(systemName: "person.2.fill")
-                        .font(.caption2)
-                        .foregroundColor(Color.biliBlue)
-                    Text("\(user.viewsText)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("粉丝")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 10)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.quaternary)
             }
-            .frame(height: 156)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(Color.biliCard)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 0.8)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
+
+    // MARK: - Actions
 
     private func loadHotKeywords() {
         guard hotKeywords.isEmpty else { return }
@@ -349,7 +355,6 @@ struct SearchView: View {
         hasSearched = true
         page = 1
         hasMore = true
-        // Reset duration filter display to match current setting
         if let cur = store.settings.searchMinDurationSeconds {
             if let idx = FilterSettings.searchDurationOptions.firstIndex(where: { $0.seconds == cur }) {
                 selectedDurationIndex = idx
@@ -358,24 +363,17 @@ struct SearchView: View {
             selectedDurationIndex = 0
         }
         let minDur = store.settings.searchMinDurationSeconds
-        // Fetch 2 pages in parallel for more results (Bilibili caps at 50/page).
-        // The API request carries the server-side duration bucket (for 1h+ filters)
-        // so we get many more matching videos than client-side filtering alone.
         var page1: [Video] = []
         var page2: [Video] = []
         let group = DispatchGroup()
         group.enter()
         BiliAPI.shared.search(keyword: keyword, type: searchType, page: 1, minDurationSeconds: minDur) { raw in
-            DispatchQueue.main.async {
-                page1 = store.applySearchFilter(raw)
-            }
+            DispatchQueue.main.async { page1 = store.applySearchFilter(raw) }
             group.leave()
         }
         group.enter()
         BiliAPI.shared.search(keyword: keyword, type: searchType, page: 2, minDurationSeconds: minDur) { raw in
-            DispatchQueue.main.async {
-                page2 = store.applySearchFilter(raw)
-            }
+            DispatchQueue.main.async { page2 = store.applySearchFilter(raw) }
             group.leave()
         }
         group.notify(queue: .main) {
