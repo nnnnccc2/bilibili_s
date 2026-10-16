@@ -351,11 +351,7 @@ final class BiliAPI {
         let searchType: String
         switch type {
         case .video: searchType = "video"
-        case .bangumi: searchType = "media_bangumi"
-        case .cinema: searchType = "media_ft"
         case .user: searchType = "bili_user"
-        case .live: searchType = "live"
-        case .article: searchType = "article"
         }
         var params: [String: String] = [
             "search_type": searchType,
@@ -1127,28 +1123,7 @@ private extension BiliAPI {
                     likes: 0, coins: 0, favorites: 0, shares: 0
                 )
             }
-        case .live:
-            return result.compactMap { item in
-                guard let title = item["title"] as? String,
-                      let roomid = item["roomid"] as? Int, roomid > 0 else { return nil }
-                let cleanTitle = title.replacingOccurrences(of: "<em class=\"keyword\">", with: "").replacingOccurrences(of: "</em>", with: "")
-                return Video(
-                    id: "\(roomid)",
-                    title: cleanTitle,
-                    cover: BiliAPI.coverURL(item["cover"] as? String ?? item["pic"] as? String ?? ""),
-                    duration: 0,
-                    upName: item["uname"] as? String ?? item["author"] as? String ?? "",
-                    upMid: item["uid"] as? Int ?? item["mid"] as? Int ?? 0,
-                    upAvatar: BiliAPI.coverURL(item["uface"] as? String ?? ""),
-                    views: item["online"] as? Int ?? 0,
-                    danmaku: 0,
-                    publishTime: "直播中",
-                    category: "直播",
-                    desc: item["area_v2_name"] as? String ?? "",
-                    likes: 0, coins: 0, favorites: 0, shares: 0
-                )
-            }
-        default:
+        case .video:
             return result.compactMap { item in
                 guard let id = item["bvid"] as? String,
                       let title = item["title"] as? String else { return nil }
