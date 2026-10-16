@@ -170,3 +170,4 @@ final class WBISigner {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
+// rebuild trigger Fri Oct 16 07:07:45 UTC 2026
