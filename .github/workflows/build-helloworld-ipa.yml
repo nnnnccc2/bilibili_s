@@ -18,6 +18,7 @@ jobs:
     runs-on: macos-14
     permissions:
       contents: write
+      issues: write
 
     steps:
       - name: Checkout repository
@@ -38,19 +39,29 @@ jobs:
           echo "compile_time=$COMPILE_TIME" >> $GITHUB_OUTPUT
 
       - name: Build for iOS Device (arm64)
+        id: build
         run: |
           xcodebuild build \
             -project helloworld/HelloWorld.xcodeproj \
-            -target HelloWorld \
+            -scheme HelloWorld \
             -configuration Release \
-            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO \
             ARCHS="arm64" \
-            VALID_ARCHS="arm64"
+            VALID_ARCHS="arm64" 2>&1 | tee build.log
+
+      - name: Report build failure log to issue
+        if: failure() && steps.build.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Posting build log to issue..."
+          gh issue create --title "helloworld build failure log" \
+            --body "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"$'\n\n''```'$'\n'"$(tail -n 120 build.log 2>/dev/null)"$'\n''```' || true
 
       - name: Locate built .app
         id: find_app
