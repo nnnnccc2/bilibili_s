@@ -157,7 +157,8 @@ struct SearchView: View {
                 VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive()
+                    .immersive(opaque: true)
+                    .id(video.id)
                     .zIndex(10)
             }
         }
@@ -189,10 +190,10 @@ struct SearchView: View {
                     .foregroundStyle(Color.secondary)
                     .padding(.horizontal)
             } else {
-                // Secondary element: a single narrow column (~4/7 of the screen
-                // width), plain gray text, nothing to draw the eye.
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(hotKeywords.prefix(5).enumerated()), id: \.offset) { _, kw in
+                // Secondary element: plain gray words that wrap loosely at their
+                // natural widths (no rigid grid), kept within ~4/7 of the width.
+                FlowLayout(spacing: 16) {
+                    ForEach(Array(hotKeywords.prefix(9).enumerated()), id: \.offset) { _, kw in
                         Button {
                             keyword = kw
                             performSearch()
@@ -201,8 +202,6 @@ struct SearchView: View {
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color.secondary)
                                 .lineLimit(1)
-                                .truncationMode(.tail)
-                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -214,6 +213,7 @@ struct SearchView: View {
             }
             Spacer()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Results

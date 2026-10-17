@@ -35,7 +35,7 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.24), value: store.immersiveDepth)
+        .animation(.easeInOut(duration: 0.18), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { showingSearch = false })
@@ -91,7 +91,7 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
-            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: selectedTab)
+            .animation(.spring(response: 0.22, dampingFraction: 0.85), value: selectedTab)
         }
         .buttonStyle(.plain)
     }
@@ -106,7 +106,7 @@ struct PressableCardStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }
 
@@ -121,24 +121,34 @@ struct PressableCardStyle: ButtonStyle {
 /// While it is presented the bottom tab bar is hidden, and the overlay is laid
 /// out inside the safe area (below the notch, above the home indicator) so its
 /// navigation title is never overlapped by content.
+/// - Parameter opaque: paint a solid black backdrop OUTSIDE the entrance fade,
+///   so dark overlays (the player) cover the notch area instantly instead of
+///   flashing the light page behind them.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
+    var opaque: Bool = false
     @State private var appeared = false
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .scaleEffect(appeared ? 1 : 0.985)
+            .background {
+                if opaque {
+                    Color.black.ignoresSafeArea()
+                }
+            }
             .onAppear {
                 store.pushImmersive()
-                // Quick, non-sticky entrance: a short fade + tiny zoom instead of
-                // the system sheet's slide-up.
-                withAnimation(.easeOut(duration: 0.22)) { appeared = true }
+                // Fast, non-sticky entrance: a short fade (no scale, which is
+                // expensive on a full-screen player and feels laggy).
+                withAnimation(.easeOut(duration: 0.16)) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive() -> some View { modifier(ImmersiveOverlay()) }
+    func immersive(opaque: Bool = false) -> some View {
+        modifier(ImmersiveOverlay(opaque: opaque))
+    }
 }

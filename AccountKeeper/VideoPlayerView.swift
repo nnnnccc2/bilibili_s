@@ -226,33 +226,46 @@ struct VideoPlayerView: View {
             .gesture(playerGesture)
     }
 
+    /// Short side of the playback area (width in inline mode, min(w,h) full screen).
+    private var playbackSide: CGFloat {
+        let w = UIScreen.main.bounds.width
+        let h = UIScreen.main.bounds.height
+        return showFullScreen ? min(w, h) : (w * 9.0 / 16.0)
+    }
+
     /// Scale the gesture HUD with the size of the playback area, so the card
     /// stays proportionate in the small inline player and on the full screen.
     private var hudScale: CGFloat {
-        let w = UIScreen.main.bounds.width
-        let h = UIScreen.main.bounds.height
-        let side = showFullScreen ? min(w, h) : (w * 9.0 / 16.0)
-        return min(max(side / 330.0, 0.70), 0.90)
+        min(max(playbackSide / 330.0, 0.70), 0.90)
     }
 
-    /// Gesture HUD: just an icon and a thin level bar in a small dark pill —
-    /// no numbers, no bright card, so it never competes with the video.
+    /// Gesture HUD: an icon plus a level bar styled exactly like the seek bar
+    /// (same track/fill/knob) in a compact dark pill — no numbers.
     private var gestureIndicatorView: some View {
         let s = hudScale
+        let barW = min(max(playbackSide * 0.42, 84), 140)
+        let knob: CGFloat = 7
+        let frac = min(max(gestureLevel, 0), 1)
         return Group {
             if showGestureIndicator {
-                HStack(spacing: 6 * s) {
+                VStack(spacing: 6) {
                     Image(systemName: gestureSymbol)
-                        .font(.system(size: 13 * s, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .font(.system(size: 15 * s, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.18)).frame(width: 58 * s, height: 3)
-                        Capsule().fill(Color.white.opacity(0.6)).frame(width: max(3, 58 * s * gestureLevel), height: 3)
+                        Capsule().fill(Color.white.opacity(0.28)).frame(width: barW, height: 3)
+                        Capsule().fill(Color.white).frame(width: max(3, barW * frac), height: 3)
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: knob, height: knob)
+                            .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                            .offset(x: max(0, min(barW - knob, barW * frac - knob / 2)))
                     }
+                    .frame(width: barW, alignment: .leading)
                 }
-                .padding(.horizontal, 10 * s)
-                .padding(.vertical, 7 * s)
-                .background(Color.black.opacity(0.35), in: Capsule())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 10 * s, style: .continuous))
                 .transition(.opacity)
             }
         }
@@ -428,7 +441,7 @@ struct VideoPlayerView: View {
     }
 
     private var playerGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
+        DragGesture(minimumDistance: 5)
             .onChanged { value in
                 if gestureDirection == .none {
                     // Determine direction on first significant movement
