@@ -47,6 +47,8 @@ struct VideoPlayerView: View {
     @State private var upAvatar: String = ""
     @State private var upNameOverride: String = ""
     @State private var rateObservation: NSKeyValueObservation?
+    @State private var statusObservation: NSKeyValueObservation?
+    @State private var isReady = false
 
     // Swipe gesture state
     @State private var gestureStartX: CGFloat = 0
@@ -55,7 +57,6 @@ struct VideoPlayerView: View {
     @State private var gestureStartBrightness: CGFloat = UIScreen.main.brightness
     @State private var gestureDirection: GestureDirection = .none
     @State private var showGestureIndicator: Bool = false
-    @State private var gestureIndicatorText: String = ""
     @State private var gestureSymbol: String = "goforward.10"
     @State private var gestureLevel: CGFloat = 0.5
 
@@ -87,6 +88,8 @@ struct VideoPlayerView: View {
                 ZStack {
                     PlayerLayerView(player: player)
                         .ignoresSafeArea()
+                        .opacity(isReady ? 1 : 0)
+                        .animation(.easeIn(duration: 0.25), value: isReady)
                     gestureIndicatorView
                     interactionLayer
                         .ignoresSafeArea()
@@ -176,6 +179,9 @@ struct VideoPlayerView: View {
             // switching to another video pauses the previous one.
             rateObservation?.invalidate()
             rateObservation = nil
+            statusObservation?.invalidate()
+            statusObservation = nil
+            isReady = false
             if let p = player {
                 p.pause()
                 PlayerManager.shared.deactivate(p)
@@ -229,33 +235,25 @@ struct VideoPlayerView: View {
         return min(max(side / 330.0, 0.70), 0.90)
     }
 
-    /// Gesture HUD: icon + thin level bar. Dark, translucent and small so it
-    /// stays a background element rather than competing with the video.
+    /// Gesture HUD: just an icon and a thin level bar in a small dark pill —
+    /// no numbers, no bright card, so it never competes with the video.
     private var gestureIndicatorView: some View {
         let s = hudScale
         return Group {
             if showGestureIndicator {
-                VStack(spacing: 5 * s) {
+                HStack(spacing: 6 * s) {
                     Image(systemName: gestureSymbol)
-                        .font(.system(size: 15 * s, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .font(.system(size: 13 * s, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.18)).frame(width: 68 * s, height: 3)
-                        Capsule().fill(Color.white.opacity(0.65)).frame(width: max(3, 68 * s * gestureLevel), height: 3)
+                        Capsule().fill(Color.white.opacity(0.18)).frame(width: 58 * s, height: 3)
+                        Capsule().fill(Color.white.opacity(0.6)).frame(width: max(3, 58 * s * gestureLevel), height: 3)
                     }
-                    Text(gestureIndicatorText)
-                        .font(.system(size: max(10, 11 * s), weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.8))
                 }
-                .padding(.horizontal, 12 * s)
-                .padding(.vertical, 8 * s)
-                .background(Color.black.opacity(0.38), in: RoundedRectangle(cornerRadius: 10 * s, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10 * s, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .padding(.horizontal, 10 * s)
+                .padding(.vertical, 7 * s)
+                .background(Color.black.opacity(0.35), in: Capsule())
+                .transition(.opacity)
             }
         }
     }
@@ -399,6 +397,8 @@ struct VideoPlayerView: View {
             Color.black
             if let player = player {
                 PlayerLayerView(player: player)
+                    .opacity(isReady ? 1 : 0)
+                    .animation(.easeIn(duration: 0.25), value: isReady)
             } else {
                 VStack(spacing: 8) {
                     if isBuffering {
@@ -452,10 +452,8 @@ struct VideoPlayerView: View {
                         gestureSymbol = isLeft ? "sun.max.fill" : "speaker.wave.3.fill"
                         if isLeft {
                             gestureLevel = UIScreen.main.brightness
-                            gestureIndicatorText = "\(Int(UIScreen.main.brightness * 100))%"
                         } else {
                             gestureLevel = CGFloat(player?.volume ?? 1)
-                            gestureIndicatorText = "\(Int((player?.volume ?? 1) * 100))%"
                         }
                         showGestureIndicator = true
                     }
@@ -473,7 +471,6 @@ struct VideoPlayerView: View {
                     let delta = (gestureStartY - value.location.y) / height
                     let newBrightness = min(max(gestureStartBrightness + delta, 0), 1)
                     UIScreen.main.brightness = newBrightness
-                    gestureIndicatorText = "\(Int(newBrightness * 100))%"
                     gestureLevel = newBrightness
                 case .verticalRight:
                     // Volume: full screen height = full volume range
@@ -481,7 +478,6 @@ struct VideoPlayerView: View {
                     let delta = Float((gestureStartY - value.location.y) / height)
                     let newVolume = min(max(gestureStartVolume + delta, 0), 1)
                     player?.volume = newVolume
-                    gestureIndicatorText = "\(Int(newVolume * 100))%"
                     gestureLevel = CGFloat(newVolume)
                 case .none:
                     break
@@ -743,6 +739,7 @@ struct VideoPlayerView: View {
 
     private func setupPlayer() {
         isBuffering = true
+        isReady = false
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
             try AVAudioSession.sharedInstance().setActive(true, options: [])
@@ -798,6 +795,14 @@ struct VideoPlayerView: View {
                 self.rateObservation = p.observe(\.rate, options: [.new]) { player, _ in
                     DispatchQueue.main.async {
                         self.isPlaying = player.rate != 0
+                    }
+                }
+                // Fade the video in once the asset is actually ready to render,
+                // so playback starts without a hard flash.
+                self.statusObservation = item.observe(\.status, options: [.new]) { observed, _ in
+                    guard observed.status == .readyToPlay else { return }
+                    DispatchQueue.main.async {
+                        withAnimation(.easeIn(duration: 0.25)) { self.isReady = true }
                     }
                 }
             }

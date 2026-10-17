@@ -191,16 +191,18 @@ struct UPSpaceView: View {
         } else {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(videos) { video in
-                    VideoCardView(video: video)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedVideo = video
+                    Button {
+                        selectedVideo = video
+                    } label: {
+                        VideoCardView(video: video)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressableCardStyle())
+                    .onAppear {
+                        if video.id == videos.last?.id, hasMore, !isLoadingMore {
+                            loadVideos(reset: false)
                         }
-                        .onAppear {
-                            if video.id == videos.last?.id, hasMore, !isLoadingMore {
-                                loadVideos(reset: false)
-                            }
-                        }
+                    }
                 }
             }
             .padding(.horizontal, 8)

@@ -189,13 +189,10 @@ struct SearchView: View {
                     .foregroundStyle(Color.secondary)
                     .padding(.horizontal)
             } else {
-                // Secondary element: plain, understated gray text — two columns
-                // over about 5 rows, no chips or badges to draw the eye.
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), alignment: .leading),
-                    GridItem(.flexible(), alignment: .leading)
-                ], alignment: .leading, spacing: 12) {
-                    ForEach(Array(hotKeywords.prefix(10).enumerated()), id: \.offset) { _, kw in
+                // Secondary element: a single narrow column (~4/7 of the screen
+                // width), plain gray text, nothing to draw the eye.
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(hotKeywords.prefix(5).enumerated()), id: \.offset) { _, kw in
                         Button {
                             keyword = kw
                             performSearch()
@@ -206,11 +203,14 @@ struct SearchView: View {
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal)
+                .frame(width: UIScreen.main.bounds.width * 4.0 / 7.0, alignment: .leading)
+                .padding(.leading)
+                .transition(.opacity)
             }
             Spacer()
         }
@@ -262,6 +262,7 @@ struct SearchView: View {
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
+                .animation(.easeOut(duration: 0.2), value: results.count)
             }
 
             if isLoadingMore {

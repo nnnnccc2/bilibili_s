@@ -32,8 +32,10 @@ struct ContentView: View {
             // Hide the tab bar while an immersive overlay is on screen.
             if store.immersiveDepth == 0 {
                 bottomBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut(duration: 0.24), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { showingSearch = false })
@@ -81,6 +83,7 @@ struct ContentView: View {
             VStack(spacing: 2) {
                 Image(systemName: selectedTab == index ? selectedIcon : icon)
                     .font(.system(size: 18))
+                    .scaleEffect(selectedTab == index ? 1.08 : 1)
                     .foregroundStyle(selectedTab == index ? Color.biliBlue : Color.biliMuted)
                 Text(title)
                     .font(.system(size: 10, weight: selectedTab == index ? .bold : .medium))
@@ -88,8 +91,22 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
+            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: selectedTab)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Press feedback
+
+/// Subtle press feedback (slight shrink + dim) shared by cards and rows, so
+/// taps feel responsive instead of dead.
+struct PressableCardStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
@@ -106,9 +123,18 @@ struct ContentView: View {
 /// navigation title is never overlapped by content.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
+    @State private var appeared = false
+
     func body(content: Content) -> some View {
         content
-            .onAppear { store.pushImmersive() }
+            .opacity(appeared ? 1 : 0)
+            .scaleEffect(appeared ? 1 : 0.985)
+            .onAppear {
+                store.pushImmersive()
+                // Quick, non-sticky entrance: a short fade + tiny zoom instead of
+                // the system sheet's slide-up.
+                withAnimation(.easeOut(duration: 0.22)) { appeared = true }
+            }
             .onDisappear { store.popImmersive() }
     }
 }

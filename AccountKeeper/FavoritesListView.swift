@@ -103,14 +103,18 @@ struct FavoritesListView: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(videos) { video in
-                    VideoCardView(video: video)
-                        .contentShape(Rectangle())
-                        .onTapGesture { selectedVideo = video }
-                        .onAppear {
-                            if video.id == videos.last?.id, hasMore, !isLoadingMore {
-                                loadMore()
-                            }
+                    Button {
+                        selectedVideo = video
+                    } label: {
+                        VideoCardView(video: video)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressableCardStyle())
+                    .onAppear {
+                        if video.id == videos.last?.id, hasMore, !isLoadingMore {
+                            loadMore()
                         }
+                    }
                 }
             }
             .padding(.horizontal, 8)
