@@ -53,7 +53,7 @@ struct FavoritesListView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.2) })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.3) })
                     .environmentObject(store)
                     .ignoresSafeArea()
                     .immersive(fadeIn: false)

@@ -119,17 +119,19 @@ struct PressableCardStyle: ButtonStyle {
 
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
-/// Immersive overlay presented above everything (and above the tab bar).
-/// - `fadeIn == true`: the overlay fades in (used for login / settings / UP space).
-/// - `fadeIn == false`: the overlay appears INSTANTLY. Used for the full-screen
-///   video player: its opaque black backdrop snaps in as a clean "full-screen
-///   switch" instead of cross-fading with the page behind it, which is what made
-///   the entrance look like a flash. Dismissal always fades out smoothly.
-/// No scaling is applied so the backdrop never shrinks inward and exposes the
-/// notch / page edge colour.
+/// `fadeIn == true`: a plain fade (login / settings / UP space).
+/// `fadeIn == false`: full-screen video — an opaque black backdrop snaps in
+/// instantly (so the page behind never shows, avoiding any flash) and the
+/// player content unfolds with a smooth scale + fade on top of it.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.2
+    var duration: Double = 0.3
+    /// `false` = full-screen video player. An opaque black backdrop snaps in
+    /// instantly so the page behind is never visible (no flash); the player
+    /// content then does a smooth scale + fade entrance over that backdrop.
+    /// Black over black means the fade is invisible, yet the entrance still reads
+    /// as a smooth full-screen unfold.
+    /// `true` = login / settings / UP space: a plain (slower) fade.
     var fadeIn: Bool = true
     @State private var appeared = false
 
@@ -138,26 +140,30 @@ struct ImmersiveOverlay: ViewModifier {
             if fadeIn {
                 content.opacity(appeared ? 1 : 0)
             } else {
-                content
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    content
+                        .opacity(appeared ? 1 : 0)
+                        .scaleEffect(appeared ? 1 : 0.94)
+                }
             }
         }
-        // Asymmetric: insertion is a no-op (instant for the player; the fade-in
-        // for others is driven by `appeared`), removal fades out.
+        // Insertion is a no-op (the backdrop must never fade in over the page);
+        // removal fades out.
         .transition(.asymmetric(insertion: .identity, removal: .opacity))
         .onAppear {
             store.pushImmersive()
-            if fadeIn {
-                withAnimation(.easeOut(duration: duration)) { appeared = true }
-            } else {
-                appeared = true
-            }
+            let curve: Animation = fadeIn
+                ? .easeOut(duration: duration)
+                : .spring(response: 0.36, dampingFraction: 0.9)
+            withAnimation(curve) { appeared = true }
         }
         .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.2, fadeIn: Bool = true) -> some View {
+    func immersive(duration: Double = 0.3, fadeIn: Bool = true) -> some View {
         modifier(ImmersiveOverlay(duration: duration, fadeIn: fadeIn))
     }
 }

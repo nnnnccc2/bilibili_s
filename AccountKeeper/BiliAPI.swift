@@ -748,7 +748,7 @@ final class BiliAPI {
             "fnver": "0",
             "fourk": "0"
         ]
-        request("https://api.bilibili.com/x/player/playurl", params: params) { [weak self] data, _, _ in
+        request("https://api.bilibili.com/x/player/playurl", params: params, referer: "https://www.bilibili.com/") { [weak self] data, _, _ in
             let url = self?.parsePlayURL(data)
             DispatchQueue.main.async { completion(url) }
         }

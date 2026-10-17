@@ -189,10 +189,10 @@ struct VideoPlayerView: View {
         }
         .overlay {
             if showingUPSpace, video.upMid > 0 {
-                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.24) })
+                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.4) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.32)
+                    .immersive(duration: 0.42)
                     .zIndex(30)
             }
         }
@@ -753,11 +753,15 @@ struct VideoPlayerView: View {
     private func setupPlayer() {
         isBuffering = true
         isReady = false
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
-            try AVAudioSession.sharedInstance().setActive(true, options: [])
-        } catch {
-            print("[BiliBili] AVAudioSession setup failed: \(error)")
+        // Configure the audio session OFF the main thread — activating it can
+        // block for a moment and would otherwise stall the player setup / UI.
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+                try AVAudioSession.sharedInstance().setActive(true, options: [])
+            } catch {
+                print("[BiliBili] AVAudioSession setup failed: \(error)")
+            }
         }
         BiliAPI.shared.streamURL(for: video) { url in
             DispatchQueue.main.async {
@@ -769,7 +773,7 @@ struct VideoPlayerView: View {
                 ]
                 let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
                 let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 1.0
+                item.preferredForwardBufferDuration = 0.5
                 if #available(iOS 16.0, *) {
                     item.preferredPeakBitRate = 2_000_000
                 }
