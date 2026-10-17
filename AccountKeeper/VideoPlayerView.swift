@@ -93,11 +93,13 @@ struct VideoPlayerView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Player (16:9). Black spacer keeps it clear of the notch.
+                        // Player (16:9). Black backing fills the notch strip so the
+                        // area above the video is black, not the page's light color.
                         playerSection
                             .aspectRatio(16.0/9.0, contentMode: .fit)
                             .frame(maxWidth: .infinity)
                             .padding(.top, topSafeArea)
+                            .background(Color.black)
 
                         // Tabs: 简介 / 评论
                         HStack(spacing: 24) {
@@ -117,6 +119,17 @@ struct VideoPlayerView: View {
                 }
                 .background(Color.biliBackground)
                 .scrollIndicators(.hidden)
+            }
+        }
+        .overlay(alignment: .top) {
+            // Pinned black strip over the notch/status-bar area (inline mode only)
+            // so the top stays black even when the content scrolls.
+            if !showFullScreen {
+                Color.black
+                    .frame(height: topSafeArea)
+                    .frame(maxWidth: .infinity)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea(edges: .top)
             }
         }
         .onAppear {
@@ -180,27 +193,31 @@ struct VideoPlayerView: View {
             .gesture(playerGesture)
     }
 
-    /// Gesture HUD: icon + vertical level bar (brightness / volume / seek).
+    /// Gesture HUD: icon + horizontal level bar (brightness / volume / seek).
     private var gestureIndicatorView: some View {
         Group {
             if showGestureIndicator {
                 VStack(spacing: 10) {
                     Image(systemName: gestureSymbol)
-                        .font(.system(size: 18, weight: .semibold))
-                    ZStack(alignment: .bottom) {
-                        Capsule().fill(Color.white.opacity(0.25)).frame(width: 4, height: 80)
-                        Capsule().fill(Color.white).frame(width: 4, height: max(4, 80 * gestureLevel))
+                        .font(.system(size: 22, weight: .medium))
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.22)).frame(width: 116, height: 5)
+                        Capsule().fill(Color.white).frame(width: max(5, 116 * gestureLevel), height: 5)
                     }
                     Text(gestureIndicatorText)
-                        .font(.caption2)
+                        .font(.system(size: 13, weight: .semibold))
                         .monospacedDigit()
                 }
                 .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(Color.black.opacity(0.55))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .transition(.opacity)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.25), radius: 14, y: 4)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
     }
@@ -234,43 +251,46 @@ struct VideoPlayerView: View {
         .transition(.opacity)
     }
 
-    /// Seek bar + time + play/pause + brightness + volume + fullscreen toggle.
+    /// One clean row: play/pause · current time · seek bar · total time · fullscreen.
     private func controlBar(fullscreen: Bool) -> some View {
-        VStack(spacing: 8) {
-            // Seek bar (tap anywhere or drag the knob)
-            HStack(spacing: 8) {
-                Text(formatTime(currentTime))
-                    .font(.system(size: 11))
-                    .monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.85))
-                playerProgressBar
-                Text(formatTime(duration))
-                    .font(.system(size: 11))
-                    .monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.85))
+        HStack(spacing: 10) {
+            Button { togglePlay() } label: {
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
-            HStack(spacing: 12) {
-                controlButton(isPlaying ? "pause.fill" : "play.fill", size: 17) { togglePlay() }
+            Text(formatTime(isScrubbing ? scrubTime : currentTime))
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.9))
 
-                controlButton("sun.min.fill") { adjustBrightness(-0.1) }
-                controlButton("sun.max.fill") { adjustBrightness(0.1) }
+            playProgressBar
 
-                Spacer()
+            Text(formatTime(duration))
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.7))
 
-                controlButton("speaker.fill") { adjustVolume(-0.1) }
-                controlButton("speaker.wave.3.fill") { adjustVolume(0.1) }
-
-                controlButton(fullscreen
+            Button {
+                showFullScreen.toggle()
+                scheduleHideControls()
+            } label: {
+                Image(systemName: fullscreen
                               ? "arrow.down.right.and.arrow.up.left"
-                              : "arrow.up.left.and.arrow.down.right") {
-                    showFullScreen.toggle()
-                    scheduleHideControls()
-                }
+                              : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
         .background(
             LinearGradient(colors: [.black.opacity(0), .black.opacity(0.45)],
                            startPoint: .top, endPoint: .bottom)
@@ -278,75 +298,53 @@ struct VideoPlayerView: View {
         )
     }
 
-    private func controlButton(_ icon: String, size: CGFloat = 15, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
-                .frame(width: 34, height: 34)
-                .background(Color.black.opacity(0.3))
-                .clipShape(Circle())
-        }
-    }
-
-    /// Custom seek bar: small knob, works with both tap and drag.
-    private var playerProgressBar: some View {
+    /// Slim seek bar, on the same line as play/pause. While dragging it only
+    /// updates the UI; the seek is committed once on release so scrubbing
+    /// stays smooth and the video never stutters.
+    private var playProgressBar: some View {
         GeometryReader { geo in
             let w = max(1, geo.size.width)
-            let frac = duration > 0 ? min(max(currentTime / duration, 0), 1) : 0
+            let shown = isScrubbing ? scrubTime : currentTime
+            let frac = duration > 0 ? min(max(shown / duration, 0), 1) : 0
+            let knob: CGFloat = isScrubbing ? 12 : 9
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.3))
+                    .fill(Color.white.opacity(0.28))
                     .frame(height: 3)
                 Capsule()
                     .fill(Color.white)
                     .frame(width: CGFloat(frac) * w, height: 3)
                 Circle()
                     .fill(Color.white)
-                    .frame(width: 8, height: 8)
-                    .offset(x: CGFloat(frac) * w - 4)
+                    .frame(width: knob, height: knob)
+                    .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                    .offset(x: CGFloat(frac) * w - knob / 2)
             }
             .frame(height: geo.size.height)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        seek(toX: value.location.x, width: w)
+                        guard duration > 0 else { return }
+                        if !isScrubbing {
+                            isScrubbing = true
+                            showControls = true
+                            controlsTimer?.invalidate()
+                        }
+                        scrubTime = min(max(value.location.x / w, 0), 1) * duration
+                    }
+                    .onEnded { value in
+                        guard duration > 0 else { isScrubbing = false; return }
+                        let t = min(max(value.location.x / w, 0), 1) * duration
+                        currentTime = t
+                        player?.seek(to: CMTime(seconds: t, preferredTimescale: 600),
+                                     toleranceBefore: .zero, toleranceAfter: .zero)
+                        isScrubbing = false
+                        scheduleHideControls()
                     }
             )
         }
-        .frame(height: 18)
-    }
-
-    private func seek(toX x: CGFloat, width: CGFloat) {
-        guard duration > 0, width > 0 else { return }
-        let frac = min(max(x / width, 0), 1)
-        let t = frac * duration
-        currentTime = t
-        player?.seek(to: CMTime(seconds: t, preferredTimescale: 600))
-        scheduleHideControls()
-    }
-
-    private func adjustBrightness(_ delta: CGFloat) {
-        let v = min(max(UIScreen.main.brightness + delta, 0), 1)
-        UIScreen.main.brightness = v
-        flashGesture(symbol: "sun.max.fill", level: v, text: "\(Int(v * 100))%")
-    }
-
-    private func adjustVolume(_ delta: Float) {
-        let v = min(max((player?.volume ?? 1) + delta, 0), 1)
-        player?.volume = v
-        flashGesture(symbol: "speaker.wave.3.fill", level: CGFloat(v), text: "\(Int(v * 100))%")
-    }
-
-    private func flashGesture(symbol: String, level: CGFloat, text: String) {
-        gestureSymbol = symbol
-        gestureLevel = level
-        gestureIndicatorText = text
-        withAnimation(.easeInOut(duration: 0.15)) { showGestureIndicator = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-            withAnimation(.easeInOut(duration: 0.2)) { showGestureIndicator = false }
-        }
+        .frame(height: 22)
     }
 
     // MARK: - Inline player section (shared controls)
@@ -444,10 +442,12 @@ struct VideoPlayerView: View {
                     if let p = player, let item = p.currentItem {
                         let seekSeconds = value.translation.width * 0.5
                         let newTime = p.currentTime().seconds + Double(seekSeconds)
-                        let duration = item.duration.seconds
-                        if duration > 0, !duration.isNaN {
-                            let clamped = min(max(newTime, 0), duration)
-                            p.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
+                        let dur = item.duration.seconds
+                        if dur > 0, !dur.isNaN {
+                            let clamped = min(max(newTime, 0), dur)
+                            currentTime = clamped
+                            p.seek(to: CMTime(seconds: clamped, preferredTimescale: 600),
+                                   toleranceBefore: .zero, toleranceAfter: .zero)
                         }
                     }
                 default:
@@ -724,10 +724,14 @@ struct VideoPlayerView: View {
                 scheduleHideControls()
                 writeHistoryOnce()
 
-                // Observe playback progress (update duration + currentTime)
+                // Observe playback progress (update duration + currentTime).
+                // Skip currentTime while the user is scrubbing so the thumb
+                // follows the finger instead of fighting the playback clock.
                 let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
                 p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-                    self.currentTime = time.seconds
+                    if !self.isScrubbing {
+                        self.currentTime = time.seconds
+                    }
                     if let d = p.currentItem?.duration.seconds, !d.isNaN {
                         self.duration = d
                     }

@@ -171,13 +171,13 @@ struct SearchView: View {
         }
     }
 
-    // MARK: - Hot keywords (哔哩哔哩热搜, tiny gray, not prominent)
+    // MARK: - Hot keywords (哔哩哔哩热搜, gray and readable, never blue)
 
     private var hotKeywordsView: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("哔哩哔哩热搜")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.gray)
                 .padding(.horizontal)
             if isLoadingKeywords && hotKeywords.isEmpty {
                 ProgressView()
@@ -185,8 +185,8 @@ struct SearchView: View {
                     .padding(.vertical, 20)
             } else if hotKeywords.isEmpty {
                 Text("暂无热搜数据")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+                    .foregroundStyle(Color.gray)
                     .padding(.horizontal)
             } else {
                 FlowLayout(spacing: 8) {
@@ -196,8 +196,8 @@ struct SearchView: View {
                             performSearch()
                         } label: {
                             Text(kw)
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.gray)
                         }
                     }
                 }
