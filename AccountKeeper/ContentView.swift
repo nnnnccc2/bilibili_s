@@ -120,43 +120,44 @@ struct PressableCardStyle: ButtonStyle {
 
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
-/// The overlay slides in from the right — the same motion as a native iOS
-/// navigation push (and what Bilibili's own app uses). A slide never changes
-/// brightness, so there is no white/black flash and the motion never feels
-/// abrupt or jumpy.
 ///
-/// The entrance is driven by an internal offset, so it works even when the
-/// call-site doesn't wrap its state change in `withAnimation`; the exit uses a
-/// `.move` removal transition animated by `dismissImmersive`.
+/// The overlay has no directional slide: it gently fades in while scaling up
+/// from 0.97 to 1.0, and fades back out on dismiss. No travel direction means
+/// the motion reads as calm and natural ("自然稳定丝滑") rather than a push,
+/// and opacity/scale never flash the notch area white or black.
+///
+/// The entrance is driven by internal state, so it works even when the call-site
+/// doesn't wrap its state change in `withAnimation`; the exit uses a
+/// scale+opacity removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.4
+    var duration: Double = 0.36
     @State private var appeared = false
-
-    private var screenWidth: CGFloat { UIScreen.main.bounds.width }
 
     func body(content: Content) -> some View {
         content
-            .offset(x: appeared ? 0 : screenWidth)
-            // Insertion is a no-op (the slide is driven by the offset above);
-            // removal slides back out to the right.
-            .transition(.asymmetric(insertion: .identity, removal: .move(edge: .trailing)))
+            .opacity(appeared ? 1 : 0)
+            .scaleEffect(appeared ? 1 : 0.97)
+            // Insertion is a no-op (the entrance is driven by `appeared` above);
+            // removal shrinks back down while fading out.
+            .transition(.asymmetric(insertion: .identity,
+                                    removal: .scale(scale: 0.97).combined(with: .opacity)))
             .onAppear {
                 store.pushImmersive()
-                withAnimation(.easeOut(duration: duration)) { appeared = true }
+                withAnimation(.easeInOut(duration: duration)) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.4) -> some View {
+    func immersive(duration: Double = 0.36) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
-/// Animates an overlay dismissal so it slides out instead of cutting.
+/// Animates an overlay dismissal so it fades/shrinks out instead of cutting.
 /// Kept a touch slower than a snap so the exit never feels abrupt.
 func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.5) {
-    withAnimation(.easeOut(duration: max(duration * 0.8, 0.22))) { action() }
+    withAnimation(.easeInOut(duration: max(duration * 0.8, 0.24))) { action() }
 }

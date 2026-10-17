@@ -194,9 +194,12 @@ struct HomeView: View {
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24, style: .continuous))
     }
 
+    /// Load the feed from the current `page`. `page` is the *next* batch to
+    /// fetch, so it is not reset here — that is what lets a pull-to-refresh move
+    /// forward to fresh content (page 1 is always the same items for 热门/直播,
+    /// which is why refreshing used to show nothing new).
     private func loadVideos(force: Bool = false) {
         isLoading = true
-        page = 1
         hasMore = true
         BiliAPI.shared.fetchHome(category: category, page: page) { raw in
             DispatchQueue.main.async {
@@ -236,15 +239,24 @@ struct HomeView: View {
     @Sendable
     private func loadVideosAsync(force: Bool = false) async {
         await withCheckedContinuation { continuation in
-            BiliAPI.shared.fetchHome(category: category, page: 1) { raw in
+            // Pull-to-refresh fetches the *next* page (not page 1) so the list
+            // visibly changes, then replaces the feed with that fresh batch.
+            BiliAPI.shared.fetchHome(category: category, page: page) { raw in
                 DispatchQueue.main.async {
                     let filtered = store.applyFilter(raw)
-                    videos = filtered
+                    if !filtered.isEmpty {
+                        rawVideos = raw
+                        videos = filtered
+                        page += 1
+                        hasMore = true
+                    } else {
+                        // Reached the end of the feed — keep the current list
+                        // instead of blanking the screen on a refresh.
+                        hasMore = false
+                    }
                     isLoading = false
                     hasLoadedOnce = true
                     lastRefreshDate = Date()
-                    page = 2
-                    hasMore = !filtered.isEmpty
                     continuation.resume()
                 }
             }

@@ -790,66 +790,29 @@ struct VideoPlayerView: View {
         case .progressive(let url):
             let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": streamHeaders])
             attachPlayer(AVPlayerItem(asset: asset), allowFallback: false)
+        case .asset(let asset):
+            // Pre-muxed during prefetch — no muxing latency on tap.
+            attachPlayer(AVPlayerItem(asset: asset), allowFallback: true)
+            scheduleFallbackIfNotReady()
         case .dash(let videoURL, let audioURL):
-            buildDashItem(videoURL: videoURL, audioURL: audioURL) { item in
-                if let item = item, !self.didFallBack {
-                    self.attachPlayer(item, allowFallback: true)
-                    // Safety net: if the muxed DASH stream never becomes playable,
-                    // fall back to the progressive mp4 instead of leaving a stuck
-                    // black player on screen.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
-                        if !self.isReady { self.fallbackToProgressive() }
-                    }
-                } else {
-                    // DASH muxing failed — fall back to the progressive mp4.
+            // Not pre-muxed (prefetch skipped or mux failed earlier) — mux now.
+            BiliAPI.shared.buildDashComposition(videoURL: videoURL, audioURL: audioURL,
+                                                knownSeconds: Double(max(video.duration, 0))) { asset in
+                guard let asset = asset, !self.didFallBack else {
                     self.fallbackToProgressive()
+                    return
                 }
+                self.attachPlayer(AVPlayerItem(asset: asset), allowFallback: true)
+                self.scheduleFallbackIfNotReady()
             }
         }
     }
 
-    /// DASH cannot be handed to AVPlayer directly: it ships video and audio as
-    /// two separate fMP4 tracks. Mux them into one AVMutableComposition. Their
-    /// init segments are tiny (<1KB) so playback starts almost immediately,
-    /// unlike the progressive mp4 whose moov atom is hundreds of KB.
-    private func buildDashItem(videoURL: URL, audioURL: URL, completion: @escaping (AVPlayerItem?) -> Void) {
-        let options: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": streamHeaders]
-        let videoAsset = AVURLAsset(url: videoURL, options: options)
-        let audioAsset = AVURLAsset(url: audioURL, options: options)
-        // The API-reported duration is a safety net for fragmented MP4 whose
-        // header doesn't expose a numeric duration.
-        let knownSeconds = Double(max(video.duration, 0))
-        let finish: (AVPlayerItem?) -> Void = { item in
-            DispatchQueue.main.async { completion(item) }
-        }
-        Task {
-            do {
-                let videoTracks = try await videoAsset.loadTracks(withMediaType: .video)
-                let audioTracks = try await audioAsset.loadTracks(withMediaType: .audio)
-                guard let vTrack = videoTracks.first, let aTrack = audioTracks.first else {
-                    finish(nil)
-                    return
-                }
-                let loaded = try await videoAsset.load(.duration)
-                let seconds = (loaded.isNumeric && loaded.seconds > 0) ? loaded.seconds : knownSeconds
-                guard seconds > 0 else {
-                    finish(nil)
-                    return
-                }
-                let range = CMTimeRange(start: .zero, duration: CMTime(seconds: seconds, preferredTimescale: 600))
-                let composition = AVMutableComposition()
-                guard let vComp = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
-                      let aComp = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-                    finish(nil)
-                    return
-                }
-                try vComp.insertTimeRange(range, of: vTrack, at: .zero)
-                try aComp.insertTimeRange(range, of: aTrack, at: .zero)
-                finish(AVPlayerItem(asset: composition))
-            } catch {
-                print("[BiliBili] DASH mux failed: \(error)")
-                finish(nil)
-            }
+    /// Safety net: if a DASH stream never becomes playable, fall back to the
+    /// progressive mp4 instead of leaving a stuck black player on screen.
+    private func scheduleFallbackIfNotReady() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            if !self.isReady { self.fallbackToProgressive() }
         }
     }
 

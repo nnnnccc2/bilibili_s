@@ -7,6 +7,7 @@
 
 import Foundation
 import CommonCrypto
+import AVFoundation
 
 // MARK: - Shared enums
 
@@ -87,6 +88,21 @@ final class BiliAPI {
 
     /// Cache of resolved playable streams keyed by bvid, so playback is instant on tap.
     private var streamCache: [String: PlayableStream] = [:]
+    /// Insertion order of `streamCache` keys, used to bound the cache size.
+    private var streamOrder: [String] = []
+    /// Max cached streams. Each DASH entry holds an `AVAsset`, so don't let the
+    /// cache grow without bound over a long session.
+    private let streamCacheLimit = 80
+
+    /// Store a resolved stream, evicting the oldest entries once over the cap.
+    private func cacheStream(_ stream: PlayableStream, for id: String) {
+        if streamCache[id] == nil { streamOrder.append(id) }
+        streamCache[id] = stream
+        if streamOrder.count > streamCacheLimit {
+            let overflow = streamOrder.count - streamCacheLimit
+            for _ in 0..<overflow { streamCache[streamOrder.removeFirst()] = nil }
+        }
+    }
 
     /// CSRF token (bili_jct) required for POST actions like follow/like/coin.
     var csrf: String { cookies["bili_jct"] ?? "" }
@@ -361,9 +377,12 @@ final class BiliAPI {
                 DispatchQueue.main.async { completion(videos) }
             }
         case .live:
-            // Live rooms (home page index returns recommend_room_list + room_list modules)
-            let params: [String: String] = ["platform": "web", "parent_area_id": "0"]
-            request("https://api.live.bilibili.com/xlive/web-interface/v1/index/getList", params: params) { [weak self] data, _, _ in
+            // Paginated live recommendations (page 1/2/3… return different rooms),
+            // so both infinite scroll and pull-to-refresh surface new content.
+            // The old index/getList endpoint had no page param and always returned
+            // the same ~11 rooms, which is why refreshing appeared to do nothing.
+            let params: [String: String] = ["page": String(page), "page_size": "20", "platform": "web"]
+            request("https://api.live.bilibili.com/room/v1/room/get_user_recommend", params: params) { [weak self] data, _, _ in
                 let videos = self?.parseLive(data) ?? []
                 DispatchQueue.main.async { completion(videos) }
             }
@@ -393,22 +412,34 @@ final class BiliAPI {
             completion([])
             return
         }
-        let searchType: String
-        switch type {
-        case .video: searchType = "video"
-        case .user: searchType = "bili_user"
+
+        // Duration only ever applies to video search (user results have no duration).
+        let minSec = (type == .video) ? minDurationSeconds : nil
+
+        // Primary path: the App-signed `/x/v2/search` endpoint. It carries the
+        // Android app signature + app UA, exactly like the official client, so it
+        // is far less likely to be served a `v_voucher` risk-control page than the
+        // web endpoint. If it yields nothing we fall back to the web API.
+        fetchAppSearch(keyword: keyword, type: type, page: page) { [weak self] appVideos in
+            guard let self = self else { return }
+            if !appVideos.isEmpty {
+                DispatchQueue.main.async { completion(Self.filterByMinDuration(appVideos, minSec)) }
+                return
+            }
+            self.fetchSearchWeb(keyword: keyword, type: type, page: page, minSec: minSec, completion: completion)
         }
+    }
+
+    /// Web search fallback with server-side duration buckets.
+    private func fetchSearchWeb(keyword: String, type: SearchType, page: Int, minSec: Int?, completion: @escaping ([Video]) -> Void) {
+        let searchType = (type == .video) ? "video" : "bili_user"
         let params: [String: String] = [
             "search_type": searchType,
             "keyword": keyword,
             "page": String(page),
             "ps": "50"
         ]
-
-        // Duration only ever applies to video search (user results have no duration).
-        let minSec = (type == .video) ? minDurationSeconds : nil
         let buckets = Self.durationBuckets(for: minSec)
-
         fetchSearchBuckets(buckets, params: params, type: type) { [weak self] videos in
             guard let self = self else { return }
             let filtered = Self.filterByMinDuration(videos, minSec)
@@ -421,6 +452,27 @@ final class BiliAPI {
             } else {
                 completion(filtered)
             }
+        }
+    }
+
+    /// Fetch one page from the App-signed search endpoint. Requires the Android
+    /// `build` / `mobi_app` / `platform` params — without them the API returns
+    /// `code: -400`.
+    private func fetchAppSearch(keyword: String, type: SearchType, page: Int, completion: @escaping ([Video]) -> Void) {
+        let searchType = (type == .video) ? "video" : "bili_user"
+        let params: [String: String] = [
+            "search_type": searchType,
+            "keyword": keyword,
+            "page": String(page),
+            "page_size": "20",
+            "build": "7540000",
+            "mobi_app": "android",
+            "platform": "android"
+        ]
+        request("https://api.bilibili.com/x/v2/search", params: params, useAppUA: true, useAppSign: true) { [weak self] data, _, _ in
+            guard let self = self else { return }
+            let videos = self.parseAppSearch(data, type: type)
+            DispatchQueue.main.async { completion(videos) }
         }
     }
 
@@ -564,11 +616,15 @@ final class BiliAPI {
     ///   moov atom is large (hundreds of KB), so playback takes a while to start.
     /// - `.dash`: separate video-only + audio-only fMP4 tracks whose init segments
     ///   are tiny (<1KB), so playback starts almost immediately. AVPlayer can't
-    ///   play DASH directly, so the player muxes the two tracks into an
-    ///   AVMutableComposition.
+    ///   play DASH directly, so the two tracks are muxed into an
+    ///   `AVMutableComposition`.
+    /// - `.asset`: a pre-muxed DASH composition. Muxing is the slow part of
+    ///   starting playback, so we build it while the card is being prefetched and
+    ///   hand the player a ready asset — the tap then starts instantly.
     enum PlayableStream {
         case progressive(URL)
         case dash(video: URL, audio: URL)
+        case asset(AVAsset)
     }
 
     /// Resolve a playable stream for the given video, preferring DASH (instant
@@ -584,13 +640,13 @@ final class BiliAPI {
         case "直播":
             requestLivePlayURL(roomId: video.id) { [weak self] url in
                 let stream = url.map { PlayableStream.progressive($0) }
-                if let stream = stream { self?.streamCache[video.id] = stream }
+                if let stream = stream, let self = self { self.cacheStream(stream, for: video.id) }
                 DispatchQueue.main.async { completion(stream) }
             }
         case "影视":
             requestCinemaPlayURL(seasonId: video.id) { [weak self] url in
                 let stream = url.map { PlayableStream.progressive($0) }
-                if let stream = stream { self?.streamCache[video.id] = stream }
+                if let stream = stream, let self = self { self.cacheStream(stream, for: video.id) }
                 DispatchQueue.main.async { completion(stream) }
             }
         default:
@@ -601,17 +657,68 @@ final class BiliAPI {
                 }
                 // Prefer DASH; fall back to the progressive mp4.
                 self.requestDashPlayURL(bvid: video.id, cid: cid) { dash in
-                    if let dash = dash {
-                        self.streamCache[video.id] = dash
-                        DispatchQueue.main.async { completion(dash) }
-                    } else {
+                    guard let dash = dash, case let .dash(vURL, aURL) = dash else {
                         self.requestPlayURL(bvid: video.id, cid: cid) { url in
                             let stream = url.map { PlayableStream.progressive($0) }
-                            if let stream = stream { self.streamCache[video.id] = stream }
+                            if let stream = stream { self.cacheStream(stream, for: video.id) }
                             DispatchQueue.main.async { completion(stream) }
                         }
+                        return
+                    }
+                    // Mux into a ready-to-play composition now (during prefetch) so
+                    // the actual tap doesn't pay the muxing cost.
+                    self.buildDashComposition(videoURL: vURL, audioURL: aURL,
+                                              knownSeconds: Double(max(video.duration, 0))) { asset in
+                        let stream: PlayableStream = asset.map { .asset($0) } ?? dash
+                        self.cacheStream(stream, for: video.id)
+                        DispatchQueue.main.async { completion(stream) }
                     }
                 }
+            }
+        }
+    }
+
+    /// Mux a DASH video-only + audio-only track pair into a single
+    /// `AVMutableComposition` that AVPlayer can play directly. Returns nil when
+    /// the tracks can't be loaded (the caller then falls back to `.dash`/progressive).
+    func buildDashComposition(videoURL: URL, audioURL: URL, knownSeconds: Double,
+                              completion: @escaping (AVAsset?) -> Void) {
+        let options: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": [
+            "Referer": "https://www.bilibili.com/",
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+        ]]
+        let videoAsset = AVURLAsset(url: videoURL, options: options)
+        let audioAsset = AVURLAsset(url: audioURL, options: options)
+        let finish: (AVAsset?) -> Void = { asset in
+            DispatchQueue.main.async { completion(asset) }
+        }
+        Task {
+            do {
+                let videoTracks = try await videoAsset.loadTracks(withMediaType: .video)
+                let audioTracks = try await audioAsset.loadTracks(withMediaType: .audio)
+                guard let vTrack = videoTracks.first, let aTrack = audioTracks.first else {
+                    finish(nil)
+                    return
+                }
+                let loaded = try await videoAsset.load(.duration)
+                let seconds = (loaded.isNumeric && loaded.seconds > 0) ? loaded.seconds : knownSeconds
+                guard seconds > 0 else {
+                    finish(nil)
+                    return
+                }
+                let range = CMTimeRange(start: .zero, duration: CMTime(seconds: seconds, preferredTimescale: 600))
+                let composition = AVMutableComposition()
+                guard let vComp = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+                      let aComp = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                    finish(nil)
+                    return
+                }
+                try vComp.insertTimeRange(range, of: vTrack, at: .zero)
+                try aComp.insertTimeRange(range, of: aTrack, at: .zero)
+                finish(composition)
+            } catch {
+                print("[BiliBili] DASH mux failed: \(error)")
+                finish(nil)
             }
         }
     }
@@ -797,7 +904,7 @@ final class BiliAPI {
     /// screen) so a later tap is instant. Concurrency is capped to avoid
     /// saturating the network.
     private var prefetchInFlight = 0
-    private let maxPrefetchInFlight = 8
+    private let maxPrefetchInFlight = 6
     func prefetchStreamURL(for video: Video) {
         guard streamCache[video.id] == nil else { return }
         guard prefetchInFlight < maxPrefetchInFlight else { return }
@@ -1371,6 +1478,64 @@ private extension BiliAPI {
         }
     }
 
+    /// Parse the App-signed `/x/v2/search` response. Results live under
+    /// `data.item[]` and are typed by `linktype` (`video` / `app_user` / `game` …).
+    /// Video items carry bvid/cid inside `share.video`, so no extra resolve is
+    /// needed to play them.
+    func parseAppSearch(_ data: Data?, type: SearchType) -> [Video] {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let items = d["item"] as? [[String: Any]] else { return [] }
+        switch type {
+        case .video:
+            return items.compactMap { item in
+                guard (item["linktype"] as? String) == "video" else { return nil }
+                guard let shareVideo = (item["share"] as? [String: Any])?["video"] as? [String: Any],
+                      let bvid = shareVideo["bvid"] as? String, !bvid.isEmpty else { return nil }
+                return Video(
+                    id: bvid,
+                    title: item["title"] as? String ?? "",
+                    cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
+                    duration: parseDuration(item["duration"] as? String ?? "0"),
+                    upName: item["author"] as? String ?? "",
+                    upMid: item["mid"] as? Int ?? 0,
+                    upAvatar: BiliAPI.coverURL(item["face"] as? String ?? ""),
+                    views: item["play"] as? Int ?? 0,
+                    danmaku: 0,
+                    publishTime: formatTime(item["ptime"] as? Int ?? 0),
+                    category: "",
+                    desc: "",
+                    likes: 0, coins: 0, favorites: 0, shares: 0,
+                    cid: shareVideo["cid"] as? Int ?? 0
+                )
+            }
+        case .user:
+            return items.compactMap { item in
+                let linktype = item["linktype"] as? String ?? ""
+                guard linktype.contains("user") else { return nil }
+                // App user cards put the mid in `param` (a string).
+                guard let mid = Int(item["param"] as? String ?? ""), mid > 0 else { return nil }
+                let face = item["cover"] as? String
+                    ?? ((item["share_plane"] as? [String: Any])?["author_face"] as? String) ?? ""
+                return Video(
+                    id: "\(mid)",
+                    title: item["title"] as? String ?? "",
+                    cover: BiliAPI.coverURL(face),
+                    duration: 0,
+                    upName: item["title"] as? String ?? "",
+                    upMid: mid,
+                    upAvatar: BiliAPI.coverURL(face),
+                    views: item["fans"] as? Int ?? 0,
+                    danmaku: 0,
+                    publishTime: "",
+                    category: "用户",
+                    desc: item["sign"] as? String ?? "",
+                    likes: 0, coins: 0, favorites: 0, shares: 0
+                )
+            }
+        }
+    }
+
     func parseSearch(_ data: Data?, type: SearchType) -> [Video] {
         guard let json = parseJSON(data),
               let d = json["data"] as? [String: Any],
@@ -1667,21 +1832,24 @@ private extension BiliAPI {
     }
 
     func parseLive(_ data: Data?) -> [Video] {
-        guard let json = parseJSON(data),
-              let d = json["data"] as? [String: Any] else { return [] }
+        guard let json = parseJSON(data), let d = json["data"] else { return [] }
 
         var rooms: [[String: Any]] = []
 
-        // 1. Recommend rooms (top of the live home page)
-        if let rrl = d["recommend_room_list"] as? [[String: Any]] {
-            rooms.append(contentsOf: rrl)
-        }
-
-        // 2. Modular room lists (area-based groupings)
-        if let modules = d["room_list"] as? [[String: Any]] {
-            for module in modules {
-                if let list = module["list"] as? [[String: Any]] {
-                    rooms.append(contentsOf: list)
+        // 1. Flat list — `room/v1/room/get_user_recommend` returns a plain array.
+        if let flat = d as? [[String: Any]] {
+            rooms.append(contentsOf: flat)
+        } else if let dict = d as? [String: Any] {
+            // 2. Recommend rooms (top of the live home page)
+            if let rrl = dict["recommend_room_list"] as? [[String: Any]] {
+                rooms.append(contentsOf: rrl)
+            }
+            // 3. Modular room lists (area-based groupings)
+            if let modules = dict["room_list"] as? [[String: Any]] {
+                for module in modules {
+                    if let list = module["list"] as? [[String: Any]] {
+                        rooms.append(contentsOf: list)
+                    }
                 }
             }
         }
@@ -1692,7 +1860,10 @@ private extension BiliAPI {
             return Video(
                 id: "\(roomid)",
                 title: title,
-                cover: BiliAPI.coverURL(item["cover"] as? String ?? item["face"] as? String ?? ""),
+                cover: BiliAPI.coverURL(item["user_cover"] as? String
+                                        ?? item["cover"] as? String
+                                        ?? item["system_cover"] as? String
+                                        ?? item["face"] as? String ?? ""),
                 duration: 0,
                 upName: item["uname"] as? String ?? "",
                 upMid: item["uid"] as? Int ?? item["up_id"] as? Int ?? 0,
@@ -1701,7 +1872,7 @@ private extension BiliAPI {
                 danmaku: 0,
                 publishTime: "直播中",
                 category: "直播",
-                desc: item["area_v2_name"] as? String ?? "",
+                desc: item["area_v2_name"] as? String ?? item["areaName"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0
             )
         }
