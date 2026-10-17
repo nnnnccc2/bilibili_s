@@ -79,7 +79,7 @@ struct ProfileView: View {
         }
         .overlay {
             if showingLogin {
-                LoginView(onDismiss: { showingLogin = false })
+                LoginView(onDismiss: { dismissImmersive { showingLogin = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(30)
@@ -87,7 +87,7 @@ struct ProfileView: View {
         }
         .overlay {
             if showingSettings {
-                FilterSettingsView(onDismiss: { showingSettings = false })
+                FilterSettingsView(onDismiss: { dismissImmersive { showingSettings = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(30)
@@ -95,7 +95,7 @@ struct ProfileView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive { selectedVideo = nil } })
                     .environmentObject(store)
                     .ignoresSafeArea()
                     .immersive()
@@ -120,14 +120,14 @@ struct ProfileView: View {
         }
         .overlay {
             if showingAbout {
-                SettingsView(onDismiss: { showingAbout = false })
+                SettingsView(onDismiss: { dismissImmersive { showingAbout = false } })
                     .immersive()
                     .zIndex(30)
             }
         }
         .overlay {
             if showingFavorites {
-                FavoritesListView(onDismiss: { showingFavorites = false })
+                FavoritesListView(onDismiss: { dismissImmersive { showingFavorites = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(30)

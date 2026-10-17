@@ -117,17 +117,17 @@ struct FollowingView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive { selectedVideo = nil } })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(opaque: true)
+                    .immersive()
                     .id(video.id)
                     .zIndex(10)
             }
         }
         .overlay {
             if showingUPSpace, selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive { showingUPSpace = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(20)

@@ -38,7 +38,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.18), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
-                SearchView(onDismiss: { showingSearch = false })
+                SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(50)
@@ -121,34 +121,31 @@ struct PressableCardStyle: ButtonStyle {
 /// While it is presented the bottom tab bar is hidden, and the overlay is laid
 /// out inside the safe area (below the notch, above the home indicator) so its
 /// navigation title is never overlapped by content.
-/// - Parameter opaque: paint a solid black backdrop OUTSIDE the entrance fade,
-///   so dark overlays (the player) cover the notch area instantly instead of
-///   flashing the light page behind them.
+/// Entrance is a short uniform cross-fade (no slide, no sticky feel) and the
+/// caller animates the dismissal so it fades out the same way.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var opaque: Bool = false
     @State private var appeared = false
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .background {
-                if opaque {
-                    Color.black.ignoresSafeArea()
-                }
-            }
+            .transition(.opacity)
             .onAppear {
                 store.pushImmersive()
-                // Fast, non-sticky entrance: a short fade (no scale, which is
-                // expensive on a full-screen player and feels laggy).
-                withAnimation(.easeOut(duration: 0.16)) { appeared = true }
+                withAnimation(.easeOut(duration: 0.2)) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(opaque: Bool = false) -> some View {
-        modifier(ImmersiveOverlay(opaque: opaque))
+    func immersive() -> some View {
+        modifier(ImmersiveOverlay())
     }
+}
+
+/// Animates an overlay dismissal so the content fades out instead of cutting.
+func dismissImmersive(_ action: @escaping () -> Void) {
+    withAnimation(.easeOut(duration: 0.2)) { action() }
 }

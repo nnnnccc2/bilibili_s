@@ -265,7 +265,7 @@ struct VideoPlayerView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
-                .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 10 * s, style: .continuous))
+                .background(Color.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 10 * s, style: .continuous))
                 .transition(.opacity)
             }
         }
@@ -280,11 +280,10 @@ struct VideoPlayerView: View {
                     if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .frame(width: 30, height: 30)
-                        .background(Color.black.opacity(0.3))
-                        .clipShape(Circle())
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
                 }
                 Spacer()
             }

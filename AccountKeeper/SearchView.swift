@@ -154,17 +154,17 @@ struct SearchView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive { selectedVideo = nil } })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(opaque: true)
+                    .immersive()
                     .id(video.id)
                     .zIndex(10)
             }
         }
         .overlay {
             if showingUPSpace {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive { showingUPSpace = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(20)
@@ -175,7 +175,7 @@ struct SearchView: View {
     // MARK: - Hot keywords (哔哩哔哩热搜, gray and readable, never blue)
 
     private var hotKeywordsView: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
             Text("哔哩哔哩热搜")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color.secondary)
@@ -192,8 +192,8 @@ struct SearchView: View {
             } else {
                 // Secondary element: plain gray words that wrap loosely at their
                 // natural widths (no rigid grid), kept within ~4/7 of the width.
-                FlowLayout(spacing: 16) {
-                    ForEach(Array(hotKeywords.prefix(9).enumerated()), id: \.offset) { _, kw in
+                FlowLayout(spacing: 9) {
+                    ForEach(Array(hotKeywords.prefix(8).enumerated()), id: \.offset) { _, kw in
                         Button {
                             keyword = kw
                             performSearch()

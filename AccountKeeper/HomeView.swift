@@ -23,7 +23,6 @@ struct HomeView: View {
     @State private var selectedUPMid: Int = 0
     @State private var selectedUPName: String = ""
     @State private var showingUPSpace = false
-    @Namespace private var categoryNamespace
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -36,17 +35,17 @@ struct HomeView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive { selectedVideo = nil } })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(opaque: true)
+                    .immersive()
                     .id(video.id)
                     .zIndex(10)
             }
         }
         .overlay {
             if showingUPSpace, selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive { showingUPSpace = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(20)
@@ -77,13 +76,8 @@ struct HomeView: View {
                             .foregroundStyle(category == cat ? Color.white : Color.biliTabText)
                             .frame(minWidth: 56)
                             .padding(.vertical, 8)
-                            .background {
-                                if category == cat {
-                                    Capsule()
-                                        .fill(Color.biliBlue)
-                                        .matchedGeometryEffect(id: "homeCategoryPill", in: categoryNamespace)
-                                }
-                            }
+                            .background(category == cat ? Color.biliBlue : Color.clear)
+                            .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -93,7 +87,6 @@ struct HomeView: View {
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 1))
             .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 1)
-            .animation(.spring(response: 0.32, dampingFraction: 0.82), value: category)
 
             Spacer(minLength: 4)
 
