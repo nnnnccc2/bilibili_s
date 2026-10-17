@@ -40,7 +40,7 @@ final class FilterEngine {
             }
         }
 
-        // 2. Clickbait / leading-title keyword filtering + 连续 !!/!!! 拦截
+        // 2. Clickbait / leading-title keyword filtering
         if settings.enableClickbaitFilter {
             let title = video.title
             for word in FilterSettings.builtInClickbaitWords {
@@ -48,9 +48,18 @@ final class FilterEngine {
                     return .clickbait
                 }
             }
-            // 2b. 连续 2+ 个 !/？/！/？ → 引导式标题 (!! / !!! / ?? / ???)
-            if hasExclamationSpam(in: title) {
+        }
+
+        // 2b. 连续 2+ 个 !/？/！/？ → 引导式标题 (!! / !!! / ?? / ???)
+        //     以及单个 !/！ 单独出现（由 exclamationWords 词表覆盖）
+        if settings.enableExclamationFilter {
+            if hasExclamationSpam(in: video.title) {
                 return .exclamationSpam
+            }
+            for word in FilterSettings.exclamationWords {
+                if video.title.contains(word) {
+                    return .exclamationSpam
+                }
             }
         }
 

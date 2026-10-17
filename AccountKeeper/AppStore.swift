@@ -44,14 +44,15 @@ final class AppStore: ObservableObject {
     var engine: FilterEngine { FilterEngine(settings: settings) }
 
     /// Applies the global filter to a list of videos, returning only those that pass.
-    /// Accumulates statistics for every blocked video.
-    func applyFilter(_ videos: [Video]) -> [Video] {
+    /// - Parameter countStats: when false (re-filtering after settings change), the
+    ///   per-reason counters are not incremented again.
+    func applyFilter(_ videos: [Video], countStats: Bool = true) -> [Video] {
         var passed: [Video] = []
         var blocked = 0
         for v in videos {
             if let reason = engine.shouldBlock(v) {
                 blocked += 1
-                settings.stats.add(reason)
+                if countStats { settings.stats.add(reason) }
             } else {
                 passed.append(v)
             }
@@ -63,13 +64,13 @@ final class AppStore: ObservableObject {
     }
 
     /// Applies the search-specific filter (global rules + min-duration).
-    func applySearchFilter(_ videos: [Video]) -> [Video] {
+    func applySearchFilter(_ videos: [Video], countStats: Bool = true) -> [Video] {
         var passed: [Video] = []
         var blocked = 0
         for v in videos {
             if let reason = engine.shouldBlockInSearch(v) {
                 blocked += 1
-                settings.stats.add(reason)
+                if countStats { settings.stats.add(reason) }
             } else {
                 passed.append(v)
             }

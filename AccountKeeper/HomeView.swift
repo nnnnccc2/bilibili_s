@@ -13,6 +13,7 @@ struct HomeView: View {
     @Binding var showingSearch: Bool
     @State private var category: HomeCategory = .recommend
     @State private var videos: [Video] = []
+    @State private var rawVideos: [Video] = []
     @State private var isLoading = true
     @State private var hasLoadedOnce = false
     @State private var isLoadingMore = false
@@ -56,6 +57,11 @@ struct HomeView: View {
             if videos.isEmpty || Date().timeIntervalSince(lastRefreshDate) > 30 {
                 loadVideos(force: true)
             }
+        }
+        .onChange(of: store.settings) { _, _ in
+            // Re-apply filter live when the user toggles a rule.
+            // countStats:false avoids double-counting already-counted blocks.
+            videos = store.applyFilter(rawVideos, countStats: false)
         }
     }
 
@@ -189,6 +195,7 @@ struct HomeView: View {
         hasMore = true
         BiliAPI.shared.fetchHome(category: category, page: page) { raw in
             DispatchQueue.main.async {
+                rawVideos = raw
                 let filtered = store.applyFilter(raw)
                 videos = filtered
                 isLoading = false
@@ -208,6 +215,7 @@ struct HomeView: View {
         isLoadingMore = true
         BiliAPI.shared.fetchHome(category: category, page: page) { raw in
             DispatchQueue.main.async {
+                rawVideos.append(contentsOf: raw)
                 let filtered = store.applyFilter(raw)
                 if filtered.isEmpty {
                     hasMore = false

@@ -36,6 +36,7 @@ struct FilterStats: Codable, Hashable {
 struct FilterSettings: Codable, Hashable {
     // Title / clickbait filtering
     var enableClickbaitFilter: Bool = true
+    var enableExclamationFilter: Bool = false
     var enableJapaneseTitleFilter: Bool = true
 
     // UP主 filtering
@@ -79,9 +80,11 @@ extension FilterSettings {
         "看完沉默", "不看后悔", "太可怕了", "太离谱了",
         "千万别买", "千万不要", "万万没想到",
         "99%的人", "所有人都", "强烈推荐",
-        "一秒入坑", "笑不活了", "人傻了", "直接封神",
-        // 感叹号垃圾标题：半角 + 全角都要覆盖。中文标题几乎都用全角 ！
-        // （半角 ! 极少出现，之前只列半角导致该规则实际从未生效）
+        "一秒入坑", "笑不活了", "人傻了", "直接封神"
+    ]
+
+    /// 感叹号拦截词（半角 + 全角；中文标题多用全角 ！）
+    static let exclamationWords: [String] = [
         "!!!", "!!", "!",
         "！！！", "！！", "！"
     ]

@@ -439,7 +439,7 @@ struct ProfileView: View {
                             ForEach(displayHistory) { item in
                                 Button {
                                     playHistoryItem(item)
-                                    showingHistory = false
+                                    dismissImmersive { showingHistory = false }
                                 } label: {
                                     HStack(spacing: 10) {
                                         CachedAsyncImage(
@@ -475,7 +475,7 @@ struct ProfileView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { showingHistory = false }
+                    Button("完成") { dismissImmersive { showingHistory = false } }
                         .foregroundColor(.biliBlue)
                 }
             }

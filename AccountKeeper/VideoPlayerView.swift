@@ -189,7 +189,7 @@ struct VideoPlayerView: View {
         }
         .overlay {
             if showingUPSpace, video.upMid > 0 {
-                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { showingUPSpace = false })
+                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { dismissImmersive { showingUPSpace = false } })
                     .environmentObject(store)
                     .ignoresSafeArea()
                     .zIndex(30)

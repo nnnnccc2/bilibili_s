@@ -31,6 +31,9 @@ struct FilterSettingsView: View {
                         // Clickbait filter
                         clickbaitCard
 
+                        // Exclamation-mark filter (separate, default off)
+                        exclamationCard
+
                         // Japanese filters
                         japaneseCard
 
@@ -172,7 +175,7 @@ struct FilterSettingsView: View {
             }
             .tint(.biliBlue)
 
-            Text("自动拦截包含\"疯了\"、\"炸了\"、\"屌爆了\"、\"！\"等标点或夸张煽动词的视频")
+            Text("自动拦截包含\"疯了\"、\"炸了\"、\"屌爆了\"等夸张煽动词的视频")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -185,6 +188,41 @@ struct FilterSettingsView: View {
                             .padding(.vertical, 6)
                             .background(Color.pink.opacity(0.12))
                             .foregroundStyle(.pink)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Exclamation marks (separate toggle, default off)
+
+    private var exclamationCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: $store.settings.enableExclamationFilter) {
+                Label("过滤含感叹号的标题", systemImage: "exclamationmark.triangle.fill")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("标题中出现 !、！、!!、！！、!!!、！！！ 时自动拦截（较激进，默认关闭）")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if store.settings.enableExclamationFilter {
+                FlowLayout(spacing: 8) {
+                    ForEach(FilterSettings.exclamationWords, id: \.self) { word in
+                        Text(word)
+                            .font(.caption)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.orange.opacity(0.12))
+                            .foregroundStyle(.orange)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }

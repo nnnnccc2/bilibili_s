@@ -12,6 +12,7 @@ struct FollowingView: View {
     @Binding var showingSearch: Bool
     @State private var selectedTab: FollowTab = .all
     @State private var videos: [Video] = []
+    @State private var rawVideos: [Video] = []
     @State private var isLoading = false
     @State private var selectedVideo: Video?
     @State private var selectedUPMid: Int = 0
@@ -134,12 +135,16 @@ struct FollowingView: View {
             }
         }
         .onAppear { if videos.isEmpty { load() } }
+        .onChange(of: store.settings) { _, _ in
+            videos = store.applyFilter(rawVideos, countStats: false)
+        }
     }
 
     private func load() {
         isLoading = true
         BiliAPI.shared.fetchFollowing { raw in
             DispatchQueue.main.async {
+                rawVideos = raw
                 let filtered = store.applyFilter(raw)
                 videos = filtered
                 isLoading = false
