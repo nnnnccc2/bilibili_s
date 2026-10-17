@@ -49,15 +49,16 @@ struct FavoritesListView: View {
                     Button("完成") { if let onDismiss = onDismiss { onDismiss() } else { dismiss() } }.foregroundColor(.biliBlue)
                 }
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(10)
-                }
-            }
             .onAppear { loadFolders() }
+        }
+        .overlay {
+            if let video = selectedVideo {
+                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                    .environmentObject(store)
+                    .ignoresSafeArea()
+                    .immersive()
+                    .zIndex(10)
+            }
         }
     }
 

@@ -50,6 +50,8 @@ struct VideoPlayerView: View {
     @State private var gestureDirection: GestureDirection = .none
     @State private var showGestureIndicator: Bool = false
     @State private var gestureIndicatorText: String = ""
+    @State private var gestureSymbol: String = "goforward.10"
+    @State private var gestureLevel: CGFloat = 0.5
 
     private enum GestureDirection { case none, horizontal, verticalLeft, verticalRight }
 
@@ -75,31 +77,16 @@ struct VideoPlayerView: View {
             Color.black.ignoresSafeArea()
 
             if showFullScreen {
-                // True full-screen: only the player, edge-to-edge
+                // True full-screen: player edge-to-edge with the shared controls
                 ZStack {
                     PlayerLayerView(player: player)
                         .ignoresSafeArea()
-                    // Gesture indicator
-                    if showGestureIndicator {
-                        VStack(spacing: 6) {
-                            Image(systemName: gestureIcon)
-                                .font(.system(size: 40, weight: .semibold))
-                            Text(gestureIndicatorText)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 28)
-                        .padding(.vertical, 18)
-                        .background(Color.black.opacity(0.55))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .transition(.opacity)
-                    }
-                    Color.black.opacity(0.001)
+                    gestureIndicatorView
+                    interactionLayer
                         .ignoresSafeArea()
-                        .onTapGesture { toggleControls() }
-                        .gesture(playerGesture)
-                    fullScreenControls
+                    if showControls {
+                        playerControlsChrome(fullscreen: true)
+                    }
                 }
             } else {
                 ScrollView {
@@ -128,23 +115,6 @@ struct VideoPlayerView: View {
                 }
                 .background(Color.biliBackground)
                 .scrollIndicators(.hidden)
-
-                // Top controls overlaid on the player (below the notch)
-                HStack {
-                    Button {
-                        if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .frame(width: 30, height: 30)
-                            .background(Color.black.opacity(0.3))
-                            .clipShape(Circle())
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 10)
-                .padding(.top, topSafeArea + 6)
             }
         }
         .onAppear {
@@ -196,89 +166,188 @@ struct VideoPlayerView: View {
         .statusBarHidden(showFullScreen)
     }
 
-    // MARK: - Full-screen controls with progress bar
+    // MARK: - Shared player controls (used by BOTH inline & full-screen)
 
-    private var fullScreenControls: some View {
-        ZStack {
-            Color.black.opacity(0.001)
-                .onTapGesture { toggleControls() }
+    /// Full-area layer that toggles the controls on tap and drives the
+    /// brightness / volume / seek swipe gestures. Sits BELOW the control chrome
+    /// so buttons and the progress bar always receive touches first.
+    private var interactionLayer: some View {
+        Color.black.opacity(0.001)
+            .contentShape(Rectangle())
+            .onTapGesture { toggleControls() }
+            .gesture(playerGesture)
+    }
 
-            if showControls {
-                VStack {
-                    // Top bar: back button (safe-area padding)
-                    HStack {
-                        Button {
-                            if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
-                        } label: {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.9))
-                                .frame(width: 30, height: 30)
-                                .background(Color.black.opacity(0.3))
-                                .clipShape(Circle())
-                        }
-                        Spacer()
+    /// Gesture HUD: icon + vertical level bar (brightness / volume / seek).
+    private var gestureIndicatorView: some View {
+        Group {
+            if showGestureIndicator {
+                VStack(spacing: 10) {
+                    Image(systemName: gestureSymbol)
+                        .font(.system(size: 18, weight: .semibold))
+                    ZStack(alignment: .bottom) {
+                        Capsule().fill(Color.white.opacity(0.25)).frame(width: 4, height: 80)
+                        Capsule().fill(Color.white).frame(width: 4, height: max(4, 80 * gestureLevel))
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, topSafeArea + 6)
-
-                    Spacer()
-
-                    // Bottom controls: play + progress bar + time + fullscreen
-                    VStack(spacing: 6) {
-                        // Progress bar — tappable for seek
-                        Slider(
-                            value: Binding(
-                                get: { duration > 0 ? currentTime / duration : 0 },
-                                set: { fraction in
-                                    let newTime = fraction * duration
-                                    if let p = player {
-                                        p.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
-                                    }
-                                }
-                            ),
-                            in: 0...1
-                        )
-                        .tint(.white)
-                        .padding(.horizontal, 16)
-
-                        HStack(spacing: 14) {
-                            Button { togglePlay() } label: {
-                                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.9))
-                                    .frame(width: 36, height: 36)
-                                    .background(Color.black.opacity(0.3))
-                                    .clipShape(Circle())
-                            }
-
-                            Text("\(formatTime(currentTime)) / \(formatTime(duration))")
-                                .font(.caption2)
-                                .foregroundStyle(.white.opacity(0.8))
-
-                            Spacer()
-
-                            Button { showFullScreen = false } label: {
-                                Image(systemName: "arrow.down.right.and.arrow.up.left")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.9))
-                                    .frame(width: 30, height: 30)
-                                    .background(Color.black.opacity(0.3))
-                                    .clipShape(Circle())
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 8)
-                    }
-                    .padding(.bottom, bottomSafeArea + 10)
+                    Text(gestureIndicatorText)
+                        .font(.caption2)
+                        .monospacedDigit()
                 }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color.black.opacity(0.55))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 .transition(.opacity)
             }
         }
-        .onAppear { scheduleHideControls() }
     }
 
-    // MARK: - Inline player section (also custom controls: play/pause bottom-left, fullscreen bottom-right)
+    /// Back button + bottom control bar. Same set of controls in both modes.
+    @ViewBuilder
+    private func playerControlsChrome(fullscreen: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button {
+                    if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(width: 30, height: 30)
+                        .background(Color.black.opacity(0.3))
+                        .clipShape(Circle())
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, fullscreen ? topSafeArea + 6 : 8)
+
+            Spacer()
+
+            controlBar(fullscreen: fullscreen)
+                .padding(.horizontal, 14)
+                .padding(.bottom, fullscreen ? bottomSafeArea + 8 : 10)
+        }
+        .transition(.opacity)
+    }
+
+    /// Seek bar + time + play/pause + brightness + volume + fullscreen toggle.
+    private func controlBar(fullscreen: Bool) -> some View {
+        VStack(spacing: 8) {
+            // Seek bar (tap anywhere or drag the knob)
+            HStack(spacing: 8) {
+                Text(formatTime(currentTime))
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.85))
+                playerProgressBar
+                Text(formatTime(duration))
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+
+            HStack(spacing: 12) {
+                controlButton(isPlaying ? "pause.fill" : "play.fill", size: 17) { togglePlay() }
+
+                controlButton("sun.min.fill") { adjustBrightness(-0.1) }
+                controlButton("sun.max.fill") { adjustBrightness(0.1) }
+
+                Spacer()
+
+                controlButton("speaker.fill") { adjustVolume(-0.1) }
+                controlButton("speaker.wave.3.fill") { adjustVolume(0.1) }
+
+                controlButton(fullscreen
+                              ? "arrow.down.right.and.arrow.up.left"
+                              : "arrow.up.left.and.arrow.down.right") {
+                    showFullScreen.toggle()
+                    scheduleHideControls()
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            LinearGradient(colors: [.black.opacity(0), .black.opacity(0.45)],
+                           startPoint: .top, endPoint: .bottom)
+                .allowsHitTesting(false)
+        )
+    }
+
+    private func controlButton(_ icon: String, size: CGFloat = 15, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: 34, height: 34)
+                .background(Color.black.opacity(0.3))
+                .clipShape(Circle())
+        }
+    }
+
+    /// Custom seek bar: small knob, works with both tap and drag.
+    private var playerProgressBar: some View {
+        GeometryReader { geo in
+            let w = max(1, geo.size.width)
+            let frac = duration > 0 ? min(max(currentTime / duration, 0), 1) : 0
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(height: 3)
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: CGFloat(frac) * w, height: 3)
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 8, height: 8)
+                    .offset(x: CGFloat(frac) * w - 4)
+            }
+            .frame(height: geo.size.height)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        seek(toX: value.location.x, width: w)
+                    }
+            )
+        }
+        .frame(height: 18)
+    }
+
+    private func seek(toX x: CGFloat, width: CGFloat) {
+        guard duration > 0, width > 0 else { return }
+        let frac = min(max(x / width, 0), 1)
+        let t = frac * duration
+        currentTime = t
+        player?.seek(to: CMTime(seconds: t, preferredTimescale: 600))
+        scheduleHideControls()
+    }
+
+    private func adjustBrightness(_ delta: CGFloat) {
+        let v = min(max(UIScreen.main.brightness + delta, 0), 1)
+        UIScreen.main.brightness = v
+        flashGesture(symbol: "sun.max.fill", level: v, text: "\(Int(v * 100))%")
+    }
+
+    private func adjustVolume(_ delta: Float) {
+        let v = min(max((player?.volume ?? 1) + delta, 0), 1)
+        player?.volume = v
+        flashGesture(symbol: "speaker.wave.3.fill", level: CGFloat(v), text: "\(Int(v * 100))%")
+    }
+
+    private func flashGesture(symbol: String, level: CGFloat, text: String) {
+        gestureSymbol = symbol
+        gestureLevel = level
+        gestureIndicatorText = text
+        withAnimation(.easeInOut(duration: 0.15)) { showGestureIndicator = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            withAnimation(.easeInOut(duration: 0.2)) { showGestureIndicator = false }
+        }
+    }
+
+    // MARK: - Inline player section (shared controls)
 
     @ViewBuilder
     private var playerSection: some View {
@@ -303,64 +372,14 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // Gesture indicator (seek / brightness / volume)
-            if showGestureIndicator {
-                VStack(spacing: 6) {
-                    Image(systemName: gestureIcon)
-                        .font(.system(size: 36, weight: .semibold))
-                    Text(gestureIndicatorText)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
-                .background(Color.black.opacity(0.55))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .transition(.opacity)
-            }
+            gestureIndicatorView
 
-            // Tap + swipe gestures
-            Color.black.opacity(0.001)
-                .onTapGesture { toggleControls() }
-                .gesture(playerGesture)
+            // Tap + swipe layer (below controls so buttons/seek bar win touches)
+            interactionLayer
 
             if showControls {
-                VStack {
-                    Spacer()
-                    HStack(alignment: .bottom) {
-                        Button { togglePlay() } label: {
-                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 44, height: 44)
-                                .background(Color.black.opacity(0.4))
-                                .clipShape(Circle())
-                        }
-                        Spacer()
-                        Button { showFullScreen = true } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.black.opacity(0.4))
-                                .clipShape(Circle())
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
-                }
-                .transition(.opacity)
+                playerControlsChrome(fullscreen: false)
             }
-        }
-    }
-
-    private var gestureIcon: String {
-        switch gestureDirection {
-        case .horizontal: return "goforward.10"
-        case .verticalLeft: return "sun.max.fill"
-        case .verticalRight: return "speaker.wave.3.fill"
-        default: return ""
         }
     }
 
@@ -374,13 +393,16 @@ struct VideoPlayerView: View {
                     if abs(dx) > abs(dy) {
                         gestureDirection = .horizontal
                         gestureStartX = value.startLocation.x
+                        gestureSymbol = "goforward.10"
                     } else {
                         let isLeft = value.startLocation.x < UIScreen.main.bounds.width / 2
                         gestureDirection = isLeft ? .verticalLeft : .verticalRight
                         gestureStartY = value.startLocation.y
                         gestureStartVolume = player?.volume ?? 1.0
                         gestureStartBrightness = UIScreen.main.brightness
+                        gestureSymbol = isLeft ? "sun.max.fill" : "speaker.wave.3.fill"
                     }
+                    gestureLevel = 0.5
                     showGestureIndicator = true
                 }
 
@@ -390,6 +412,10 @@ struct VideoPlayerView: View {
                     let delta = value.translation.width
                     let seekSeconds = delta * 0.5
                     gestureIndicatorText = "\(seekSeconds >= 0 ? "+" : "")\(Int(seekSeconds))s"
+                    if duration > 0 {
+                        let frac = min(max((currentTime + seekSeconds) / duration, 0), 1)
+                        gestureLevel = CGFloat(frac)
+                    }
                 case .verticalLeft:
                     // Brightness: full screen height = full brightness range
                     let height = UIScreen.main.bounds.height
@@ -397,6 +423,7 @@ struct VideoPlayerView: View {
                     let newBrightness = min(max(gestureStartBrightness + delta, 0), 1)
                     UIScreen.main.brightness = newBrightness
                     gestureIndicatorText = "\(Int(newBrightness * 100))%"
+                    gestureLevel = newBrightness
                 case .verticalRight:
                     // Volume: full screen height = full volume range
                     let height = UIScreen.main.bounds.height
@@ -404,6 +431,7 @@ struct VideoPlayerView: View {
                     let newVolume = min(max(gestureStartVolume + delta, 0), 1)
                     player?.volume = newVolume
                     gestureIndicatorText = "\(Int(newVolume * 100))%"
+                    gestureLevel = CGFloat(newVolume)
                 case .none:
                     break
                 }

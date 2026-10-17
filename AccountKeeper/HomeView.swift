@@ -38,6 +38,7 @@ struct HomeView: View {
                 VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                     .environmentObject(store)
                     .ignoresSafeArea()
+                    .immersive()
                     .zIndex(10)
             }
         }
@@ -45,7 +46,7 @@ struct HomeView: View {
             if showingUPSpace, selectedUPMid > 0 {
                 UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
                     .environmentObject(store)
-                    .ignoresSafeArea()
+                    .immersive()
                     .zIndex(20)
             }
         }

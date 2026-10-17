@@ -114,21 +114,22 @@ struct FollowingView: View {
                     }
                 }
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(10)
-                }
+        }
+        .overlay {
+            if let video = selectedVideo {
+                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                    .environmentObject(store)
+                    .ignoresSafeArea()
+                    .immersive()
+                    .zIndex(10)
             }
-            .overlay {
-                if showingUPSpace, selectedUPMid > 0 {
-                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(20)
-                }
+        }
+        .overlay {
+            if showingUPSpace, selectedUPMid > 0 {
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
+                    .environmentObject(store)
+                    .immersive()
+                    .zIndex(20)
             }
         }
         .onAppear { if videos.isEmpty { load() } }

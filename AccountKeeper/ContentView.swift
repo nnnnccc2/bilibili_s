@@ -29,13 +29,16 @@ struct ContentView: View {
         .tint(.biliBlue)
         .background(Color.biliBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            bottomBar
+            // Hide the tab bar while an immersive overlay is on screen.
+            if store.immersiveDepth == 0 {
+                bottomBar
+            }
         }
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { showingSearch = false })
                     .environmentObject(store)
-                    .ignoresSafeArea()
+                    .immersive()
                     .zIndex(50)
             }
         }
@@ -93,4 +96,23 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentObject(AppStore())
+}
+
+// MARK: - Immersive overlay helper
+
+/// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
+/// While it is presented the bottom tab bar is hidden, and the overlay is laid
+/// out inside the safe area (below the notch, above the home indicator) so its
+/// navigation title is never overlapped by content.
+struct ImmersiveOverlay: ViewModifier {
+    @EnvironmentObject var store: AppStore
+    func body(content: Content) -> some View {
+        content
+            .onAppear { store.pushImmersive() }
+            .onDisappear { store.popImmersive() }
+    }
+}
+
+extension View {
+    func immersive() -> some View { modifier(ImmersiveOverlay()) }
 }

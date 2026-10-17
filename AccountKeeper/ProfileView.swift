@@ -76,55 +76,61 @@ struct ProfileView: View {
                     }
                 }
             }
-            .overlay {
-                if showingLogin {
-                    LoginView(onDismiss: { showingLogin = false })
-                        .environmentObject(store)
-                        .ignoresSafeArea().zIndex(30)
-                }
+        }
+        .overlay {
+            if showingLogin {
+                LoginView(onDismiss: { showingLogin = false })
+                    .environmentObject(store)
+                    .immersive()
+                    .zIndex(30)
             }
-            .overlay {
-                if showingSettings {
-                    FilterSettingsView(onDismiss: { showingSettings = false })
-                        .environmentObject(store)
-                        .ignoresSafeArea().zIndex(30)
-                }
+        }
+        .overlay {
+            if showingSettings {
+                FilterSettingsView(onDismiss: { showingSettings = false })
+                    .environmentObject(store)
+                    .immersive()
+                    .zIndex(30)
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(10)
-                }
+        }
+        .overlay {
+            if let video = selectedVideo {
+                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                    .environmentObject(store)
+                    .ignoresSafeArea()
+                    .immersive()
+                    .zIndex(10)
             }
-            .alert("退出登录", isPresented: $showingLogoutAlert) {
-                Button("取消", role: .cancel) {}
-                Button("退出", role: .destructive) {
-                    store.logout()
-                    remoteHistory.removeAll()
-                }
-            } message: {
-                Text("确定要退出当前账号吗？")
+        }
+        .alert("退出登录", isPresented: $showingLogoutAlert) {
+            Button("取消", role: .cancel) {}
+            Button("退出", role: .destructive) {
+                store.logout()
+                remoteHistory.removeAll()
             }
-            .overlay {
-                if showingHistory {
-                    historySheet
-                        .ignoresSafeArea().zIndex(30)
-                }
+        } message: {
+            Text("确定要退出当前账号吗？")
+        }
+        .overlay {
+            if showingHistory {
+                historySheet
+                    .immersive()
+                    .zIndex(30)
             }
-            .overlay {
-                if showingAbout {
-                    SettingsView(onDismiss: { showingAbout = false })
-                        .ignoresSafeArea().zIndex(30)
-                }
+        }
+        .overlay {
+            if showingAbout {
+                SettingsView(onDismiss: { showingAbout = false })
+                    .immersive()
+                    .zIndex(30)
             }
-            .overlay {
-                if showingFavorites {
-                    FavoritesListView(onDismiss: { showingFavorites = false })
-                        .environmentObject(store)
-                        .ignoresSafeArea().zIndex(30)
-                }
+        }
+        .overlay {
+            if showingFavorites {
+                FavoritesListView(onDismiss: { showingFavorites = false })
+                    .environmentObject(store)
+                    .immersive()
+                    .zIndex(30)
             }
         }
         .onAppear {

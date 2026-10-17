@@ -51,19 +51,20 @@ struct UPSpaceView: View {
                         .lineLimit(1)
                 }
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .zIndex(10)
-                }
-            }
             .onAppear {
                 if info == nil {
                     loadInfo()
                     loadVideos(reset: true)
                 }
+            }
+        }
+        .overlay {
+            if let video = selectedVideo {
+                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                    .environmentObject(store)
+                    .ignoresSafeArea()
+                    .immersive()
+                    .zIndex(10)
             }
         }
     }
