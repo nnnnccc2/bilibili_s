@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.3), value: store.immersiveDepth)
+        .animation(.easeInOut(duration: 0.3), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -134,9 +134,9 @@ struct ImmersiveOverlay: ViewModifier {
     var duration: Double = 0.3
     @State private var appeared = false
 
-    /// 丝滑、无顿挫：缓出曲线，从起手到落位全程连续，没有突然加速或骤停。
+    /// 流畅、对称：标准 easeInOut，两端速度连续过渡，没有单向偏置的顿挫。
     private var enterCurve: Animation {
-        .timingCurve(0.22, 1.0, 0.36, 1.0, duration: duration)
+        .easeInOut(duration: duration)
     }
 
     func body(content: Content) -> some View {
@@ -159,5 +159,5 @@ extension View {
 
 /// Animates an overlay dismissal so it leaves on the same smooth, quiet dissolve.
 func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.26) {
-    withAnimation(.easeOut(duration: duration)) { action() }
+    withAnimation(.easeInOut(duration: duration)) { action() }
 }
