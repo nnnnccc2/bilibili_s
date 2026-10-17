@@ -742,7 +742,7 @@ final class BiliAPI {
             "build": "7540000"
         ]
         request("https://app.bilibili.com/x/v2/space/archive",
-                params: params, useAppSign: true, useAppUA: true) { [weak self] data, _, _ in
+                params: params, useAppUA: true, useAppSign: true) { [weak self] data, _, _ in
             let (videos, total) = self?.parseUPVideosApp(data, mid: mid) ?? ([], 0)
             if !videos.isEmpty {
                 DispatchQueue.main.async { completion(videos, total) }
@@ -1323,7 +1323,7 @@ private extension BiliAPI {
         return (v, t)
     }
 
-    /// Parse the app endpoint /x/v2/space/archive/cursor response (data.item[]).
+    /// Parse the app endpoint /x/v2/space/archive response (data.item[]).
     /// Fields: title / cover / duration(sec) / play / danmaku / ctime / author / bvid / first_cid.
     func parseUPVideosApp(_ data: Data?, mid: Int) -> ([Video], Int) {
         guard let json = parseJSON(data),
