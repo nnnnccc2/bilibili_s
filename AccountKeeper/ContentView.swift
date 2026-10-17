@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.timingCurve(0.2, 0.8, 0.35, 1.0, duration: 0.24), value: store.immersiveDepth)
+        .animation(.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.3), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -131,13 +131,12 @@ struct PressableCardStyle: ButtonStyle {
 /// removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.24
+    var duration: Double = 0.3
     @State private var appeared = false
 
-    /// Firm and tight: most of the density lands immediately, then it simply
-    /// stops. No slack at either end.
+    /// 丝滑、无顿挫：缓出曲线，从起手到落位全程连续，没有突然加速或骤停。
     private var enterCurve: Animation {
-        .timingCurve(0.2, 0.8, 0.35, 1.0, duration: duration)
+        .timingCurve(0.22, 1.0, 0.36, 1.0, duration: duration)
     }
 
     func body(content: Content) -> some View {
@@ -153,12 +152,12 @@ struct ImmersiveOverlay: ViewModifier {
 }
 
 extension View {
-    func immersive(duration: Double = 0.24) -> some View {
+    func immersive(duration: Double = 0.3) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
-/// Animates an overlay dismissal so it leaves on the same firm, quiet dissolve.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.2) {
+/// Animates an overlay dismissal so it leaves on the same smooth, quiet dissolve.
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.26) {
     withAnimation(.easeOut(duration: duration)) { action() }
 }
