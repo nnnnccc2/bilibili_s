@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.timingCurve(0.165, 0.84, 0.44, 1.0, duration: 0.34), value: store.immersiveDepth)
+        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -121,33 +121,34 @@ struct PressableCardStyle: ButtonStyle {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// The motion is crisp but alive ("干练" + "像水一样有生命"): the overlay starts a
-/// touch *larger* than the screen (1.025 → 1.0) so it settles into place without
-/// ever pulling back from the edges — scaling below 1.0 used to flash a white
-/// border and jump the notch colour — and it leaves by expanding very slightly
-/// (1.0 → 1.03) as it fades. Both use sharp cubic curves instead of `easeInOut`,
-/// whose slow ramp-up read as sluggish and lifeless.
+/// The motion is a "跃起" (spring-up): the page leaps up from below the screen
+/// and lands with a light bounce, fading in as it rises so its leading edge
+/// blends into the page behind instead of cutting. It leaves the same way —
+/// dropping back down with a spring while fading out.
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
 /// doesn't wrap its state change in `withAnimation`; the exit uses an
-/// opacity+scale removal transition animated by `dismissImmersive`.
+/// opacity+offset removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.34
+    var duration: Double = 0.42
     @State private var appeared = false
 
-    /// Quick, confident start; soft landing (≈ easeOutQuart).
+    /// How far below its resting place the page starts before it leaps up.
+    private var leapDistance: CGFloat { 240 }
+
+    /// Springy enough to read as a leap, damped enough to land without wobble.
     private var enterCurve: Animation {
-        .timingCurve(0.165, 0.84, 0.44, 1.0, duration: duration)
+        .spring(response: duration, dampingFraction: 0.82)
     }
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .scaleEffect(appeared ? 1 : 1.025)
+            .offset(y: appeared ? 0 : leapDistance)
             .transition(.asymmetric(
                 insertion: .identity,
-                removal: .opacity.combined(with: .scale(scale: 1.03))))
+                removal: .opacity.combined(with: .offset(y: leapDistance * 0.6))))
             .onAppear {
                 store.pushImmersive()
                 withAnimation(enterCurve) { appeared = true }
@@ -157,14 +158,12 @@ struct ImmersiveOverlay: ViewModifier {
 }
 
 extension View {
-    func immersive(duration: Double = 0.34) -> some View {
+    func immersive(duration: Double = 0.42) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
-/// Animates an overlay dismissal so it leaves gracefully instead of cutting.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.26) {
-    // Gentle start, quick exit (≈ easeInCubic) — it lets go of the screen at
-    // once instead of hanging around.
-    withAnimation(.timingCurve(0.55, 0.06, 0.68, 0.19, duration: duration)) { action() }
+/// Animates an overlay dismissal so it drops away with a spring, not a cut.
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.32) {
+    withAnimation(.spring(response: duration, dampingFraction: 0.9)) { action() }
 }
