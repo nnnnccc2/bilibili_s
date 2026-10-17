@@ -93,28 +93,32 @@ struct SearchView: View {
                     .padding(.vertical, 8)
                 }
 
-                // Duration filter chips (search-specific)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(Array(FilterSettings.searchDurationOptions.enumerated()), id: \.offset) { index, opt in
-                            Button {
-                                selectedDurationIndex = index
-                                let seconds = opt.seconds
-                                store.settings.searchMinDurationSeconds = seconds
-                                if hasSearched { performSearch() }
-                            } label: {
-                                Text(opt.label)
-                                    .font(.caption)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 5)
-                                    .background(selectedDurationIndex == index ? Color.biliBlue : Color(.secondarySystemBackground))
-                                    .foregroundStyle(selectedDurationIndex == index ? .white : .primary)
-                                    .clipShape(Capsule())
+                // Duration filter chips — VIDEO search only. User results have no
+                // duration, so the filter is meaningless there and hiding it
+                // prevents the "点击时长→没有匹配内容" bug.
+                if searchType == .video {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(FilterSettings.searchDurationOptions.enumerated()), id: \.offset) { index, opt in
+                                Button {
+                                    selectedDurationIndex = index
+                                    let seconds = opt.seconds
+                                    store.settings.searchMinDurationSeconds = seconds
+                                    if hasSearched { performSearch() }
+                                } label: {
+                                    Text(opt.label)
+                                        .font(.caption)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 5)
+                                        .background(selectedDurationIndex == index ? Color.biliBlue : Color(.secondarySystemBackground))
+                                        .foregroundStyle(selectedDurationIndex == index ? .white : .primary)
+                                        .clipShape(Capsule())
+                                }
                             }
                         }
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
                 }
 
                 Divider()
@@ -130,7 +134,9 @@ struct SearchView: View {
                     ContentUnavailableView(
                         "没有匹配的内容",
                         systemImage: "magnifyingglass",
-                        description: Text("试试其他关键词")
+                        description: Text(store.lastBlockedCount > 0
+                                          ? "结果被过滤规则净化了 \(store.lastBlockedCount) 条，可放宽过滤或更换关键词"
+                                          : "试试其他关键词")
                     )
                 } else {
                     resultScrollView
@@ -154,19 +160,19 @@ struct SearchView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.12) })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.2) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.12)
+                    .immersive(duration: 0.26, scale: 1.0)
                     .id(video.id)
                     .zIndex(10)
             }
         }
         .overlay {
             if showingUPSpace {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.3) })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.24) })
                     .environmentObject(store)
-                    .immersive(duration: 0.3)
+                    .immersive(duration: 0.24)
                     .zIndex(20)
             }
         }
@@ -371,25 +377,27 @@ struct SearchView: View {
         hasSearched = true
         page = 1
         hasMore = true
-        if let cur = store.settings.searchMinDurationSeconds {
+        // Duration filter only applies to video search.
+        let isVideoSearch = searchType == .video
+        if isVideoSearch, let cur = store.settings.searchMinDurationSeconds {
             if let idx = FilterSettings.searchDurationOptions.firstIndex(where: { $0.seconds == cur }) {
                 selectedDurationIndex = idx
             }
-        } else {
+        } else if isVideoSearch {
             selectedDurationIndex = 0
         }
-        let minDur = store.settings.searchMinDurationSeconds
+        let minDur = isVideoSearch ? store.settings.searchMinDurationSeconds : nil
         var page1: [Video] = []
         var page2: [Video] = []
         let group = DispatchGroup()
         group.enter()
         BiliAPI.shared.search(keyword: keyword, type: searchType, page: 1, minDurationSeconds: minDur) { raw in
-            DispatchQueue.main.async { page1 = store.applySearchFilter(raw) }
+            DispatchQueue.main.async { page1 = store.applySearchFilter(raw, applyMinDuration: isVideoSearch) }
             group.leave()
         }
         group.enter()
         BiliAPI.shared.search(keyword: keyword, type: searchType, page: 2, minDurationSeconds: minDur) { raw in
-            DispatchQueue.main.async { page2 = store.applySearchFilter(raw) }
+            DispatchQueue.main.async { page2 = store.applySearchFilter(raw, applyMinDuration: isVideoSearch) }
             group.leave()
         }
         group.notify(queue: .main) {
@@ -407,10 +415,11 @@ struct SearchView: View {
     private func loadMore() {
         guard hasMore, !isLoadingMore else { return }
         isLoadingMore = true
-        let minDur = store.settings.searchMinDurationSeconds
+        let isVideoSearch = searchType == .video
+        let minDur = isVideoSearch ? store.settings.searchMinDurationSeconds : nil
         BiliAPI.shared.search(keyword: keyword, type: searchType, page: page, minDurationSeconds: minDur) { raw in
             DispatchQueue.main.async {
-                let filtered = store.applySearchFilter(raw)
+                let filtered = store.applySearchFilter(raw, applyMinDuration: isVideoSearch)
                 if filtered.isEmpty {
                     hasMore = false
                 } else {

@@ -341,10 +341,11 @@ final class BiliAPI {
     /// Search Bilibili content.
     /// - Parameter minDurationSeconds: optional minimum duration in seconds.
     ///   For thresholds >= 10 min we use Bilibili's server-side duration buckets
-    ///   (10-30 / 30-60 / 60+ min) and fetch ALL buckets from the threshold's
-    ///   bucket upward, then combine + dedupe. This avoids the "no results"
-    ///   problem where client-side filtering of an all-duration page removes
-    ///   every short video. For thresholds < 10 min we fetch all and filter
+    ///   (10-30 / 30-60 / 60+ min) and fetch every bucket at or above the
+    ///   threshold, then combine + dedupe. If the server buckets come back empty
+    ///   (risk control, or genuinely no long videos) we fall back to fetching all
+    ///   and filtering client-side, so a duration filter never yields an
+    ///   unexplained empty page. For thresholds < 10 min we fetch all and filter
     ///   client-side (only a tiny fraction of results get removed).
     func search(keyword: String, type: SearchType, page: Int = 1, minDurationSeconds: Int? = nil, completion: @escaping ([Video]) -> Void) {
         guard !keyword.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -356,61 +357,97 @@ final class BiliAPI {
         case .video: searchType = "video"
         case .user: searchType = "bili_user"
         }
-        var params: [String: String] = [
+        let params: [String: String] = [
             "search_type": searchType,
             "keyword": keyword,
             "page": String(page),
             "ps": "50"
         ]
 
-        // Determine which server-side duration buckets to fetch.
-        // Bilibili buckets: 0=全部, 1=<10min, 2=10-30min, 3=30-60min, 4=>60min.
-        // For a "minimum duration" filter we fetch every bucket at or above the
-        // threshold's bucket so long videos aren't missed.
-        let buckets: [Int]
-        if type == .video, let sec = minDurationSeconds {
-            if sec >= 3600 {
-                buckets = [4]
-            } else if sec >= 1800 {
-                buckets = [3, 4]
-            } else if sec >= 600 {
-                buckets = [2, 3, 4]
-            } else {
-                buckets = [0]
-            }
-        } else {
-            buckets = [0]
-        }
+        // Duration only ever applies to video search (user results have no duration).
+        let minSec = (type == .video) ? minDurationSeconds : nil
+        let buckets = Self.durationBuckets(for: minSec)
 
-        if buckets.count == 1 {
-            params["duration"] = String(buckets[0])
-            request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: false) { [weak self] data, _, _ in
-                let videos = self?.parseSearch(data, type: type) ?? []
-                DispatchQueue.main.async { completion(videos) }
+        fetchSearchBuckets(buckets, params: params, type: type) { [weak self] videos in
+            guard let self = self else { return }
+            let filtered = Self.filterByMinDuration(videos, minSec)
+            if filtered.isEmpty, buckets != [0] {
+                // Server-side buckets were empty → fetch everything and filter
+                // client-side so the user still gets results.
+                self.fetchSearchBuckets([0], params: params, type: type) { all in
+                    completion(Self.filterByMinDuration(all, minSec))
+                }
+            } else {
+                completion(filtered)
             }
-        } else {
-            // Fetch multiple buckets in parallel and merge (dedup by bvid).
-            let group = DispatchGroup()
-            var merged: [String: Video] = [:]
-            for bucket in buckets {
-                var p = params
-                p["duration"] = String(bucket)
-                group.enter()
-                request("https://api.bilibili.com/x/web-interface/search/type", params: p, useWBI: false) { [weak self] data, _, _ in
-                    let videos = self?.parseSearch(data, type: type) ?? []
-                    DispatchQueue.main.async {
-                        for v in videos { merged[v.id] = v }
-                        group.leave()
+        }
+    }
+
+    /// Server-side duration buckets to fetch for a given minimum duration.
+    /// Bilibili buckets: 0=全部, 1=<10min, 2=10-30min, 3=30-60min, 4=>60min.
+    /// Returns all buckets at or above the threshold's lower bound.
+    private static func durationBuckets(for minSec: Int?) -> [Int] {
+        guard let s = minSec else { return [0] }
+        if s >= 3600 { return [4] }
+        if s >= 1800 { return [3, 4] }
+        if s >= 600 { return [2, 3, 4] }
+        return [0]
+    }
+
+    private static func filterByMinDuration(_ videos: [Video], _ minSec: Int?) -> [Video] {
+        guard let s = minSec else { return videos }
+        return videos.filter { $0.duration >= s }
+    }
+
+    /// Fetch one or more duration buckets. Single-bucket fetches retry once on an
+    /// empty result (guards against transient risk-control / network misses);
+    /// multi-bucket fetches run in parallel and merge, preserving bucket order.
+    private func fetchSearchBuckets(_ buckets: [Int], params: [String: String], type: SearchType, completion: @escaping ([Video]) -> Void) {
+        let url = "https://api.bilibili.com/x/web-interface/search/type"
+        if buckets.count == 1 {
+            var p = params
+            p["duration"] = String(buckets[0])
+            request(url, params: p, useWBI: false) { [weak self] data, _, _ in
+                guard let self = self else { return }
+                let videos = self.parseSearch(data, type: type)
+                if videos.isEmpty {
+                    // Retry once after a short delay in case it was transient.
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) {
+                        self.request(url, params: p, useWBI: false) { data2, _, _ in
+                            let retry = self.parseSearch(data2, type: type)
+                            DispatchQueue.main.async { completion(retry) }
+                        }
                     }
+                } else {
+                    DispatchQueue.main.async { completion(videos) }
                 }
             }
-            group.notify(queue: .main) {
-                // Preserve the bucket order: bucket 2 first, then 3, then 4.
-                // Since dict doesn't preserve order, sort by original insertion
-                // isn't possible — but search relevance within each bucket is
-                // fine, and combining them gives plenty of results.
-                completion(Array(merged.values))
+            return
+        }
+        var columnResults = Array(repeating: [Video](), count: buckets.count)
+        let group = DispatchGroup()
+        for (index, bucket) in buckets.enumerated() {
+            var p = params
+            p["duration"] = String(bucket)
+            group.enter()
+            request(url, params: p, useWBI: false) { [weak self] data, _, _ in
+                let videos = self?.parseSearch(data, type: type) ?? []
+                DispatchQueue.main.async {
+                    columnResults[index] = videos
+                    group.leave()
+                }
             }
+        }
+        group.notify(queue: .main) {
+            var seen = Set<String>()
+            var merged: [Video] = []
+            for column in columnResults {
+                for v in column where !seen.contains(v.id) {
+                    seen.insert(v.id)
+                    merged.append(v)
+                }
+            }
+            completion(merged)
         }
     }
 
@@ -631,17 +668,29 @@ final class BiliAPI {
     }
 
     /// Prefetch the stream URL for a video (called when a card appears on screen).
-    /// Only prefetches when cid is already known to avoid extra requests.
-    /// Concurrency is capped to avoid saturating the network while scrolling.
+    /// If the feed didn't provide a cid (e.g. 动态/关注 feeds), we resolve it via
+    /// the detail API first so that a later tap is instant instead of waiting for
+    /// two chained requests. Concurrency is capped to avoid saturating the network.
     private var prefetchInFlight = 0
-    private let maxPrefetchInFlight = 4
+    private let maxPrefetchInFlight = 8
     func prefetchStreamURL(for video: Video) {
-        guard streamURLCache[video.id] == nil, video.cid > 0 else { return }
+        guard streamURLCache[video.id] == nil else { return }
         guard prefetchInFlight < maxPrefetchInFlight else { return }
         prefetchInFlight += 1
-        requestPlayURL(bvid: video.id, cid: video.cid) { [weak self] url in
+        let finish: (URL?) -> Void = { [weak self] url in
             if let url = url { self?.streamURLCache[video.id] = url }
             self?.prefetchInFlight -= 1
+        }
+        if video.cid > 0 {
+            requestPlayURL(bvid: video.id, cid: video.cid, completion: finish)
+        } else {
+            fetchVideoDetail(bvid: video.id) { [weak self] detail in
+                guard let self = self, let cid = detail?.cid, cid > 0 else {
+                    finish(nil)
+                    return
+                }
+                self.requestPlayURL(bvid: video.id, cid: cid, completion: finish)
+            }
         }
     }
 
@@ -649,10 +698,10 @@ final class BiliAPI {
         let params: [String: String] = [
             "bvid": bvid,
             "cid": String(cid),
-            "qn": "80",
+            "qn": "64",
             "fnval": "0",
             "fnver": "0",
-            "fourk": "1"
+            "fourk": "0"
         ]
         request("https://api.bilibili.com/x/player/playurl", params: params) { [weak self] data, _, _ in
             let url = self?.parsePlayURL(data)

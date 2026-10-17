@@ -142,14 +142,16 @@ extension FilterSettings {
         blockedDurationSeconds.max()
     }
 
-    /// Search duration filter options (search result page)
+    /// Search duration filter options (search result page).
+    /// IMPORTANT: every `seconds` value must be unique — the selected index is
+    /// resolved by matching `seconds`, so duplicate values make one chip
+    /// unselectable (e.g. "60 秒以上" collided with "1 分钟以上").
     static let searchDurationOptions: [(label: String, seconds: Int?)] = [
         ("全部时长", nil),
         ("10 秒以上", 10),
         ("20 秒以上", 20),
         ("30 秒以上", 30),
         ("40 秒以上", 40),
-        ("60 秒以上", 60),
         ("1 分钟以上", 60),
         ("2 分钟以上", 120),
         ("4 分钟以上", 240),

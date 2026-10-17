@@ -64,11 +64,13 @@ final class AppStore: ObservableObject {
     }
 
     /// Applies the search-specific filter (global rules + min-duration).
-    func applySearchFilter(_ videos: [Video], countStats: Bool = true) -> [Video] {
+    /// - Parameter applyMinDuration: false for user search — user results have no
+    ///   duration and must not be filtered out by a min-duration threshold.
+    func applySearchFilter(_ videos: [Video], countStats: Bool = true, applyMinDuration: Bool = true) -> [Video] {
         var passed: [Video] = []
         var blocked = 0
         for v in videos {
-            if let reason = engine.shouldBlockInSearch(v) {
+            if let reason = engine.shouldBlockInSearch(v, applyMinDuration: applyMinDuration) {
                 blocked += 1
                 if countStats { settings.stats.add(reason) }
             } else {

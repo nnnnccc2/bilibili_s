@@ -103,11 +103,14 @@ final class FilterEngine {
     }
 
     /// Search-result specific filter: applies the global rules plus the search min-duration filter.
-    func shouldBlockInSearch(_ video: Video) -> BlockReason? {
+    /// - Parameter applyMinDuration: pass false for user search — user results carry
+    ///   no duration (duration == 0), so applying a min-duration filter would block
+    ///   every user and produce an empty "没有匹配内容" page.
+    func shouldBlockInSearch(_ video: Video, applyMinDuration: Bool = true) -> BlockReason? {
         if let reason = shouldBlock(video) {
             return reason
         }
-        if let minSec = settings.searchMinDurationSeconds, video.duration < minSec {
+        if applyMinDuration, let minSec = settings.searchMinDurationSeconds, video.duration < minSec {
             return .duration
         }
         return nil
