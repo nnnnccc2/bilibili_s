@@ -41,6 +41,8 @@ struct VideoPlayerView: View {
     @State private var controlsTimer: Timer?
     @State private var currentTime: Double = 0
     @State private var duration: Double = 0
+    @State private var isScrubbing = false
+    @State private var scrubTime: Double = 0
 
     // Swipe gesture state
     @State private var gestureStartX: CGFloat = 0
