@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: store.immersiveDepth)
+        .animation(.timingCurve(0.2, 0.8, 0.35, 1.0, duration: 0.24), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -121,34 +121,29 @@ struct PressableCardStyle: ButtonStyle {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// The motion is a "跃起" (spring-up): the page leaps up from below the screen
-/// and lands with a light bounce, fading in as it rises so its leading edge
-/// blends into the page behind instead of cutting. It leaves the same way —
-/// dropping back down with a spring while fading out.
+/// The transition is deliberately unnoticeable — no slide, no scale, no spring.
+/// Like a ligament it is short and taut: the page is simply *there*, arriving on
+/// a fast, firm dissolve. Anything with direction, bounce, or a long ramp draws
+/// attention to the animation itself, which is exactly what we don't want.
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
-/// doesn't wrap its state change in `withAnimation`; the exit uses an
-/// opacity+offset removal transition animated by `dismissImmersive`.
+/// doesn't wrap its state change in `withAnimation`; the exit uses an opacity
+/// removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.42
+    var duration: Double = 0.24
     @State private var appeared = false
 
-    /// How far below its resting place the page starts before it leaps up.
-    private var leapDistance: CGFloat { 240 }
-
-    /// Springy enough to read as a leap, damped enough to land without wobble.
+    /// Firm and tight: most of the density lands immediately, then it simply
+    /// stops. No slack at either end.
     private var enterCurve: Animation {
-        .spring(response: duration, dampingFraction: 0.82)
+        .timingCurve(0.2, 0.8, 0.35, 1.0, duration: duration)
     }
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : leapDistance)
-            .transition(.asymmetric(
-                insertion: .identity,
-                removal: .opacity.combined(with: .offset(y: leapDistance * 0.6))))
+            .transition(.asymmetric(insertion: .identity, removal: .opacity))
             .onAppear {
                 store.pushImmersive()
                 withAnimation(enterCurve) { appeared = true }
@@ -158,12 +153,12 @@ struct ImmersiveOverlay: ViewModifier {
 }
 
 extension View {
-    func immersive(duration: Double = 0.42) -> some View {
+    func immersive(duration: Double = 0.24) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
-/// Animates an overlay dismissal so it drops away with a spring, not a cut.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.32) {
-    withAnimation(.spring(response: duration, dampingFraction: 0.9)) { action() }
+/// Animates an overlay dismissal so it leaves on the same firm, quiet dissolve.
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.2) {
+    withAnimation(.easeOut(duration: duration)) { action() }
 }
