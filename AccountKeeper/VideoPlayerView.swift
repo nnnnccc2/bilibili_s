@@ -678,14 +678,13 @@ struct VideoPlayerView: View {
 
                 // Observe playback progress (update duration + currentTime)
                 let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-                p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-                    guard let self = self else { return }
+                p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
                     self.currentTime = time.seconds
                     if let d = p.currentItem?.duration.seconds, !d.isNaN {
                         self.duration = d
                     }
                 }
-                // Duration observer
+                // Playback ended → pause UI
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
                     self.isPlaying = false
                 }
