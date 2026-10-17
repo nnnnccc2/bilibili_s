@@ -816,29 +816,39 @@ struct VideoPlayerView: View {
         let options: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": streamHeaders]
         let videoAsset = AVURLAsset(url: videoURL, options: options)
         let audioAsset = AVURLAsset(url: audioURL, options: options)
+        // The API-reported duration is a safety net for fragmented MP4 whose
+        // header doesn't expose a numeric duration.
+        let knownSeconds = Double(max(video.duration, 0))
+        let finish: (AVPlayerItem?) -> Void = { item in
+            DispatchQueue.main.async { completion(item) }
+        }
         Task {
             do {
                 let videoTracks = try await videoAsset.loadTracks(withMediaType: .video)
                 let audioTracks = try await audioAsset.loadTracks(withMediaType: .audio)
                 guard let vTrack = videoTracks.first, let aTrack = audioTracks.first else {
-                    await MainActor.run { completion(nil) }
+                    finish(nil)
                     return
                 }
-                let vDuration = try await videoAsset.load(.duration)
-                let aDuration = try await audioAsset.load(.duration)
+                let loaded = try await videoAsset.load(.duration)
+                let seconds = (loaded.isNumeric && loaded.seconds > 0) ? loaded.seconds : knownSeconds
+                guard seconds > 0 else {
+                    finish(nil)
+                    return
+                }
+                let range = CMTimeRange(start: .zero, duration: CMTime(seconds: seconds, preferredTimescale: 600))
                 let composition = AVMutableComposition()
                 guard let vComp = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
                       let aComp = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-                    await MainActor.run { completion(nil) }
+                    finish(nil)
                     return
                 }
-                try vComp.insertTimeRange(CMTimeRange(start: .zero, duration: vDuration), of: vTrack, at: .zero)
-                try aComp.insertTimeRange(CMTimeRange(start: .zero, duration: aDuration), of: aTrack, at: .zero)
-                let item = AVPlayerItem(asset: composition)
-                await MainActor.run { completion(item) }
+                try vComp.insertTimeRange(range, of: vTrack, at: .zero)
+                try aComp.insertTimeRange(range, of: aTrack, at: .zero)
+                finish(AVPlayerItem(asset: composition))
             } catch {
                 print("[BiliBili] DASH mux failed: \(error)")
-                await MainActor.run { completion(nil) }
+                finish(nil)
             }
         }
     }
@@ -853,7 +863,7 @@ struct VideoPlayerView: View {
                     return
                 }
                 let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": self.streamHeaders])
-                self.attachPlayer(AVPlayerItem(asset: asset))
+                self.attachPlayer(AVPlayerItem(asset: asset), allowFallback: false)
             }
         }
     }
