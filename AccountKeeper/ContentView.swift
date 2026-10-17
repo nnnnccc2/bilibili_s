@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.42), value: store.immersiveDepth)
+        .animation(.timingCurve(0.165, 0.84, 0.44, 1.0, duration: 0.34), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -121,42 +121,50 @@ struct PressableCardStyle: ButtonStyle {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// The overlay has no directional slide and no scale: it cross-fades in and out.
-/// Scaling a full-screen overlay pulls it off the screen edges, which used to
-/// flash a white border and make the notch colour jump, so the motion is a pure
-/// dissolve — calm and fluid ("像水的流动") rather than a push.
+/// The motion is crisp but alive ("干练" + "像水一样有生命"): the overlay starts a
+/// touch *larger* than the screen (1.025 → 1.0) so it settles into place without
+/// ever pulling back from the edges — scaling below 1.0 used to flash a white
+/// border and jump the notch colour — and it leaves by expanding very slightly
+/// (1.0 → 1.03) as it fades. Both use sharp cubic curves instead of `easeInOut`,
+/// whose slow ramp-up read as sluggish and lifeless.
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
-/// doesn't wrap its state change in `withAnimation`; the exit uses an opacity
-/// removal transition animated by `dismissImmersive`.
+/// doesn't wrap its state change in `withAnimation`; the exit uses an
+/// opacity+scale removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.42
+    var duration: Double = 0.34
     @State private var appeared = false
+
+    /// Quick, confident start; soft landing (≈ easeOutQuart).
+    private var enterCurve: Animation {
+        .timingCurve(0.165, 0.84, 0.44, 1.0, duration: duration)
+    }
 
     func body(content: Content) -> some View {
         content
-            // Water-like: a plain cross-fade. No scale — scaling a full-screen
-            // overlay pulls it away from the screen edges, which flashed a white
-            // border and made the notch colour jump — and no spring, so nothing
-            // bounces or settles. It simply dissolves in and out.
             .opacity(appeared ? 1 : 0)
-            .transition(.asymmetric(insertion: .identity, removal: .opacity))
+            .scaleEffect(appeared ? 1 : 1.025)
+            .transition(.asymmetric(
+                insertion: .identity,
+                removal: .opacity.combined(with: .scale(scale: 1.03))))
             .onAppear {
                 store.pushImmersive()
-                withAnimation(.easeInOut(duration: duration)) { appeared = true }
+                withAnimation(enterCurve) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.42) -> some View {
+    func immersive(duration: Double = 0.34) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
-/// Animates an overlay dismissal so it fades out instead of cutting.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.42) {
-    withAnimation(.easeInOut(duration: duration)) { action() }
+/// Animates an overlay dismissal so it leaves gracefully instead of cutting.
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.26) {
+    // Gentle start, quick exit (≈ easeInCubic) — it lets go of the screen at
+    // once instead of hanging around.
+    withAnimation(.timingCurve(0.55, 0.06, 0.68, 0.19, duration: duration)) { action() }
 }
