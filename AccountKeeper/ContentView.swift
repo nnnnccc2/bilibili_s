@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.24), value: store.immersiveDepth)
+        .animation(.easeInOut(duration: 0.42), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -131,7 +131,7 @@ struct PressableCardStyle: ButtonStyle {
 /// removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.24
+    var duration: Double = 0.42
     @State private var appeared = false
 
     func body(content: Content) -> some View {
@@ -151,12 +151,12 @@ struct ImmersiveOverlay: ViewModifier {
 }
 
 extension View {
-    func immersive(duration: Double = 0.24) -> some View {
+    func immersive(duration: Double = 0.42) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
 /// Animates an overlay dismissal so it fades out instead of cutting.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.24) {
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.42) {
     withAnimation(.easeInOut(duration: duration)) { action() }
 }

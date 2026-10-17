@@ -621,15 +621,12 @@ final class BiliAPI {
         }
     }
 
-    /// Videos at/above this length start from a DASH stream instead of the
-    /// progressive mp4. The progressive mp4 carries its entire index (`moov`) at
-    /// the front and AVPlayer must download all of it before it can play —
-    /// measured 0.16 MB at 2 min, 2.15 MB at 30 min, 3.8 MB at 52 min, and tens
-    /// of MB for multi-hour videos — which is why long videos sat on a black
-    /// screen while the index downloaded, while short ones started instantly.
-    /// DASH's fragmented index is only a few KB, so a long video starts right
-    /// away. Short clips stay on the mp4 and skip the muxing cost entirely.
-    private let dashMinDurationSeconds = 600
+    /// DASH playback is OFF. On iOS the split DASH tracks can't be played
+    /// directly — they must be muxed into an `AVMutableComposition`, and that
+    /// muxing cost (CPU + extra track requests during prefetch) made the feed
+    /// heavier to scroll without a perceptible startup gain. Short and long
+    /// clips alike run on the progressive mp4 here.
+    private let prefersDash = false
 
     /// A playable source for AVPlayer. Bilibili serves two kinds:
     /// - `.progressive`: a single mp4 with muxed audio+video. Simple, but its
@@ -647,9 +644,8 @@ final class BiliAPI {
         case asset(AVAsset)
     }
 
-    /// Resolve a playable stream for the given video. Short clips use the
-    /// progressive mp4, long clips (see `dashMinDurationSeconds`) use DASH; live
-    /// and cinema have their own URLs.
+    /// Resolve a playable stream for the given video. Progressive mp4 is the
+    /// default path (see `prefersDash`); live and cinema have their own URLs.
     func resolveStream(for video: Video, completion: @escaping (PlayableStream?) -> Void) {
         // Return the cached stream immediately if available.
         if let cached = streamCache[video.id] {
@@ -683,12 +679,12 @@ final class BiliAPI {
                         DispatchQueue.main.async { completion(stream) }
                     }
                 }
-                guard video.duration >= self.dashMinDurationSeconds else {
+                guard self.prefersDash else {
                     loadProgressive()
                     return
                 }
-                // Long video: DASH. Fetch the split tracks and mux them into a
-                // ready composition during prefetch so the tap starts instantly.
+                // DASH path (kept behind `prefersDash`): fetch the split tracks
+                // and mux them into a ready composition during prefetch.
                 self.requestDashPlayURL(bvid: video.id, cid: cid) { dash in
                     guard let dash = dash, case let .dash(vURL, aURL) = dash else {
                         loadProgressive()
