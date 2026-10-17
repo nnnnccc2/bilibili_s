@@ -63,7 +63,7 @@ struct UPSpaceView: View {
                 VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.12) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.12)
+                    .immersive(duration: 0.12, scale: 1.0)
                     .id(video.id)
                     .zIndex(10)
             }

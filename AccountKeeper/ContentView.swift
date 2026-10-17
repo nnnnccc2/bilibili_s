@@ -121,34 +121,46 @@ struct PressableCardStyle: ButtonStyle {
 /// While it is presented the bottom tab bar is hidden, and the overlay is laid
 /// out inside the safe area (below the notch, above the home indicator) so its
 /// navigation title is never overlapped by content.
-/// Entrance is a short uniform cross-fade (no slide, no sticky feel) and the
-/// caller animates the dismissal so it fades out the same way.
-/// - Parameter duration: entrance/exit fade duration. The video player uses a
-///   short duration (feels instant), the UP space uses a longer one (smooth).
+/// Entrance is a uniform fade + barely-perceptible scale-in. The spring is
+/// slightly overdamped (ζ > 1) so it settles with zero overshoot — no bounce,
+/// no sticky feel. The scale is only 1% so the overlay's edges never visibly
+/// lift off the screen (which would flash the underlying page and feel jumpy).
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
     var duration: Double = 0.2
+    /// Initial scale (1 = no scale, pure fade). Full-screen black overlays
+    /// (video player) pass 1 so their edges never lift off the screen.
+    var initialScale: CGFloat = 0.99
     @State private var appeared = false
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
+            .scaleEffect(appeared ? 1 : initialScale)
             .transition(.opacity)
             .onAppear {
                 store.pushImmersive()
-                withAnimation(.easeOut(duration: duration)) { appeared = true }
+                // Overdamped spring → smooth settle, no oscillation. response is
+                // floored so short durations (e.g. video player) still get a
+                // perceptible, non-snappy fade instead of an instant cut.
+                let curve = Animation.spring(response: max(duration, 0.28),
+                                             dampingFraction: 1.08,
+                                             blendDuration: 0)
+                withAnimation(curve) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.2) -> some View {
-        modifier(ImmersiveOverlay(duration: duration))
+    func immersive(duration: Double = 0.2, scale: CGFloat = 0.99) -> some View {
+        modifier(ImmersiveOverlay(duration: duration, initialScale: scale))
     }
 }
 
 /// Animates an overlay dismissal so the content fades out instead of cutting.
+/// The fade is floored at 0.18s so even "snappy" overlays (video player) exit
+/// smoothly rather than snapping closed.
 func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.2) {
-    withAnimation(.easeOut(duration: duration)) { action() }
+    withAnimation(.easeOut(duration: max(duration * 0.75, 0.18))) { action() }
 }
