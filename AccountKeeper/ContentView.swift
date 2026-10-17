@@ -131,33 +131,34 @@ struct PressableCardStyle: ButtonStyle {
 /// scale+opacity removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.36
+    /// Base timing for the entrance spring (and the exit, via `dismissImmersive`).
+    var duration: Double = 0.38
     @State private var appeared = false
 
     func body(content: Content) -> some View {
         content
+            // A deeper start scale (0.90) plus a settling spring gives the
+            // overlay real weight — it rises into place and settles instead of
+            // just "thinning" into view.
             .opacity(appeared ? 1 : 0)
-            .scaleEffect(appeared ? 1 : 0.97)
-            // Insertion is a no-op (the entrance is driven by `appeared` above);
-            // removal shrinks back down while fading out.
+            .scaleEffect(appeared ? 1 : 0.90)
             .transition(.asymmetric(insertion: .identity,
-                                    removal: .scale(scale: 0.97).combined(with: .opacity)))
+                                    removal: .scale(scale: 0.94).combined(with: .opacity)))
             .onAppear {
                 store.pushImmersive()
-                withAnimation(.easeInOut(duration: duration)) { appeared = true }
+                withAnimation(.spring(response: duration, dampingFraction: 0.84)) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.36) -> some View {
+    func immersive(duration: Double = 0.38) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
 /// Animates an overlay dismissal so it fades/shrinks out instead of cutting.
-/// Kept a touch slower than a snap so the exit never feels abrupt.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.5) {
-    withAnimation(.easeInOut(duration: max(duration * 0.8, 0.24))) { action() }
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.45) {
+    withAnimation(.easeInOut(duration: duration)) { action() }
 }

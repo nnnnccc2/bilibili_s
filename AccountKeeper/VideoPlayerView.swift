@@ -91,7 +91,7 @@ struct VideoPlayerView: View {
                     PlayerLayerView(player: player)
                         .ignoresSafeArea()
                         .opacity(isReady ? 1 : 0)
-                        .animation(.easeIn(duration: 0.25), value: isReady)
+                        .animation(.easeIn(duration: 0.18), value: isReady)
                     gestureIndicatorView
                     interactionLayer
                         .ignoresSafeArea()
@@ -413,7 +413,7 @@ struct VideoPlayerView: View {
             if let player = player {
                 PlayerLayerView(player: player)
                     .opacity(isReady ? 1 : 0)
-                    .animation(.easeIn(duration: 0.25), value: isReady)
+                    .animation(.easeIn(duration: 0.18), value: isReady)
             } else {
                 VStack(spacing: 8) {
                     if isBuffering {
@@ -879,7 +879,7 @@ struct VideoPlayerView: View {
             switch observed.status {
             case .readyToPlay:
                 DispatchQueue.main.async {
-                    withAnimation(.easeIn(duration: 0.25)) { self.isReady = true }
+                    withAnimation(.easeIn(duration: 0.18)) { self.isReady = true }
                 }
             case .failed:
                 if allowFallback {

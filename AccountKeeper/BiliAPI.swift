@@ -416,28 +416,35 @@ final class BiliAPI {
         // Duration only ever applies to video search (user results have no duration).
         let minSec = (type == .video) ? minDurationSeconds : nil
 
-        // Primary path: the App-signed `/x/v2/search` endpoint. It carries the
-        // Android app signature + app UA, exactly like the official client, so it
-        // is far less likely to be served a `v_voucher` risk-control page than the
-        // web endpoint. If it yields nothing we fall back to the web API.
-        fetchAppSearch(keyword: keyword, type: type, page: page) { [weak self] appVideos in
+        // Primary path: the web `/x/web-interface/search/type` endpoint. With the
+        // visitor cookies (buvid3/buvid4) it is NOT risk-controlled and returns
+        // 50 pure video results per page (the App endpoint mixes card types —
+        // only ~12 of 20 are actually videos — which is why results looked
+        // "incomplete"). It also supports server-side duration buckets.
+        fetchSearchWeb(keyword: keyword, type: type, page: page, minSec: minSec) { [weak self] webVideos in
             guard let self = self else { return }
-            if !appVideos.isEmpty {
-                DispatchQueue.main.async { completion(Self.filterByMinDuration(appVideos, minSec)) }
+            if !webVideos.isEmpty {
+                completion(webVideos)
                 return
             }
-            self.fetchSearchWeb(keyword: keyword, type: type, page: page, minSec: minSec, completion: completion)
+            // Fallback: the App-signed `/x/v2/search` endpoint when the web
+            // endpoint is risk-controlled or genuinely empty.
+            self.fetchAppSearch(keyword: keyword, type: type, page: page) { appVideos in
+                completion(Self.filterByMinDuration(appVideos, minSec))
+            }
         }
     }
 
-    /// Web search fallback with server-side duration buckets.
+    /// Web search (primary path): pure video/user results with server-side
+    /// duration buckets. `page_size` (not the legacy `ps`) is what the endpoint
+    /// actually honours — `ps` is silently ignored and caps the page at 20.
     private func fetchSearchWeb(keyword: String, type: SearchType, page: Int, minSec: Int?, completion: @escaping ([Video]) -> Void) {
         let searchType = (type == .video) ? "video" : "bili_user"
         let params: [String: String] = [
             "search_type": searchType,
             "keyword": keyword,
             "page": String(page),
-            "ps": "50"
+            "page_size": "50"
         ]
         let buckets = Self.durationBuckets(for: minSec)
         fetchSearchBuckets(buckets, params: params, type: type) { [weak self] videos in
@@ -531,13 +538,16 @@ final class BiliAPI {
     /// visitor IDs and retry once, so search self-heals instead of showing an
     /// empty "没有匹配内容".
     private func fetchSearchPage(url: String, params: [String: String], type: SearchType, completion: @escaping ([Video]) -> Void) {
-        request(url, params: params, useWBI: false) { [weak self] data, _, _ in
+        // The search endpoint expects a Bilibili Referer; without one it is far
+        // more likely to answer with the risk-control HTML page.
+        let referer = "https://www.bilibili.com/"
+        request(url, params: params, useWBI: false, referer: referer) { [weak self] data, _, _ in
             guard let self = self else { return }
             let videos = self.parseSearch(data, type: type)
             let isHTML = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } == nil
             if videos.isEmpty, isHTML {
                 self.fetchBuvid3(retry: 1) {
-                    self.request(url, params: params, useWBI: false) { d2, _, _ in
+                    self.request(url, params: params, useWBI: false, referer: referer) { d2, _, _ in
                         let retry = self.parseSearch(d2, type: type)
                         DispatchQueue.main.async { completion(retry) }
                     }
@@ -904,7 +914,7 @@ final class BiliAPI {
     /// screen) so a later tap is instant. Concurrency is capped to avoid
     /// saturating the network.
     private var prefetchInFlight = 0
-    private let maxPrefetchInFlight = 6
+    private let maxPrefetchInFlight = 10
     func prefetchStreamURL(for video: Video) {
         guard streamCache[video.id] == nil else { return }
         guard prefetchInFlight < maxPrefetchInFlight else { return }
