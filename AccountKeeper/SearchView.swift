@@ -176,8 +176,8 @@ struct SearchView: View {
     private var hotKeywordsView: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("哔哩哔哩热搜")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.gray)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.secondary)
                 .padding(.horizontal)
             if isLoadingKeywords && hotKeywords.isEmpty {
                 ProgressView()
@@ -186,7 +186,7 @@ struct SearchView: View {
             } else if hotKeywords.isEmpty {
                 Text("暂无热搜数据")
                     .font(.caption)
-                    .foregroundStyle(Color.gray)
+                    .foregroundStyle(Color.secondary)
                     .padding(.horizontal)
             } else {
                 FlowLayout(spacing: 8) {
@@ -197,7 +197,7 @@ struct SearchView: View {
                         } label: {
                             Text(kw)
                                 .font(.system(size: 13))
-                                .foregroundStyle(Color.gray)
+                                .foregroundStyle(Color.secondary)
                         }
                     }
                 }
@@ -343,7 +343,7 @@ struct SearchView: View {
     private func loadHotKeywords() {
         guard hotKeywords.isEmpty else { return }
         isLoadingKeywords = true
-        BiliAPI.shared.fetchTrendingKeywords(limit: 10) { keywords in
+        BiliAPI.shared.fetchTrendingKeywords(limit: 6) { keywords in
             DispatchQueue.main.async {
                 hotKeywords = keywords
                 isLoadingKeywords = false

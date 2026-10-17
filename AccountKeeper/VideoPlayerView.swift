@@ -43,6 +43,8 @@ struct VideoPlayerView: View {
     @State private var duration: Double = 0
     @State private var isScrubbing = false
     @State private var scrubTime: Double = 0
+    @State private var gestureStartTime: Double = 0
+    @State private var upAvatar: String = ""
 
     // Swipe gesture state
     @State private var gestureStartX: CGFloat = 0
@@ -93,13 +95,12 @@ struct VideoPlayerView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Player (16:9). Black backing fills the notch strip so the
-                        // area above the video is black, not the page's light color.
+                        // Player (16:9). The ScrollView already leaves the notch
+                        // area clear; no extra top padding so the video sits flush
+                        // against the bottom of the notch.
                         playerSection
                             .aspectRatio(16.0/9.0, contentMode: .fit)
                             .frame(maxWidth: .infinity)
-                            .padding(.top, topSafeArea)
-                            .background(Color.black)
 
                         // Tabs: 简介 / 评论
                         HStack(spacing: 24) {
@@ -137,7 +138,14 @@ struct VideoPlayerView: View {
             loadComments()
             if video.upMid > 0 {
                 BiliAPI.shared.fetchUPSpaceInfo(mid: video.upMid) { info in
-                    DispatchQueue.main.async { upFans = info?.fans ?? 0 }
+                    DispatchQueue.main.async {
+                        upFans = info?.fans ?? 0
+                        // Search results & UP-space lists don't carry the UP avatar;
+                        // fill it in from the profile so the player always shows one.
+                        if let face = info?.avatar, !face.isEmpty {
+                            upAvatar = face
+                        }
+                    }
                 }
             }
             if store.currentUser != nil, video.upMid > 0 {
@@ -193,30 +201,30 @@ struct VideoPlayerView: View {
             .gesture(playerGesture)
     }
 
-    /// Gesture HUD: icon + horizontal level bar (brightness / volume / seek).
+    /// Gesture HUD: icon + horizontal level bar (brightness / volume).
     private var gestureIndicatorView: some View {
         Group {
             if showGestureIndicator {
-                VStack(spacing: 10) {
+                VStack(spacing: 6) {
                     Image(systemName: gestureSymbol)
-                        .font(.system(size: 22, weight: .medium))
+                        .font(.system(size: 17, weight: .medium))
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.22)).frame(width: 116, height: 5)
-                        Capsule().fill(Color.white).frame(width: max(5, 116 * gestureLevel), height: 5)
+                        Capsule().fill(Color.white.opacity(0.22)).frame(width: 76, height: 4)
+                        Capsule().fill(Color.white).frame(width: max(4, 76 * gestureLevel), height: 4)
                     }
                     Text(gestureIndicatorText)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .monospacedDigit()
                 }
                 .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(0.25), radius: 14, y: 4)
+                .shadow(color: .black.opacity(0.22), radius: 8, y: 2)
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
@@ -337,8 +345,8 @@ struct VideoPlayerView: View {
                         guard duration > 0 else { isScrubbing = false; return }
                         let t = min(max(value.location.x / w, 0), 1) * duration
                         currentTime = t
-                        player?.seek(to: CMTime(seconds: t, preferredTimescale: 600),
-                                     toleranceBefore: .zero, toleranceAfter: .zero)
+                        // Default (keyframe) tolerance → snappy, non-jarring seek.
+                        player?.seek(to: CMTime(seconds: t, preferredTimescale: 600))
                         isScrubbing = false
                         scheduleHideControls()
                     }
@@ -391,9 +399,14 @@ struct VideoPlayerView: View {
                     let dx = value.translation.width
                     let dy = value.translation.height
                     if abs(dx) > abs(dy) {
+                        // Horizontal = seek: drive the real seek bar, no card.
                         gestureDirection = .horizontal
                         gestureStartX = value.startLocation.x
-                        gestureSymbol = "goforward.10"
+                        gestureStartTime = currentTime
+                        scrubTime = currentTime
+                        isScrubbing = true
+                        showControls = true
+                        controlsTimer?.invalidate()
                     } else {
                         let isLeft = value.startLocation.x < UIScreen.main.bounds.width / 2
                         gestureDirection = isLeft ? .verticalLeft : .verticalRight
@@ -401,21 +414,23 @@ struct VideoPlayerView: View {
                         gestureStartVolume = player?.volume ?? 1.0
                         gestureStartBrightness = UIScreen.main.brightness
                         gestureSymbol = isLeft ? "sun.max.fill" : "speaker.wave.3.fill"
+                        if isLeft {
+                            gestureLevel = UIScreen.main.brightness
+                            gestureIndicatorText = "\(Int(UIScreen.main.brightness * 100))%"
+                        } else {
+                            gestureLevel = CGFloat(player?.volume ?? 1)
+                            gestureIndicatorText = "\(Int((player?.volume ?? 1) * 100))%"
+                        }
+                        showGestureIndicator = true
                     }
-                    gestureLevel = 0.5
-                    showGestureIndicator = true
                 }
 
                 switch gestureDirection {
                 case .horizontal:
-                    // Seek: 1px ≈ 0.5s
-                    let delta = value.translation.width
-                    let seekSeconds = delta * 0.5
-                    gestureIndicatorText = "\(seekSeconds >= 0 ? "+" : "")\(Int(seekSeconds))s"
-                    if duration > 0 {
-                        let frac = min(max((currentTime + seekSeconds) / duration, 0), 1)
-                        gestureLevel = CGFloat(frac)
-                    }
+                    // Seek: 1px ≈ 0.5s. Only the thumb moves; the seek is
+                    // committed once on release so playback stays smooth.
+                    let target = gestureStartTime + Double(value.translation.width) * 0.5
+                    scrubTime = min(max(target, 0), max(duration, 0))
                 case .verticalLeft:
                     // Brightness: full screen height = full brightness range
                     let height = UIScreen.main.bounds.height
@@ -436,20 +451,15 @@ struct VideoPlayerView: View {
                     break
                 }
             }
-            .onEnded { value in
+            .onEnded { _ in
                 switch gestureDirection {
                 case .horizontal:
-                    if let p = player, let item = p.currentItem {
-                        let seekSeconds = value.translation.width * 0.5
-                        let newTime = p.currentTime().seconds + Double(seekSeconds)
-                        let dur = item.duration.seconds
-                        if dur > 0, !dur.isNaN {
-                            let clamped = min(max(newTime, 0), dur)
-                            currentTime = clamped
-                            p.seek(to: CMTime(seconds: clamped, preferredTimescale: 600),
-                                   toleranceBefore: .zero, toleranceAfter: .zero)
-                        }
-                    }
+                    currentTime = scrubTime
+                    // Default (keyframe) tolerance keeps the resume snappy
+                    // instead of a frozen, hard cut.
+                    player?.seek(to: CMTime(seconds: scrubTime, preferredTimescale: 600))
+                    isScrubbing = false
+                    scheduleHideControls()
                 default:
                     break
                 }
@@ -550,7 +560,7 @@ struct VideoPlayerView: View {
                 } label: {
                     HStack(spacing: 10) {
                         CachedAsyncImage(
-                            url: URL(string: BiliAPI.coverThumb(video.upAvatar, width: 80)),
+                            url: URL(string: BiliAPI.coverThumb(upAvatar.isEmpty ? video.upAvatar : upAvatar, width: 80)),
                             targetSize: CGSize(width: 40, height: 40)
                         ) { img in
                             img.resizable().scaledToFill()
