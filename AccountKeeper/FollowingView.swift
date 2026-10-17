@@ -121,16 +121,16 @@ struct FollowingView: View {
                 VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.12) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.12, scale: 1.0)
+                    .immersive(duration: 0.12)
                     .id(video.id)
                     .zIndex(10)
             }
         }
         .overlay {
             if showingUPSpace, selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.35) })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.3) })
                     .environmentObject(store)
-                    .immersive(duration: 0.35)
+                    .immersive(duration: 0.3)
                     .zIndex(20)
             }
         }

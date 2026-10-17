@@ -39,16 +39,16 @@ struct HomeView: View {
                 VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.12) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.12, scale: 1.0)
+                    .immersive(duration: 0.12)
                     .id(video.id)
                     .zIndex(10)
             }
         }
         .overlay {
             if showingUPSpace, selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.35) })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.3) })
                     .environmentObject(store)
-                    .immersive(duration: 0.35)
+                    .immersive(duration: 0.3)
                     .zIndex(20)
             }
         }
@@ -165,7 +165,12 @@ struct HomeView: View {
                                 selectedVideo = video
                             }
                             .onAppear {
-                                if video.id == videos.last?.id, hasMore, !isLoadingMore {
+                                guard hasMore, !isLoadingMore else { return }
+                                // Pre-load when within the last 4 items so
+                                // scrolling stays continuous — no stop-wait-load
+                                // hitch at the very bottom.
+                                if let idx = videos.firstIndex(where: { $0.id == video.id }),
+                                   idx >= videos.count - 4 {
                                     loadMore()
                                 }
                             }

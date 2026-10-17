@@ -121,16 +121,14 @@ struct PressableCardStyle: ButtonStyle {
 /// While it is presented the bottom tab bar is hidden, and the overlay is laid
 /// out inside the safe area (below the notch, above the home indicator) so its
 /// navigation title is never overlapped by content.
-/// Entrance is a uniform fade + barely-perceptible scale-in. The spring is
-/// slightly overdamped (ζ > 1) so it settles with zero overshoot — no bounce,
-/// no sticky feel. The scale is only 1% so the overlay's edges never visibly
-/// lift off the screen (which would flash the underlying page and feel jumpy).
+/// Entrance: a fast, near-critically-damped spring + 2% scale-in, so it feels
+/// like a smooth full-screen expansion (no edge flash, no bounce, no lag).
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
     var duration: Double = 0.2
-    /// Initial scale (1 = no scale, pure fade). Full-screen black overlays
-    /// (video player) pass 1 so their edges never lift off the screen.
-    var initialScale: CGFloat = 0.99
+    /// Initial scale. 0.98 gives a clear full-screen expansion feel with
+    /// minimal edge peeking; pass 1 for a pure fade.
+    var initialScale: CGFloat = 0.98
     @State private var appeared = false
 
     func body(content: Content) -> some View {
@@ -140,11 +138,11 @@ struct ImmersiveOverlay: ViewModifier {
             .transition(.opacity)
             .onAppear {
                 store.pushImmersive()
-                // Overdamped spring → smooth settle, no oscillation. response is
-                // floored so short durations (e.g. video player) still get a
-                // perceptible, non-snappy fade instead of an instant cut.
-                let curve = Animation.spring(response: max(duration, 0.28),
-                                             dampingFraction: 1.08,
+                // Near-critically-damped spring (ζ≈0.92): settles fast with
+                // essentially no overshoot, so the entrance feels snappy AND
+                // smooth. Low response floor keeps short durations crisp.
+                let curve = Animation.spring(response: max(duration, 0.16),
+                                             dampingFraction: 0.92,
                                              blendDuration: 0)
                 withAnimation(curve) { appeared = true }
             }
@@ -153,14 +151,13 @@ struct ImmersiveOverlay: ViewModifier {
 }
 
 extension View {
-    func immersive(duration: Double = 0.2, scale: CGFloat = 0.99) -> some View {
+    func immersive(duration: Double = 0.2, scale: CGFloat = 0.98) -> some View {
         modifier(ImmersiveOverlay(duration: duration, initialScale: scale))
     }
 }
 
 /// Animates an overlay dismissal so the content fades out instead of cutting.
-/// The fade is floored at 0.18s so even "snappy" overlays (video player) exit
-/// smoothly rather than snapping closed.
+/// Fast exit (0.6× duration, floored at 0.1s) so going back feels instant.
 func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.2) {
-    withAnimation(.easeOut(duration: max(duration * 0.75, 0.18))) { action() }
+    withAnimation(.easeOut(duration: max(duration * 0.6, 0.1))) { action() }
 }

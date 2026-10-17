@@ -56,7 +56,7 @@ struct FavoritesListView: View {
                 VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.12) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.12, scale: 1.0)
+                    .immersive(duration: 0.12)
                     .id(video.id)
                     .zIndex(10)
             }
