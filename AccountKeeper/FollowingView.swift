@@ -118,19 +118,19 @@ struct FollowingView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive { selectedVideo = nil } })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.12) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive()
+                    .immersive(duration: 0.12)
                     .id(video.id)
                     .zIndex(10)
             }
         }
         .overlay {
             if showingUPSpace, selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive { showingUPSpace = false } })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.35) })
                     .environmentObject(store)
-                    .immersive()
+                    .immersive(duration: 0.35)
                     .zIndex(20)
             }
         }

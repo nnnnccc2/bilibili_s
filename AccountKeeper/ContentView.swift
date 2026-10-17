@@ -123,8 +123,11 @@ struct PressableCardStyle: ButtonStyle {
 /// navigation title is never overlapped by content.
 /// Entrance is a short uniform cross-fade (no slide, no sticky feel) and the
 /// caller animates the dismissal so it fades out the same way.
+/// - Parameter duration: entrance/exit fade duration. The video player uses a
+///   short duration (feels instant), the UP space uses a longer one (smooth).
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
+    var duration: Double = 0.2
     @State private var appeared = false
 
     func body(content: Content) -> some View {
@@ -133,19 +136,19 @@ struct ImmersiveOverlay: ViewModifier {
             .transition(.opacity)
             .onAppear {
                 store.pushImmersive()
-                withAnimation(.easeOut(duration: 0.2)) { appeared = true }
+                withAnimation(.easeOut(duration: duration)) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive() -> some View {
-        modifier(ImmersiveOverlay())
+    func immersive(duration: Double = 0.2) -> some View {
+        modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
 /// Animates an overlay dismissal so the content fades out instead of cutting.
-func dismissImmersive(_ action: @escaping () -> Void) {
-    withAnimation(.easeOut(duration: 0.2)) { action() }
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.2) {
+    withAnimation(.easeOut(duration: duration)) { action() }
 }

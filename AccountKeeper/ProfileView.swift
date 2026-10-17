@@ -95,10 +95,10 @@ struct ProfileView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive { selectedVideo = nil } })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.12) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive()
+                    .immersive(duration: 0.12)
                     .zIndex(10)
             }
         }
