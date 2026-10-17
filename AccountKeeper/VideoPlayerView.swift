@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AVFoundation
+import UIKit
 
 struct VideoPlayerView: View {
     @EnvironmentObject var store: AppStore
@@ -52,6 +53,22 @@ struct VideoPlayerView: View {
 
     private enum GestureDirection { case none, horizontal, verticalLeft, verticalRight }
 
+    /// Top safe-area inset (notch / Dynamic Island) so controls & video sit below it.
+    private var topSafeArea: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        guard let ws = scenes.first as? UIWindowScene else { return 0 }
+        let window = ws.windows.first(where: { $0.isKeyWindow }) ?? ws.windows.first
+        return window?.safeAreaInsets.top ?? 0
+    }
+
+    /// Bottom safe-area inset (home indicator) so controls sit above it.
+    private var bottomSafeArea: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        guard let ws = scenes.first as? UIWindowScene else { return 0 }
+        let window = ws.windows.first(where: { $0.isKeyWindow }) ?? ws.windows.first
+        return window?.safeAreaInsets.bottom ?? 0
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             // Dark background so letterbox areas are black, not white
@@ -87,10 +104,11 @@ struct VideoPlayerView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Player (16:9, edge-to-edge)
+                        // Player (16:9). Black spacer keeps it clear of the notch.
                         playerSection
                             .aspectRatio(16.0/9.0, contentMode: .fit)
                             .frame(maxWidth: .infinity)
+                            .padding(.top, topSafeArea)
 
                         // Tabs: 简介 / 评论
                         HStack(spacing: 24) {
@@ -111,7 +129,7 @@ struct VideoPlayerView: View {
                 .background(Color.biliBackground)
                 .scrollIndicators(.hidden)
 
-                // Top controls overlaid on the player (safe-area aware)
+                // Top controls overlaid on the player (below the notch)
                 HStack {
                     Button {
                         if let onDismiss = onDismiss { onDismiss() } else { dismiss() }
@@ -126,7 +144,7 @@ struct VideoPlayerView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 10)
-                .padding(.top, 6)
+                .padding(.top, topSafeArea + 6)
             }
         }
         .onAppear {
@@ -202,7 +220,7 @@ struct VideoPlayerView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 14)
-                    .padding(.top, 6)
+                    .padding(.top, topSafeArea + 6)
 
                     Spacer()
 
@@ -252,7 +270,7 @@ struct VideoPlayerView: View {
                         .padding(.horizontal, 14)
                         .padding(.bottom, 8)
                     }
-                    .padding(.bottom, 10)
+                    .padding(.bottom, bottomSafeArea + 10)
                 }
                 .transition(.opacity)
             }
