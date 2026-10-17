@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: store.immersiveDepth)
+        .animation(.easeOut(duration: 0.18), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -131,12 +131,12 @@ struct PressableCardStyle: ButtonStyle {
 /// removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.3
+    var duration: Double = 0.18
     @State private var appeared = false
 
-    /// 流畅、对称：标准 easeInOut，两端速度连续过渡，没有单向偏置的顿挫。
+    /// 快速响应：缓出曲线，起手即动、立即到位，没有 easeInOut 那种慢慢加速的迟滞。
     private var enterCurve: Animation {
-        .easeInOut(duration: duration)
+        .easeOut(duration: duration)
     }
 
     func body(content: Content) -> some View {
@@ -152,12 +152,12 @@ struct ImmersiveOverlay: ViewModifier {
 }
 
 extension View {
-    func immersive(duration: Double = 0.3) -> some View {
+    func immersive(duration: Double = 0.18) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
 /// Animates an overlay dismissal so it leaves on the same smooth, quiet dissolve.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.26) {
-    withAnimation(.easeInOut(duration: duration)) { action() }
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.16) {
+    withAnimation(.easeOut(duration: duration)) { action() }
 }
