@@ -726,6 +726,41 @@ final class BiliAPI {
         }
     }
 
+    /// PGC seasons (影视 / 番剧) have no regular UP主, so the video list carries no
+    /// avatar. Fetch the season's official owner ("up_info") from the season detail
+    /// so the player can show an avatar instead of a blank circle.
+    func fetchPgcSeasonOwner(seasonId: String, completion: @escaping (UPSpaceInfo?) -> Void) {
+        guard let sid = Int(seasonId), sid > 0 else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        let params: [String: String] = ["season_id": String(sid)]
+        request("https://api.bilibili.com/pgc/view/web/season",
+                params: params, useWBI: false, useAppUA: true,
+                referer: "https://www.bilibili.com/bangumi/play/ss\(sid)") { [weak self] data, _, _ in
+            let info = self?.parsePgcSeasonOwner(data)
+            DispatchQueue.main.async { completion(info) }
+        }
+    }
+
+    func parsePgcSeasonOwner(_ data: Data?) -> UPSpaceInfo? {
+        guard let json = parseJSON(data),
+              let r = json["result"] as? [String: Any],
+              let up = r["up_info"] as? [String: Any],
+              let avatar = up["avatar"] as? String, !avatar.isEmpty else { return nil }
+        return UPSpaceInfo(
+            mid: up["mid"] as? Int ?? 0,
+            name: up["uname"] as? String ?? "",
+            avatar: avatar,
+            sign: "",
+            level: 0,
+            fans: up["follower"] as? Int ?? 0,
+            following: 0,
+            likes: 0,
+            archiveCount: 0
+        )
+    }
+
     /// Fetch a UP主's video list (paginated).
     /// Primary: the app endpoint /x/v2/space/archive with app signing — it never
     /// triggers the web WBI risk-control (-352 / -799) that left most UP主 lists

@@ -45,6 +45,7 @@ struct VideoPlayerView: View {
     @State private var scrubTime: Double = 0
     @State private var gestureStartTime: Double = 0
     @State private var upAvatar: String = ""
+    @State private var upNameOverride: String = ""
     @State private var rateObservation: NSKeyValueObservation?
 
     // Swipe gesture state
@@ -152,6 +153,17 @@ struct VideoPlayerView: View {
                         }
                     }
                 }
+            } else if video.category == "影视" {
+                // PGC seasons have no UP主; use the season's official owner so the
+                // player still shows an avatar and name.
+                BiliAPI.shared.fetchPgcSeasonOwner(seasonId: video.id) { info in
+                    DispatchQueue.main.async {
+                        guard let info = info else { return }
+                        if !info.avatar.isEmpty { upAvatar = info.avatar }
+                        if !info.name.isEmpty { upNameOverride = info.name }
+                        if info.fans > 0 { upFans = info.fans }
+                    }
+                }
             }
             if store.currentUser != nil, video.upMid > 0 {
                 BiliAPI.shared.checkRelation(mid: video.upMid) { following in
@@ -214,34 +226,35 @@ struct VideoPlayerView: View {
         let w = UIScreen.main.bounds.width
         let h = UIScreen.main.bounds.height
         let side = showFullScreen ? min(w, h) : (w * 9.0 / 16.0)
-        return min(max(side / 300.0, 0.72), 1.4)
+        return min(max(side / 330.0, 0.70), 0.90)
     }
 
-    /// Gesture HUD: icon + horizontal level bar (brightness / volume).
+    /// Gesture HUD: icon + thin level bar. Dark, translucent and small so it
+    /// stays a background element rather than competing with the video.
     private var gestureIndicatorView: some View {
         let s = hudScale
         return Group {
             if showGestureIndicator {
-                VStack(spacing: 6 * s) {
+                VStack(spacing: 5 * s) {
                     Image(systemName: gestureSymbol)
-                        .font(.system(size: 18 * s, weight: .medium))
+                        .font(.system(size: 15 * s, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.22)).frame(width: 84 * s, height: max(3, 4 * s))
-                        Capsule().fill(Color.white).frame(width: max(3, 84 * s * gestureLevel), height: max(3, 4 * s))
+                        Capsule().fill(Color.white.opacity(0.18)).frame(width: 68 * s, height: 3)
+                        Capsule().fill(Color.white.opacity(0.65)).frame(width: max(3, 68 * s * gestureLevel), height: 3)
                     }
                     Text(gestureIndicatorText)
-                        .font(.system(size: 12 * s, weight: .semibold))
+                        .font(.system(size: max(10, 11 * s), weight: .medium))
                         .monospacedDigit()
+                        .foregroundStyle(.white.opacity(0.8))
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16 * s)
-                .padding(.vertical, 11 * s)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14 * s, style: .continuous))
+                .padding(.horizontal, 12 * s)
+                .padding(.vertical, 8 * s)
+                .background(Color.black.opacity(0.38), in: RoundedRectangle(cornerRadius: 10 * s, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14 * s, style: .continuous)
-                        .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 10 * s, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(0.22), radius: 8 * s, y: 2 * s)
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
@@ -600,7 +613,7 @@ struct VideoPlayerView: View {
                         .clipShape(Circle())
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(video.upName)
+                            Text(upNameOverride.isEmpty ? video.upName : upNameOverride)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundStyle(.primary)

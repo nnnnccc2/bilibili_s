@@ -176,7 +176,7 @@ struct SearchView: View {
     private var hotKeywordsView: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("哔哩哔哩热搜")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color.secondary)
                 .padding(.horizontal)
             if isLoadingKeywords && hotKeywords.isEmpty {
@@ -189,32 +189,23 @@ struct SearchView: View {
                     .foregroundStyle(Color.secondary)
                     .padding(.horizontal)
             } else {
-                // Two per row ≈ 4/7 of the row width each, shorter rows that wrap
-                // to about 5 lines; smaller text so it stays understated.
+                // Secondary element: plain, understated gray text — two columns
+                // over about 5 rows, no chips or badges to draw the eye.
                 LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8)
-                ], spacing: 8) {
-                    ForEach(Array(hotKeywords.prefix(10).enumerated()), id: \.offset) { index, kw in
+                    GridItem(.flexible(), alignment: .leading),
+                    GridItem(.flexible(), alignment: .leading)
+                ], alignment: .leading, spacing: 12) {
+                    ForEach(Array(hotKeywords.prefix(10).enumerated()), id: \.offset) { _, kw in
                         Button {
                             keyword = kw
                             performSearch()
                         } label: {
-                            HStack(spacing: 6) {
-                                Text("\(index + 1)")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Color.secondary.opacity(0.7))
-                                Text(kw)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Color.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.vertical, 9)
-                            .padding(.horizontal, 10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+                            Text(kw)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.plain)
                     }
