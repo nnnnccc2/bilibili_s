@@ -85,8 +85,8 @@ final class BiliAPI {
         WBISigner.shared.cookieHeader = all.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
     }
 
-    /// Cache of resolved stream URLs keyed by bvid, to make playback near-instant on tap.
-    private var streamURLCache: [String: URL] = [:]
+    /// Cache of resolved playable streams keyed by bvid, so playback is instant on tap.
+    private var streamCache: [String: PlayableStream] = [:]
 
     /// CSRF token (bili_jct) required for POST actions like follow/like/coin.
     var csrf: String { cookies["bili_jct"] ?? "" }
@@ -559,13 +559,23 @@ final class BiliAPI {
         }
     }
 
-    /// Get a playable video stream URL using the Bilibili player API.
-    /// Prefers a progressive mp4 (durl) with muxed audio+video so AVPlayer can play directly.
-    /// Routes by video.category: regular videos use playurl, live rooms use the live
-    /// playurl API, and cinema (PGC) seasons resolve the first episode then playurl.
-    func streamURL(for video: Video, completion: @escaping (URL?) -> Void) {
-        // Return cached URL immediately if available
-        if let cached = streamURLCache[video.id] {
+    /// A playable source for AVPlayer. Bilibili serves two kinds:
+    /// - `.progressive`: a single mp4 with muxed audio+video. Simple, but its
+    ///   moov atom is large (hundreds of KB), so playback takes a while to start.
+    /// - `.dash`: separate video-only + audio-only fMP4 tracks whose init segments
+    ///   are tiny (<1KB), so playback starts almost immediately. AVPlayer can't
+    ///   play DASH directly, so the player muxes the two tracks into an
+    ///   AVMutableComposition.
+    enum PlayableStream {
+        case progressive(URL)
+        case dash(video: URL, audio: URL)
+    }
+
+    /// Resolve a playable stream for the given video, preferring DASH (instant
+    /// start) and falling back to the progressive mp4 when DASH is unavailable.
+    func resolveStream(for video: Video, completion: @escaping (PlayableStream?) -> Void) {
+        // Return the cached stream immediately if available.
+        if let cached = streamCache[video.id] {
             DispatchQueue.main.async { completion(cached) }
             return
         }
@@ -573,36 +583,107 @@ final class BiliAPI {
         switch video.category {
         case "直播":
             requestLivePlayURL(roomId: video.id) { [weak self] url in
-                if let url = url { self?.streamURLCache[video.id] = url }
-                completion(url)
+                let stream = url.map { PlayableStream.progressive($0) }
+                if let stream = stream { self?.streamCache[video.id] = stream }
+                DispatchQueue.main.async { completion(stream) }
             }
         case "影视":
             requestCinemaPlayURL(seasonId: video.id) { [weak self] url in
-                if let url = url { self?.streamURLCache[video.id] = url }
-                completion(url)
+                let stream = url.map { PlayableStream.progressive($0) }
+                if let stream = stream { self?.streamCache[video.id] = stream }
+                DispatchQueue.main.async { completion(stream) }
             }
         default:
-            let cachedCid = video.cid
-            if cachedCid > 0 {
-                // Fast path: cid already known from feed, go straight to playurl
-                requestPlayURL(bvid: video.id, cid: cachedCid) { [weak self] url in
-                    if let url = url { self?.streamURLCache[video.id] = url }
-                    completion(url)
-                }
-                return
-            }
-            // Slow path: fetch detail to get cid first
-            fetchVideoDetail(bvid: video.id) { [weak self] detail in
-                guard let cid = detail?.cid, cid > 0 else {
+            resolveCid(for: video) { [weak self] cid in
+                guard let self = self, cid > 0 else {
                     DispatchQueue.main.async { completion(nil) }
                     return
                 }
-                self?.requestPlayURL(bvid: video.id, cid: cid) { url in
-                    if let url = url { self?.streamURLCache[video.id] = url }
-                    completion(url)
+                // Prefer DASH; fall back to the progressive mp4.
+                self.requestDashPlayURL(bvid: video.id, cid: cid) { dash in
+                    if let dash = dash {
+                        self.streamCache[video.id] = dash
+                        DispatchQueue.main.async { completion(dash) }
+                    } else {
+                        self.requestPlayURL(bvid: video.id, cid: cid) { url in
+                            let stream = url.map { PlayableStream.progressive($0) }
+                            if let stream = stream { self.streamCache[video.id] = stream }
+                            DispatchQueue.main.async { completion(stream) }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    /// Resolve a progressive mp4 URL directly (used as a runtime fallback when a
+    /// DASH composition fails to become playable). Does not touch the cache.
+    func progressiveFallback(for video: Video, completion: @escaping (URL?) -> Void) {
+        if video.category == "直播" || video.category == "影视" {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        resolveCid(for: video) { [weak self] cid in
+            guard let self = self, cid > 0 else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            self.requestPlayURL(bvid: video.id, cid: cid, completion: completion)
+        }
+    }
+
+    /// Resolve the cid for a video — feeds that already carry it skip the request.
+    private func resolveCid(for video: Video, completion: @escaping (Int) -> Void) {
+        if video.cid > 0 {
+            DispatchQueue.main.async { completion(video.cid) }
+            return
+        }
+        fetchVideoDetail(bvid: video.id) { detail in
+            DispatchQueue.main.async { completion(detail?.cid ?? 0) }
+        }
+    }
+
+    /// Fetch the DASH manifest and pick a muxable video + audio pair.
+    private func requestDashPlayURL(bvid: String, cid: Int, completion: @escaping (PlayableStream?) -> Void) {
+        let params: [String: String] = [
+            "bvid": bvid,
+            "cid": String(cid),
+            "qn": "64",
+            "fnval": "16",
+            "fnver": "0",
+            "fourk": "0"
+        ]
+        request("https://api.bilibili.com/x/player/playurl", params: params, referer: "https://www.bilibili.com/") { [weak self] data, _, _ in
+            let stream = self?.parseDash(data)
+            DispatchQueue.main.async { completion(stream) }
+        }
+    }
+
+    /// Pick an H.264 (avc1) video track at up to 720p plus the richest audio
+    /// track. H.264 is chosen over HEVC (hvc1) because AVPlayer's HEVC support
+    /// outside HLS/DASH manifests is unreliable.
+    private func parseDash(_ data: Data?) -> PlayableStream? {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let dash = d["dash"] as? [String: Any] else { return nil }
+        let videos = (dash["video"] as? [[String: Any]]) ?? []
+        let audios = (dash["audio"] as? [[String: Any]]) ?? []
+        let avcPool = videos.filter { ($0["codecs"] as? String)?.hasPrefix("avc") == true }
+        let pool = avcPool.isEmpty ? videos : avcPool
+        let upTo720 = pool.filter { (($0["id"] as? Int) ?? 0) <= 64 }
+        let chosenVideo = upTo720.max { (($0["id"] as? Int) ?? 0) < (($1["id"] as? Int) ?? 0) }
+            ?? pool.min { (($0["id"] as? Int) ?? 0) < (($1["id"] as? Int) ?? 0) }
+        let chosenAudio = audios.max { (($0["bandwidth"] as? Int) ?? 0) < (($1["bandwidth"] as? Int) ?? 0) }
+        guard let vURL = streamURLString(from: chosenVideo),
+              let aURL = streamURLString(from: chosenAudio) else { return nil }
+        return .dash(video: vURL, audio: aURL)
+    }
+
+    private func streamURLString(from rep: [String: Any]?) -> URL? {
+        guard let rep = rep else { return nil }
+        if let s = rep["baseUrl"] as? String, let u = URL(string: s) { return u }
+        if let backups = rep["backupUrl"] as? [String], let s = backups.first, let u = URL(string: s) { return u }
+        return nil
     }
 
     // MARK: - Live stream URL
@@ -712,30 +793,18 @@ final class BiliAPI {
         return nil
     }
 
-    /// Prefetch the stream URL for a video (called when a card appears on screen).
-    /// If the feed didn't provide a cid (e.g. 动态/关注 feeds), we resolve it via
-    /// the detail API first so that a later tap is instant instead of waiting for
-    /// two chained requests. Concurrency is capped to avoid saturating the network.
+    /// Prefetch the playable stream for a video (called when a card appears on
+    /// screen) so a later tap is instant. Concurrency is capped to avoid
+    /// saturating the network.
     private var prefetchInFlight = 0
     private let maxPrefetchInFlight = 8
     func prefetchStreamURL(for video: Video) {
-        guard streamURLCache[video.id] == nil else { return }
+        guard streamCache[video.id] == nil else { return }
         guard prefetchInFlight < maxPrefetchInFlight else { return }
         prefetchInFlight += 1
-        let finish: (URL?) -> Void = { [weak self] url in
-            if let url = url { self?.streamURLCache[video.id] = url }
+        resolveStream(for: video) { [weak self] _ in
+            // resolveStream caches the result itself; just release the slot.
             self?.prefetchInFlight -= 1
-        }
-        if video.cid > 0 {
-            requestPlayURL(bvid: video.id, cid: video.cid, completion: finish)
-        } else {
-            fetchVideoDetail(bvid: video.id) { [weak self] detail in
-                guard let self = self, let cid = detail?.cid, cid > 0 else {
-                    finish(nil)
-                    return
-                }
-                self.requestPlayURL(bvid: video.id, cid: cid, completion: finish)
-            }
         }
     }
 

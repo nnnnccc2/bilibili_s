@@ -49,6 +49,8 @@ struct VideoPlayerView: View {
     @State private var rateObservation: NSKeyValueObservation?
     @State private var statusObservation: NSKeyValueObservation?
     @State private var isReady = false
+    /// Guards the one-shot DASH → progressive fallback so we never build two players.
+    @State private var didFallBack = false
 
     // Swipe gesture state
     @State private var gestureStartX: CGFloat = 0
@@ -189,10 +191,10 @@ struct VideoPlayerView: View {
         }
         .overlay {
             if showingUPSpace, video.upMid > 0 {
-                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.4) })
+                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.5) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.42)
+                    .immersive(duration: 0.45)
                     .zIndex(30)
             }
         }
@@ -750,6 +752,13 @@ struct VideoPlayerView: View {
 
     // MARK: - Player setup
 
+    private var streamHeaders: [String: String] {
+        [
+            "Referer": "https://www.bilibili.com/",
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+        ]
+    }
+
     private func setupPlayer() {
         isBuffering = true
         isReady = false
@@ -762,69 +771,149 @@ struct VideoPlayerView: View {
         } catch {
             print("[BiliBili] AVAudioSession setup failed: \(error)")
         }
-        BiliAPI.shared.streamURL(for: video) { url in
+        BiliAPI.shared.resolveStream(for: video) { stream in
             DispatchQueue.main.async {
                 isBuffering = false
-                guard let url = url else {
+                guard let stream = stream else {
                     // No playable stream (会员专享 / 地区限制 / 接口风控) — surface a
                     // message instead of spinning on a black screen forever.
                     self.toast = "该视频暂时无法播放"
                     return
                 }
-                let headers = [
-                    "Referer": "https://www.bilibili.com/",
-                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
-                ]
-                let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
-                let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 1.0
-                let p = AVPlayer(playerItem: item)
-                // `automaticallyWaitsToMinimizeStalling` is left at its default
-                // (true): disabling it made some streams fail to start / stall
-                // immediately. Reliability first; startup is handled by keeping
-                // the forward buffer small (1.0s) above.
-                p.rate = 1.0
-                self.player = p
-                // Pause any previously-playing video, then play this one.
-                PlayerManager.shared.activate(p)
-                p.play()
-                isPlaying = true
-                showControls = true
-                scheduleHideControls()
-                writeHistoryOnce()
+                self.startPlayback(stream)
+            }
+        }
+    }
 
-                // Observe playback progress (update duration + currentTime).
-                // Skip currentTime while the user is scrubbing so the thumb
-                // follows the finger instead of fighting the playback clock.
-                let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-                p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-                    if !self.isScrubbing {
-                        self.currentTime = time.seconds
+    private func startPlayback(_ stream: BiliAPI.PlayableStream) {
+        switch stream {
+        case .progressive(let url):
+            let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": streamHeaders])
+            attachPlayer(AVPlayerItem(asset: asset), allowFallback: false)
+        case .dash(let videoURL, let audioURL):
+            buildDashItem(videoURL: videoURL, audioURL: audioURL) { item in
+                if let item = item, !self.didFallBack {
+                    self.attachPlayer(item, allowFallback: true)
+                    // Safety net: if the muxed DASH stream never becomes playable,
+                    // fall back to the progressive mp4 instead of leaving a stuck
+                    // black player on screen.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+                        if !self.isReady { self.fallbackToProgressive() }
                     }
-                    if let d = p.currentItem?.duration.seconds, !d.isNaN {
-                        self.duration = d
-                    }
+                } else {
+                    // DASH muxing failed — fall back to the progressive mp4.
+                    self.fallbackToProgressive()
                 }
-                // Playback ended → pause UI
-                NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
-                    self.isPlaying = false
+            }
+        }
+    }
+
+    /// DASH cannot be handed to AVPlayer directly: it ships video and audio as
+    /// two separate fMP4 tracks. Mux them into one AVMutableComposition. Their
+    /// init segments are tiny (<1KB) so playback starts almost immediately,
+    /// unlike the progressive mp4 whose moov atom is hundreds of KB.
+    private func buildDashItem(videoURL: URL, audioURL: URL, completion: @escaping (AVPlayerItem?) -> Void) {
+        let options: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": streamHeaders]
+        let videoAsset = AVURLAsset(url: videoURL, options: options)
+        let audioAsset = AVURLAsset(url: audioURL, options: options)
+        Task {
+            do {
+                let videoTracks = try await videoAsset.loadTracks(withMediaType: .video)
+                let audioTracks = try await audioAsset.loadTracks(withMediaType: .audio)
+                guard let vTrack = videoTracks.first, let aTrack = audioTracks.first else {
+                    await MainActor.run { completion(nil) }
+                    return
                 }
-                // Keep the play/pause icon in sync when this player is paused by
-                // someone else — e.g. PlayerManager pauses it when another video
-                // starts, which previously left the old controls showing "pause".
-                self.rateObservation = p.observe(\.rate, options: [.new]) { player, _ in
-                    DispatchQueue.main.async {
-                        self.isPlaying = player.rate != 0
-                    }
+                let vDuration = try await videoAsset.load(.duration)
+                let aDuration = try await audioAsset.load(.duration)
+                let composition = AVMutableComposition()
+                guard let vComp = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+                      let aComp = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                    await MainActor.run { completion(nil) }
+                    return
                 }
-                // Fade the video in once the asset is actually ready to render,
-                // so playback starts without a hard flash.
-                self.statusObservation = item.observe(\.status, options: [.new]) { observed, _ in
-                    guard observed.status == .readyToPlay else { return }
-                    DispatchQueue.main.async {
-                        withAnimation(.easeIn(duration: 0.25)) { self.isReady = true }
-                    }
+                try vComp.insertTimeRange(CMTimeRange(start: .zero, duration: vDuration), of: vTrack, at: .zero)
+                try aComp.insertTimeRange(CMTimeRange(start: .zero, duration: aDuration), of: aTrack, at: .zero)
+                let item = AVPlayerItem(asset: composition)
+                await MainActor.run { completion(item) }
+            } catch {
+                print("[BiliBili] DASH mux failed: \(error)")
+                await MainActor.run { completion(nil) }
+            }
+        }
+    }
+
+    private func fallbackToProgressive() {
+        guard !didFallBack else { return }
+        didFallBack = true
+        BiliAPI.shared.progressiveFallback(for: video) { url in
+            DispatchQueue.main.async {
+                guard let url = url else {
+                    self.toast = "该视频暂时无法播放"
+                    return
                 }
+                let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": self.streamHeaders])
+                self.attachPlayer(AVPlayerItem(asset: asset))
+            }
+        }
+    }
+
+    /// Attach a ready player item and wire up all observation.
+    /// `allowFallback` is true only for DASH streams — a progressive failure is
+    /// retried with the same kind of URL, which would just loop, so we skip it.
+    private func attachPlayer(_ item: AVPlayerItem, allowFallback: Bool) {
+        item.preferredForwardBufferDuration = 1.0
+        let p = AVPlayer(playerItem: item)
+        // `automaticallyWaitsToMinimizeStalling` is left at its default (true):
+        // disabling it made some streams fail to start / stall immediately.
+        // Reliability first; startup is handled by the small forward buffer above.
+        p.rate = 1.0
+        self.player = p
+        // Pause any previously-playing video, then play this one.
+        PlayerManager.shared.activate(p)
+        p.play()
+        isPlaying = true
+        showControls = true
+        scheduleHideControls()
+        writeHistoryOnce()
+
+        // Observe playback progress (update duration + currentTime). Skip
+        // currentTime while the user is scrubbing so the thumb follows the
+        // finger instead of fighting the playback clock.
+        let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
+        p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            if !self.isScrubbing {
+                self.currentTime = time.seconds
+            }
+            if let d = p.currentItem?.duration.seconds, !d.isNaN {
+                self.duration = d
+            }
+        }
+        // Playback ended → pause UI
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
+            self.isPlaying = false
+        }
+        // Keep the play/pause icon in sync when this player is paused by someone
+        // else — e.g. PlayerManager pauses it when another video starts.
+        self.rateObservation = p.observe(\.rate, options: [.new]) { player, _ in
+            DispatchQueue.main.async {
+                self.isPlaying = player.rate != 0
+            }
+        }
+        // Fade the video in once the asset is ready to render (no hard flash).
+        // If the item fails — e.g. an unplayable DASH composition — fall back.
+        self.statusObservation = item.observe(\.status, options: [.new]) { observed, _ in
+            switch observed.status {
+            case .readyToPlay:
+                DispatchQueue.main.async {
+                    withAnimation(.easeIn(duration: 0.25)) { self.isReady = true }
+                }
+            case .failed:
+                if allowFallback {
+                    DispatchQueue.main.async { self.fallbackToProgressive() }
+                }
+            default:
+                break
             }
         }
     }

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject var store: AppStore
@@ -119,49 +120,42 @@ struct PressableCardStyle: ButtonStyle {
 
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
-/// The overlay sits on an opaque backdrop matching the app page colour, which
-/// snaps in instantly — the page behind is never visible, so there is no white
-/// flash — while the content scales + fades in gently for a smooth, unhurried
-/// entrance. Dismissal fades out the same way.
+/// The overlay slides in from the right — the same motion as a native iOS
+/// navigation push (and what Bilibili's own app uses). A slide never changes
+/// brightness, so there is no white/black flash and the motion never feels
+/// abrupt or jumpy.
+///
+/// The entrance is driven by an internal offset, so it works even when the
+/// call-site doesn't wrap its state change in `withAnimation`; the exit uses a
+/// `.move` removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.5
-    /// `false` = full-screen video (slightly smaller zoom-in); `true` = UP space
-    /// / login / settings.
-    var fadeIn: Bool = true
+    var duration: Double = 0.4
     @State private var appeared = false
 
+    private var screenWidth: CGFloat { UIScreen.main.bounds.width }
+
     func body(content: Content) -> some View {
-        ZStack {
-            // Opaque backdrop matching the page colour (#F5FBFF) so the cross-fade
-            // below is invisible and never exposes whatever page sits behind.
-            Color.biliBackground.ignoresSafeArea()
-            content
-                .opacity(appeared ? 1 : 0)
-                .scaleEffect(appeared ? 1 : (fadeIn ? 0.96 : 0.97))
-        }
-        // Insertion is a no-op (the backdrop must not fade in over the page —
-        // that is what produced the white flash); removal fades out.
-        .transition(.asymmetric(insertion: .identity, removal: .opacity))
-        .onAppear {
-            store.pushImmersive()
-            // Slow, near-critically-damped spring: smooth settle, no bounce, and
-            // no abrupt "pop" on the way in.
-            withAnimation(.spring(response: duration, dampingFraction: 0.95)) {
-                appeared = true
+        content
+            .offset(x: appeared ? 0 : screenWidth)
+            // Insertion is a no-op (the slide is driven by the offset above);
+            // removal slides back out to the right.
+            .transition(.asymmetric(insertion: .identity, removal: .move(edge: .trailing)))
+            .onAppear {
+                store.pushImmersive()
+                withAnimation(.easeOut(duration: duration)) { appeared = true }
             }
-        }
-        .onDisappear { store.popImmersive() }
+            .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.5, fadeIn: Bool = true) -> some View {
-        modifier(ImmersiveOverlay(duration: duration, fadeIn: fadeIn))
+    func immersive(duration: Double = 0.4) -> some View {
+        modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
-/// Animates an overlay dismissal so the content fades out instead of cutting.
+/// Animates an overlay dismissal so it slides out instead of cutting.
 /// Kept a touch slower than a snap so the exit never feels abrupt.
 func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.5) {
     withAnimation(.easeOut(duration: max(duration * 0.8, 0.22))) { action() }

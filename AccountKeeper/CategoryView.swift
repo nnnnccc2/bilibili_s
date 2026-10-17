@@ -159,9 +159,10 @@ struct CategoryView: View {
             }
             .overlay {
                 if let video = selectedVideo {
-                    VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                    VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
                         .environmentObject(store)
                         .ignoresSafeArea()
+                        .immersive()
                         .zIndex(10)
                 }
             }

@@ -36,19 +36,19 @@ struct HomeView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.3) })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.5) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(fadeIn: false)
+                    .immersive()
                     .id(video.id)
                     .zIndex(10)
             }
         }
         .overlay {
             if showingUPSpace, selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.4) })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.5) })
                     .environmentObject(store)
-                    .immersive(duration: 0.42)
+                    .immersive(duration: 0.45)
                     .zIndex(20)
             }
         }
