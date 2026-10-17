@@ -460,13 +460,13 @@ struct VideoPlayerView: View {
                         let isLeft = value.startLocation.x < UIScreen.main.bounds.width / 2
                         gestureDirection = isLeft ? .verticalLeft : .verticalRight
                         gestureStartY = value.startLocation.y
-                        gestureStartVolume = player?.volume ?? 1.0
+                        gestureStartVolume = PlayerManager.shared.volume
                         gestureStartBrightness = UIScreen.main.brightness
                         gestureSymbol = isLeft ? "sun.max.fill" : "speaker.wave.3.fill"
                         if isLeft {
                             gestureLevel = UIScreen.main.brightness
                         } else {
-                            gestureLevel = CGFloat(player?.volume ?? 1)
+                            gestureLevel = CGFloat(PlayerManager.shared.volume)
                         }
                         showGestureIndicator = true
                     }
@@ -490,7 +490,7 @@ struct VideoPlayerView: View {
                     let height = UIScreen.main.bounds.height
                     let delta = Float((gestureStartY - value.location.y) / height)
                     let newVolume = min(max(gestureStartVolume + delta, 0), 1)
-                    player?.volume = newVolume
+                    PlayerManager.shared.setVolume(newVolume)
                     gestureLevel = CGFloat(newVolume)
                 case .none:
                     break
@@ -769,13 +769,12 @@ struct VideoPlayerView: View {
                 ]
                 let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
                 let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 5.0
+                item.preferredForwardBufferDuration = 2.0
                 if #available(iOS 16.0, *) {
                     item.preferredPeakBitRate = 2_000_000
                 }
                 let p = AVPlayer(playerItem: item)
                 p.automaticallyWaitsToMinimizeStalling = true
-                p.volume = 1.0
                 p.rate = 1.0
                 self.player = p
                 // Pause any previously-playing video, then play this one.

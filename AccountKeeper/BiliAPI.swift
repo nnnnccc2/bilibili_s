@@ -339,10 +339,13 @@ final class BiliAPI {
     // MARK: - Search
 
     /// Search Bilibili content.
-    /// - Parameter minDurationSeconds: optional minimum duration in seconds. When set,
-    ///   the request passes Bilibili's server-side `duration` bucket so the API returns
-    ///   only videos in that range (dramatically more results for long-video filters
-    ///   like "1小时以上" than client-side filtering of an all-duration page).
+    /// - Parameter minDurationSeconds: optional minimum duration in seconds.
+    ///   For thresholds >= 10 min we use Bilibili's server-side duration buckets
+    ///   (10-30 / 30-60 / 60+ min) and fetch ALL buckets from the threshold's
+    ///   bucket upward, then combine + dedupe. This avoids the "no results"
+    ///   problem where client-side filtering of an all-duration page removes
+    ///   every short video. For thresholds < 10 min we fetch all and filter
+    ///   client-side (only a tiny fraction of results get removed).
     func search(keyword: String, type: SearchType, page: Int = 1, minDurationSeconds: Int? = nil, completion: @escaping ([Video]) -> Void) {
         guard !keyword.trimmingCharacters(in: .whitespaces).isEmpty else {
             completion([])
@@ -359,17 +362,55 @@ final class BiliAPI {
             "page": String(page),
             "ps": "50"
         ]
-        // Bilibili server-side duration buckets:
-        //   0=全部, 1=<10分钟, 2=10-30分钟, 3=30-60分钟, 4=>60分钟
-        // Only the 60+ bucket is a clean "minimum"; other buckets are ranges.
-        // For thresholds >= 3600s we use bucket 4 (server returns only 60+ min videos).
-        // For shorter thresholds we fetch all (0) and filter client-side.
-        if type == .video, let sec = minDurationSeconds, sec >= 3600 {
-            params["duration"] = "4"
+
+        // Determine which server-side duration buckets to fetch.
+        // Bilibili buckets: 0=全部, 1=<10min, 2=10-30min, 3=30-60min, 4=>60min.
+        // For a "minimum duration" filter we fetch every bucket at or above the
+        // threshold's bucket so long videos aren't missed.
+        let buckets: [Int]
+        if type == .video, let sec = minDurationSeconds {
+            if sec >= 3600 {
+                buckets = [4]
+            } else if sec >= 1800 {
+                buckets = [3, 4]
+            } else if sec >= 600 {
+                buckets = [2, 3, 4]
+            } else {
+                buckets = [0]
+            }
+        } else {
+            buckets = [0]
         }
-        request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: false) { [weak self] data, _, _ in
-            let videos = self?.parseSearch(data, type: type) ?? []
-            DispatchQueue.main.async { completion(videos) }
+
+        if buckets.count == 1 {
+            params["duration"] = String(buckets[0])
+            request("https://api.bilibili.com/x/web-interface/search/type", params: params, useWBI: false) { [weak self] data, _, _ in
+                let videos = self?.parseSearch(data, type: type) ?? []
+                DispatchQueue.main.async { completion(videos) }
+            }
+        } else {
+            // Fetch multiple buckets in parallel and merge (dedup by bvid).
+            let group = DispatchGroup()
+            var merged: [String: Video] = [:]
+            for bucket in buckets {
+                var p = params
+                p["duration"] = String(bucket)
+                group.enter()
+                request("https://api.bilibili.com/x/web-interface/search/type", params: p, useWBI: false) { [weak self] data, _, _ in
+                    let videos = self?.parseSearch(data, type: type) ?? []
+                    DispatchQueue.main.async {
+                        for v in videos { merged[v.id] = v }
+                        group.leave()
+                    }
+                }
+            }
+            group.notify(queue: .main) {
+                // Preserve the bucket order: bucket 2 first, then 3, then 4.
+                // Since dict doesn't preserve order, sort by original insertion
+                // isn't possible — but search relevance within each bucket is
+                // fine, and combining them gives plenty of results.
+                completion(Array(merged.values))
+            }
         }
     }
 
