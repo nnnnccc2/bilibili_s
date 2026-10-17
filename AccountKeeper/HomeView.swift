@@ -196,7 +196,6 @@ struct HomeView: View {
 
     private func loadVideos(force: Bool = false) {
         isLoading = true
-        page = 1
         hasMore = true
         BiliAPI.shared.fetchHome(category: category, page: page) { raw in
             DispatchQueue.main.async {
@@ -236,15 +235,27 @@ struct HomeView: View {
     @Sendable
     private func loadVideosAsync(force: Bool = false) async {
         await withCheckedContinuation { continuation in
-            BiliAPI.shared.fetchHome(category: category, page: 1) { raw in
+            // Pull-to-refresh fetches the *next* batch (not page 1 — page 1
+            // returns byte-identical items for 推荐/热门/直播, verified against
+            // the live API) and replaces the feed with it, so the list visibly
+            // changes. isLoading stays false so the refresh control isn't torn
+            // down mid-refresh.
+            BiliAPI.shared.fetchHome(category: category, page: page) { raw in
                 DispatchQueue.main.async {
                     let filtered = store.applyFilter(raw)
-                    videos = filtered
+                    if !filtered.isEmpty {
+                        rawVideos = raw
+                        videos = filtered
+                        page += 1
+                        hasMore = true
+                    } else {
+                        // Reached the end of the feed — keep the current list
+                        // instead of blanking the screen on a refresh.
+                        hasMore = false
+                    }
                     isLoading = false
                     hasLoadedOnce = true
                     lastRefreshDate = Date()
-                    page = 2
-                    hasMore = !filtered.isEmpty
                     continuation.resume()
                 }
             }
