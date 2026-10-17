@@ -131,34 +131,34 @@ struct PressableCardStyle: ButtonStyle {
 /// scale+opacity removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    /// Base timing for the entrance spring (and the exit, via `dismissImmersive`).
-    var duration: Double = 0.38
+    /// Base timing for both the entrance and the exit.
+    var duration: Double = 0.34
     @State private var appeared = false
 
     func body(content: Content) -> some View {
         content
-            // A deeper start scale (0.90) plus a settling spring gives the
-            // overlay real weight — it rises into place and settles instead of
-            // just "thinning" into view.
+            // Water-like: the overlay is already moving on the first frame and
+            // simply decelerates into place. No spring, so there is no overshoot
+            // or slow settling — it flows in and out instead of "sticking".
             .opacity(appeared ? 1 : 0)
-            .scaleEffect(appeared ? 1 : 0.90)
+            .scaleEffect(appeared ? 1 : 0.95)
             .transition(.asymmetric(insertion: .identity,
-                                    removal: .scale(scale: 0.94).combined(with: .opacity)))
+                                    removal: .scale(scale: 0.96).combined(with: .opacity)))
             .onAppear {
                 store.pushImmersive()
-                withAnimation(.spring(response: duration, dampingFraction: 0.84)) { appeared = true }
+                withAnimation(.easeOut(duration: duration)) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.38) -> some View {
+    func immersive(duration: Double = 0.34) -> some View {
         modifier(ImmersiveOverlay(duration: duration))
     }
 }
 
 /// Animates an overlay dismissal so it fades/shrinks out instead of cutting.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.45) {
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.34) {
     withAnimation(.easeInOut(duration: duration)) { action() }
 }

@@ -159,7 +159,7 @@ struct SearchView: View {
         }
         .overlay {
             if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.5) })
+                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
                     .environmentObject(store)
                     .ignoresSafeArea()
                     .immersive()
@@ -169,9 +169,9 @@ struct SearchView: View {
         }
         .overlay {
             if showingUPSpace {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.5) })
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }) })
                     .environmentObject(store)
-                    .immersive(duration: 0.45)
+                    .immersive()
                     .zIndex(20)
             }
         }

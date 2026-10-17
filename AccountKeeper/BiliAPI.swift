@@ -621,6 +621,13 @@ final class BiliAPI {
         }
     }
 
+    /// DASH playback is OFF. On iOS the split DASH tracks can't be played
+    /// directly — they must be muxed into an `AVMutableComposition`, and that
+    /// muxing cost (CPU + extra track requests during prefetch) made the feed
+    /// heavier to scroll without a perceptible startup gain. A progressive mp4
+    /// starts just as fast and needs no muxing.
+    private let prefersDash = false
+
     /// A playable source for AVPlayer. Bilibili serves two kinds:
     /// - `.progressive`: a single mp4 with muxed audio+video. Simple, but its
     ///   moov atom is large (hundreds of KB), so playback takes a while to start.
@@ -637,8 +644,8 @@ final class BiliAPI {
         case asset(AVAsset)
     }
 
-    /// Resolve a playable stream for the given video, preferring DASH (instant
-    /// start) and falling back to the progressive mp4 when DASH is unavailable.
+    /// Resolve a playable stream for the given video. Progressive mp4 is the
+    /// default path (see `prefersDash`); live and cinema have their own URLs.
     func resolveStream(for video: Video, completion: @escaping (PlayableStream?) -> Void) {
         // Return the cached stream immediately if available.
         if let cached = streamCache[video.id] {
@@ -665,18 +672,24 @@ final class BiliAPI {
                     DispatchQueue.main.async { completion(nil) }
                     return
                 }
-                // Prefer DASH; fall back to the progressive mp4.
+                let loadProgressive = {
+                    self.requestPlayURL(bvid: video.id, cid: cid) { url in
+                        let stream = url.map { PlayableStream.progressive($0) }
+                        if let stream = stream { self.cacheStream(stream, for: video.id) }
+                        DispatchQueue.main.async { completion(stream) }
+                    }
+                }
+                guard self.prefersDash else {
+                    loadProgressive()
+                    return
+                }
+                // DASH path (kept behind `prefersDash`): fetch the split tracks
+                // and mux them into a ready composition during prefetch.
                 self.requestDashPlayURL(bvid: video.id, cid: cid) { dash in
                     guard let dash = dash, case let .dash(vURL, aURL) = dash else {
-                        self.requestPlayURL(bvid: video.id, cid: cid) { url in
-                            let stream = url.map { PlayableStream.progressive($0) }
-                            if let stream = stream { self.cacheStream(stream, for: video.id) }
-                            DispatchQueue.main.async { completion(stream) }
-                        }
+                        loadProgressive()
                         return
                     }
-                    // Mux into a ready-to-play composition now (during prefetch) so
-                    // the actual tap doesn't pay the muxing cost.
                     self.buildDashComposition(videoURL: vURL, audioURL: aURL,
                                               knownSeconds: Double(max(video.duration, 0))) { asset in
                         let stream: PlayableStream = asset.map { .asset($0) } ?? dash
@@ -914,7 +927,7 @@ final class BiliAPI {
     /// screen) so a later tap is instant. Concurrency is capped to avoid
     /// saturating the network.
     private var prefetchInFlight = 0
-    private let maxPrefetchInFlight = 10
+    private let maxPrefetchInFlight = 6
     func prefetchStreamURL(for video: Video) {
         guard streamCache[video.id] == nil else { return }
         guard prefetchInFlight < maxPrefetchInFlight else { return }
