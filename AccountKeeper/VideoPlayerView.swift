@@ -753,34 +753,36 @@ struct VideoPlayerView: View {
     private func setupPlayer() {
         isBuffering = true
         isReady = false
-        // Configure the audio session OFF the main thread — activating it can
-        // block for a moment and would otherwise stall the player setup / UI.
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
-                try AVAudioSession.sharedInstance().setActive(true, options: [])
-            } catch {
-                print("[BiliBili] AVAudioSession setup failed: \(error)")
-            }
+        // Activate the audio session BEFORE building the player — AVPlayer needs
+        // it active to start reliably, so keep this on the main thread (doing it
+        // asynchronously raced with playback and made some videos never start).
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+        } catch {
+            print("[BiliBili] AVAudioSession setup failed: \(error)")
         }
         BiliAPI.shared.streamURL(for: video) { url in
             DispatchQueue.main.async {
                 isBuffering = false
-                guard let url = url else { return }
+                guard let url = url else {
+                    // No playable stream (会员专享 / 地区限制 / 接口风控) — surface a
+                    // message instead of spinning on a black screen forever.
+                    self.toast = "该视频暂时无法播放"
+                    return
+                }
                 let headers = [
                     "Referer": "https://www.bilibili.com/",
                     "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
                 ]
                 let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
                 let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 0.5
-                if #available(iOS 16.0, *) {
-                    item.preferredPeakBitRate = 2_000_000
-                }
+                item.preferredForwardBufferDuration = 1.0
                 let p = AVPlayer(playerItem: item)
-                // Start playback as soon as possible instead of waiting for a large
-                // buffer — this trims a couple of seconds off the "loading" gap.
-                p.automaticallyWaitsToMinimizeStalling = false
+                // `automaticallyWaitsToMinimizeStalling` is left at its default
+                // (true): disabling it made some streams fail to start / stall
+                // immediately. Reliability first; startup is handled by keeping
+                // the forward buffer small (1.0s) above.
                 p.rate = 1.0
                 self.player = p
                 // Pause any previously-playing video, then play this one.

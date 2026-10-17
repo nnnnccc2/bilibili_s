@@ -119,56 +119,50 @@ struct PressableCardStyle: ButtonStyle {
 
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
-/// `fadeIn == true`: a plain fade (login / settings / UP space).
-/// `fadeIn == false`: full-screen video — an opaque black backdrop snaps in
-/// instantly (so the page behind never shows, avoiding any flash) and the
-/// player content unfolds with a smooth scale + fade on top of it.
+/// The overlay sits on an opaque backdrop matching the app page colour, which
+/// snaps in instantly — the page behind is never visible, so there is no white
+/// flash — while the content scales + fades in gently for a smooth, unhurried
+/// entrance. Dismissal fades out the same way.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.3
-    /// `false` = full-screen video player. An opaque black backdrop snaps in
-    /// instantly so the page behind is never visible (no flash); the player
-    /// content then does a smooth scale + fade entrance over that backdrop.
-    /// Black over black means the fade is invisible, yet the entrance still reads
-    /// as a smooth full-screen unfold.
-    /// `true` = login / settings / UP space: a plain (slower) fade.
+    var duration: Double = 0.5
+    /// `false` = full-screen video (slightly smaller zoom-in); `true` = UP space
+    /// / login / settings.
     var fadeIn: Bool = true
     @State private var appeared = false
 
     func body(content: Content) -> some View {
-        Group {
-            if fadeIn {
-                content.opacity(appeared ? 1 : 0)
-            } else {
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    content
-                        .opacity(appeared ? 1 : 0)
-                        .scaleEffect(appeared ? 1 : 0.94)
-                }
-            }
+        ZStack {
+            // Opaque backdrop matching the page colour (#F5FBFF) so the cross-fade
+            // below is invisible and never exposes whatever page sits behind.
+            Color.biliBackground.ignoresSafeArea()
+            content
+                .opacity(appeared ? 1 : 0)
+                .scaleEffect(appeared ? 1 : (fadeIn ? 0.96 : 0.97))
         }
-        // Insertion is a no-op (the backdrop must never fade in over the page);
-        // removal fades out.
+        // Insertion is a no-op (the backdrop must not fade in over the page —
+        // that is what produced the white flash); removal fades out.
         .transition(.asymmetric(insertion: .identity, removal: .opacity))
         .onAppear {
             store.pushImmersive()
-            let curve: Animation = fadeIn
-                ? .easeOut(duration: duration)
-                : .spring(response: 0.36, dampingFraction: 0.9)
-            withAnimation(curve) { appeared = true }
+            // Slow, near-critically-damped spring: smooth settle, no bounce, and
+            // no abrupt "pop" on the way in.
+            withAnimation(.spring(response: duration, dampingFraction: 0.95)) {
+                appeared = true
+            }
         }
         .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.3, fadeIn: Bool = true) -> some View {
+    func immersive(duration: Double = 0.5, fadeIn: Bool = true) -> some View {
         modifier(ImmersiveOverlay(duration: duration, fadeIn: fadeIn))
     }
 }
 
 /// Animates an overlay dismissal so the content fades out instead of cutting.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.2) {
-    withAnimation(.easeOut(duration: max(duration * 0.6, 0.15))) { action() }
+/// Kept a touch slower than a snap so the exit never feels abrupt.
+func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.5) {
+    withAnimation(.easeOut(duration: max(duration * 0.8, 0.22))) { action() }
 }

@@ -740,17 +740,31 @@ final class BiliAPI {
     }
 
     private func requestPlayURL(bvid: String, cid: Int, completion: @escaping (URL?) -> Void) {
+        // 720p first, then step down. Some videos simply don't offer 720p (or a
+        // request gets rate-limited) — previously those came back empty and the
+        // player never started.
+        attemptPlayURL(bvid: bvid, cid: cid, qns: [64, 32, 16], completion: completion)
+    }
+
+    private func attemptPlayURL(bvid: String, cid: Int, qns: [Int], completion: @escaping (URL?) -> Void) {
+        guard let qn = qns.first else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
         let params: [String: String] = [
             "bvid": bvid,
             "cid": String(cid),
-            "qn": "64",
+            "qn": String(qn),
             "fnval": "0",
             "fnver": "0",
             "fourk": "0"
         ]
         request("https://api.bilibili.com/x/player/playurl", params: params, referer: "https://www.bilibili.com/") { [weak self] data, _, _ in
-            let url = self?.parsePlayURL(data)
-            DispatchQueue.main.async { completion(url) }
+            if let url = self?.parsePlayURL(data) {
+                DispatchQueue.main.async { completion(url) }
+            } else {
+                self?.attemptPlayURL(bvid: bvid, cid: cid, qns: Array(qns.dropFirst()), completion: completion)
+            }
         }
     }
 
@@ -1527,17 +1541,13 @@ private extension BiliAPI {
     func parsePlayURL(_ data: Data?) -> URL? {
         guard let json = parseJSON(data),
               let d = json["data"] as? [String: Any] else { return nil }
-        // Prefer durl: progressive mp4/flv with muxed audio+video (AVPlayer-friendly)
+        // Only use `durl`: a progressive mp4 with muxed audio+video, which is what
+        // AVPlayer can actually play. The DASH fallback used to return a
+        // video-only fMP4 base URL that AVPlayer cannot play (or plays with no
+        // audio / stalls), which is what made some videos "unplayable".
         if let durl = d["durl"] as? [[String: Any]],
            let first = durl.first,
            let url = first["url"] as? String {
-            return URL(string: url)
-        }
-        // Fallback: DASH (video only, no separate audio muxing in AVPlayer)
-        if let dash = d["dash"] as? [String: Any],
-           let videoArr = dash["video"] as? [[String: Any]],
-           let video = videoArr.first,
-           let url = video["baseUrl"] as? String {
             return URL(string: url)
         }
         return nil
