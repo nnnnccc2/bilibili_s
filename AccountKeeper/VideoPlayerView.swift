@@ -45,6 +45,7 @@ struct VideoPlayerView: View {
     @State private var scrubTime: Double = 0
     @State private var gestureStartTime: Double = 0
     @State private var upAvatar: String = ""
+    @State private var rateObservation: NSKeyValueObservation?
 
     // Swipe gesture state
     @State private var gestureStartX: CGFloat = 0
@@ -95,9 +96,13 @@ struct VideoPlayerView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Player (16:9). The ScrollView already leaves the notch
-                        // area clear; no extra top padding so the video sits flush
-                        // against the bottom of the notch.
+                        // Explicit notch-height spacer: the ScrollView ignores the
+                        // top safe area, so this places the video exactly at the
+                        // bottom edge of the notch (never under it, no gap).
+                        Color.black
+                            .frame(height: topSafeArea)
+                            .frame(maxWidth: .infinity)
+
                         playerSection
                             .aspectRatio(16.0/9.0, contentMode: .fit)
                             .frame(maxWidth: .infinity)
@@ -120,6 +125,7 @@ struct VideoPlayerView: View {
                 }
                 .background(Color.biliBackground)
                 .scrollIndicators(.hidden)
+                .ignoresSafeArea(edges: .top)
             }
         }
         .overlay(alignment: .top) {
@@ -130,7 +136,6 @@ struct VideoPlayerView: View {
                     .frame(height: topSafeArea)
                     .frame(maxWidth: .infinity)
                     .allowsHitTesting(false)
-                    .ignoresSafeArea(edges: .top)
             }
         }
         .onAppear {
@@ -157,6 +162,8 @@ struct VideoPlayerView: View {
         .onDisappear {
             // Pause & release this player when leaving; PlayerManager ensures
             // switching to another video pauses the previous one.
+            rateObservation?.invalidate()
+            rateObservation = nil
             if let p = player {
                 p.pause()
                 PlayerManager.shared.deactivate(p)
@@ -201,30 +208,40 @@ struct VideoPlayerView: View {
             .gesture(playerGesture)
     }
 
+    /// Scale the gesture HUD with the size of the playback area, so the card
+    /// stays proportionate in the small inline player and on the full screen.
+    private var hudScale: CGFloat {
+        let w = UIScreen.main.bounds.width
+        let h = UIScreen.main.bounds.height
+        let side = showFullScreen ? min(w, h) : (w * 9.0 / 16.0)
+        return min(max(side / 300.0, 0.72), 1.4)
+    }
+
     /// Gesture HUD: icon + horizontal level bar (brightness / volume).
     private var gestureIndicatorView: some View {
-        Group {
+        let s = hudScale
+        return Group {
             if showGestureIndicator {
-                VStack(spacing: 6) {
+                VStack(spacing: 6 * s) {
                     Image(systemName: gestureSymbol)
-                        .font(.system(size: 17, weight: .medium))
+                        .font(.system(size: 18 * s, weight: .medium))
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.22)).frame(width: 76, height: 4)
-                        Capsule().fill(Color.white).frame(width: max(4, 76 * gestureLevel), height: 4)
+                        Capsule().fill(Color.white.opacity(0.22)).frame(width: 84 * s, height: max(3, 4 * s))
+                        Capsule().fill(Color.white).frame(width: max(3, 84 * s * gestureLevel), height: max(3, 4 * s))
                     }
                     Text(gestureIndicatorText)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12 * s, weight: .semibold))
                         .monospacedDigit()
                 }
                 .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 16 * s)
+                .padding(.vertical, 11 * s)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14 * s, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14 * s, style: .continuous)
                         .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(0.22), radius: 8, y: 2)
+                .shadow(color: .black.opacity(0.22), radius: 8 * s, y: 2 * s)
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
@@ -342,12 +359,18 @@ struct VideoPlayerView: View {
                         scrubTime = min(max(value.location.x / w, 0), 1) * duration
                     }
                     .onEnded { value in
-                        guard duration > 0 else { isScrubbing = false; return }
+                        guard duration > 0, let p = player else { isScrubbing = false; return }
                         let t = min(max(value.location.x / w, 0), 1) * duration
-                        currentTime = t
-                        // Default (keyframe) tolerance → snappy, non-jarring seek.
-                        player?.seek(to: CMTime(seconds: t, preferredTimescale: 600))
-                        isScrubbing = false
+                        scrubTime = t
+                        // Keep isScrubbing while the seek is in flight so the
+                        // periodic observer can't bounce the thumb back to the
+                        // old position before the seek lands.
+                        p.seek(to: CMTime(seconds: t, preferredTimescale: 600)) { _ in
+                            DispatchQueue.main.async {
+                                currentTime = t
+                                isScrubbing = false
+                            }
+                        }
                         scheduleHideControls()
                     }
             )
@@ -454,12 +477,18 @@ struct VideoPlayerView: View {
             .onEnded { _ in
                 switch gestureDirection {
                 case .horizontal:
-                    currentTime = scrubTime
-                    // Default (keyframe) tolerance keeps the resume snappy
-                    // instead of a frozen, hard cut.
-                    player?.seek(to: CMTime(seconds: scrubTime, preferredTimescale: 600))
-                    isScrubbing = false
-                    scheduleHideControls()
+                    if let p = player {
+                        let t = scrubTime
+                        p.seek(to: CMTime(seconds: t, preferredTimescale: 600)) { _ in
+                            DispatchQueue.main.async {
+                                currentTime = t
+                                isScrubbing = false
+                            }
+                        }
+                        scheduleHideControls()
+                    } else {
+                        isScrubbing = false
+                    }
                 default:
                     break
                 }
@@ -749,6 +778,14 @@ struct VideoPlayerView: View {
                 // Playback ended → pause UI
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
                     self.isPlaying = false
+                }
+                // Keep the play/pause icon in sync when this player is paused by
+                // someone else — e.g. PlayerManager pauses it when another video
+                // starts, which previously left the old controls showing "pause".
+                self.rateObservation = p.observe(\.rate, options: [.new]) { player, _ in
+                    DispatchQueue.main.async {
+                        self.isPlaying = player.rate != 0
+                    }
                 }
             }
         }

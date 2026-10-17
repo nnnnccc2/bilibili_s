@@ -189,16 +189,34 @@ struct SearchView: View {
                     .foregroundStyle(Color.secondary)
                     .padding(.horizontal)
             } else {
-                FlowLayout(spacing: 8) {
-                    ForEach(hotKeywords, id: \.self) { kw in
+                // Two per row ≈ 4/7 of the row width each, shorter rows that wrap
+                // to about 5 lines; smaller text so it stays understated.
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8)
+                ], spacing: 8) {
+                    ForEach(Array(hotKeywords.prefix(10).enumerated()), id: \.offset) { index, kw in
                         Button {
                             keyword = kw
                             performSearch()
                         } label: {
-                            Text(kw)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color.secondary)
+                            HStack(spacing: 6) {
+                                Text("\(index + 1)")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color.secondary.opacity(0.7))
+                                Text(kw)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 9)
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal)
@@ -343,7 +361,7 @@ struct SearchView: View {
     private func loadHotKeywords() {
         guard hotKeywords.isEmpty else { return }
         isLoadingKeywords = true
-        BiliAPI.shared.fetchTrendingKeywords(limit: 6) { keywords in
+        BiliAPI.shared.fetchTrendingKeywords(limit: 10) { keywords in
             DispatchQueue.main.async {
                 hotKeywords = keywords
                 isLoadingKeywords = false
