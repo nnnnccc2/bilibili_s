@@ -727,13 +727,33 @@ final class BiliAPI {
     }
 
     /// Fetch a UP主's video list (paginated).
-    /// Uses web endpoint /x/space/wbi/arc/search with WBI signing + buvid3 cookie.
-    /// Stable code=0 and supports pn pagination. Forces WBI key refresh on retries.
+    /// Primary: the app endpoint /x/v2/space/archive with app signing — it never
+    /// triggers the web WBI risk-control (-352 / -799) that left most UP主 lists
+    /// blank, returns code=0 reliably, and supports pn/ps pagination. Falls back
+    /// to the web WBI endpoint when the app endpoint yields nothing.
     func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
-        fetchUPVideos(mid: mid, page: page, pageSize: pageSize, retry: 4, completion: completion)
+        let params: [String: String] = [
+            "vmid": String(mid),
+            "ps": String(pageSize),
+            "pn": String(page),
+            "order": "pubdate",
+            "mobi_app": "android",
+            "platform": "android",
+            "build": "7540000"
+        ]
+        request("https://app.bilibili.com/x/v2/space/archive",
+                params: params, useAppSign: true, useAppUA: true) { [weak self] data, _, _ in
+            let (videos, total) = self?.parseUPVideosApp(data, mid: mid) ?? ([], 0)
+            if !videos.isEmpty {
+                DispatchQueue.main.async { completion(videos, total) }
+            } else {
+                // App endpoint gave nothing — try the web WBI endpoint as backup.
+                self?.fetchUPVideosWBI(mid: mid, page: page, pageSize: pageSize, retry: 4, completion: completion)
+            }
+        }
     }
 
-    private func fetchUPVideos(mid: Int, page: Int, pageSize: Int, retry: Int, completion: @escaping ([Video], Int) -> Void) {
+    private func fetchUPVideosWBI(mid: Int, page: Int, pageSize: Int, retry: Int, completion: @escaping ([Video], Int) -> Void) {
         let params: [String: String] = [
             "mid": String(mid),
             "ps": String(pageSize),
@@ -750,7 +770,7 @@ final class BiliAPI {
             print("[BiliBili] fetchUPVideos mid=\(mid) page=\(page) retry=\(retry) code=\(code) msg=\(msg) count=\(videos.count)")
             if videos.isEmpty && retry > 0 {
                 DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
-                    self?.fetchUPVideos(mid: mid, page: page, pageSize: pageSize, retry: retry - 1, completion: completion)
+                    self?.fetchUPVideosWBI(mid: mid, page: page, pageSize: pageSize, retry: retry - 1, completion: completion)
                 }
             } else {
                 DispatchQueue.main.async { completion(videos, total) }
@@ -1301,6 +1321,37 @@ private extension BiliAPI {
     func parseUPVideos(_ data: Data?) -> ([Video], Int) {
         let (v, t, _, _) = parseUPVideosDebug(data)
         return (v, t)
+    }
+
+    /// Parse the app endpoint /x/v2/space/archive/cursor response (data.item[]).
+    /// Fields: title / cover / duration(sec) / play / danmaku / ctime / author / bvid / first_cid.
+    func parseUPVideosApp(_ data: Data?, mid: Int) -> ([Video], Int) {
+        guard let json = parseJSON(data),
+              let d = json["data"] as? [String: Any],
+              let items = d["item"] as? [[String: Any]] else { return ([], 0) }
+        let total = d["count"] as? Int ?? items.count
+        let videos = items.compactMap { item -> Video? in
+            guard let bvid = item["bvid"] as? String,
+                  let title = item["title"] as? String else { return nil }
+            let dur = item["duration"] as? Int ?? 0
+            return Video(
+                id: bvid,
+                title: title,
+                cover: BiliAPI.coverURL(item["cover"] as? String ?? ""),
+                duration: dur > 0 ? dur : parseDuration(item["length"] as? String ?? "0"),
+                upName: item["author"] as? String ?? "",
+                upMid: mid,
+                upAvatar: "",
+                views: item["play"] as? Int ?? 0,
+                danmaku: item["danmaku"] as? Int ?? 0,
+                publishTime: formatTime(item["ctime"] as? Int ?? 0),
+                category: item["tname"] as? String ?? "",
+                desc: "",
+                likes: 0, coins: 0, favorites: 0, shares: 0,
+                cid: item["first_cid"] as? Int ?? 0
+            )
+        }
+        return (videos, total > 0 ? total : videos.count)
     }
 
     func parsePlayURL(_ data: Data?) -> URL? {
