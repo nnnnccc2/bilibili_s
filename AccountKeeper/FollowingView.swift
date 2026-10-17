@@ -121,7 +121,7 @@ struct FollowingView: View {
                 VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.2) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.26, scale: 1.0)
+                    .immersive(fadeIn: false)
                     .id(video.id)
                     .zIndex(10)
             }
@@ -130,7 +130,7 @@ struct FollowingView: View {
             if showingUPSpace, selectedUPMid > 0 {
                 UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.24) })
                     .environmentObject(store)
-                    .immersive(duration: 0.24)
+                    .immersive(duration: 0.32)
                     .zIndex(20)
             }
         }

@@ -192,7 +192,7 @@ struct VideoPlayerView: View {
                 UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.24) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.24)
+                    .immersive(duration: 0.32)
                     .zIndex(30)
             }
         }
@@ -769,12 +769,14 @@ struct VideoPlayerView: View {
                 ]
                 let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
                 let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 2.0
+                item.preferredForwardBufferDuration = 1.0
                 if #available(iOS 16.0, *) {
                     item.preferredPeakBitRate = 2_000_000
                 }
                 let p = AVPlayer(playerItem: item)
-                p.automaticallyWaitsToMinimizeStalling = true
+                // Start playback as soon as possible instead of waiting for a large
+                // buffer — this trims a couple of seconds off the "loading" gap.
+                p.automaticallyWaitsToMinimizeStalling = false
                 p.rate = 1.0
                 self.player = p
                 // Pause any previously-playing video, then play this one.

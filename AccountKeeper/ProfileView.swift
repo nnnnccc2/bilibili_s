@@ -98,7 +98,7 @@ struct ProfileView: View {
                 VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.2) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.26, scale: 1.0)
+                    .immersive(fadeIn: false)
                     .zIndex(10)
             }
         }

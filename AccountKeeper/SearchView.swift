@@ -93,32 +93,31 @@ struct SearchView: View {
                     .padding(.vertical, 8)
                 }
 
-                // Duration filter chips — VIDEO search only. User results have no
-                // duration, so the filter is meaningless there and hiding it
-                // prevents the "点击时长→没有匹配内容" bug.
-                if searchType == .video {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(Array(FilterSettings.searchDurationOptions.enumerated()), id: \.offset) { index, opt in
-                                Button {
-                                    selectedDurationIndex = index
-                                    let seconds = opt.seconds
-                                    store.settings.searchMinDurationSeconds = seconds
-                                    if hasSearched { performSearch() }
-                                } label: {
-                                    Text(opt.label)
-                                        .font(.caption)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 5)
-                                        .background(selectedDurationIndex == index ? Color.biliBlue : Color(.secondarySystemBackground))
-                                        .foregroundStyle(selectedDurationIndex == index ? .white : .primary)
-                                        .clipShape(Capsule())
-                                }
+                // Duration filter chips. Shown for both video and user search; for
+                // user search a tap is simply a no-op (user results carry no
+                // duration, so a duration filter is meaningless there).
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(FilterSettings.searchDurationOptions.enumerated()), id: \.offset) { index, opt in
+                            Button {
+                                guard searchType == .video else { return }
+                                selectedDurationIndex = index
+                                let seconds = opt.seconds
+                                store.settings.searchMinDurationSeconds = seconds
+                                if hasSearched { performSearch() }
+                            } label: {
+                                Text(opt.label)
+                                    .font(.caption)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 5)
+                                    .background(selectedDurationIndex == index ? Color.biliBlue : Color(.secondarySystemBackground))
+                                    .foregroundStyle(selectedDurationIndex == index ? .white : .primary)
+                                    .clipShape(Capsule())
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom, 8)
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 }
 
                 Divider()
@@ -163,7 +162,7 @@ struct SearchView: View {
                 VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }, duration: 0.2) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive(duration: 0.26, scale: 1.0)
+                    .immersive(fadeIn: false)
                     .id(video.id)
                     .zIndex(10)
             }
@@ -172,7 +171,7 @@ struct SearchView: View {
             if showingUPSpace {
                 UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }, duration: 0.24) })
                     .environmentObject(store)
-                    .immersive(duration: 0.24)
+                    .immersive(duration: 0.32)
                     .zIndex(20)
             }
         }

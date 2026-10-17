@@ -71,9 +71,11 @@ final class BiliAPI {
         didSet { saveCookies() }
     }
 
-    /// Visitor cookies (buvid3, buvid4, b_nut) fetched on launch; not persisted.
+    /// Visitor cookies (buvid3, buvid4, b_nut). Persisted so a real server-issued
+    /// set survives launches — Bilibili's search endpoint returns a risk-control
+    /// HTML page (→ empty "没有匹配内容") when buvid3/buvid4 are missing.
     private var visitorCookies: [String: String] = [:] {
-        didSet { syncWBISignerCookie() }
+        didSet { syncWBISignerCookie(); saveVisitorCookies() }
     }
 
     /// Keep WBISigner's cookie in sync so its nav/key fetch carries buvid3.
@@ -94,10 +96,20 @@ final class BiliAPI {
         config.httpCookieStorage = nil
         self.session = URLSession(configuration: config)
         loadCookies()
-        // Set a locally-generated buvid3 IMMEDIATELY so the first API call
-        // (popular/live/cinema/search return -352 风控 without it) always has one.
-        // The real one from finger/spi overwrites it once fetched.
-        visitorCookies["buvid3"] = Self.generateBuvid3()
+        loadVisitorCookies()
+        // Ensure a full visitor-cookie set exists IMMEDIATELY so the first API call
+        // we make (search / popular / live / cinema return a risk-control page
+        // without buvid3+buvid4) always carries one. Real values from finger/spi
+        // overwrite these synthetic fallbacks once fetched.
+        if (visitorCookies["buvid3"] ?? "").isEmpty {
+            visitorCookies["buvid3"] = Self.generateBuvid3()
+        }
+        if (visitorCookies["buvid4"] ?? "").isEmpty {
+            visitorCookies["buvid4"] = Self.generateBuvid4()
+        }
+        if (visitorCookies["b_nut"] ?? "").isEmpty {
+            visitorCookies["b_nut"] = String(Int(Date().timeIntervalSince1970))
+        }
         fetchBuvid3()
     }
 
@@ -122,30 +134,48 @@ final class BiliAPI {
         return "\(uuid)\(ts)infoc"
     }
 
-    /// Fetch buvid3/buvid4 visitor IDs required by anti-bot checks.
-    /// Retries up to 3 times on failure.
-    private func fetchBuvid3(retry: Int = 3) {
-        guard let url = URL(string: "https://api.bilibili.com/x/frontend/finger/spi") else { return }
+    /// Synthetic buvid4 fallback in Bilibili's format. Used only until the real
+    /// one arrives from finger/spi.
+    private static func generateBuvid4() -> String {
+        let hex = "0123456789ABCDEF"
+        func rand(_ n: Int) -> String {
+            String((0..<n).map { _ in hex.randomElement()! })
+        }
+        let uuid = "\(rand(8))-\(rand(4))-\(rand(4))-\(rand(4))-\(rand(12))"
+        let ts = String(Int(Date().timeIntervalSince1970))
+        return "\(uuid)\(ts)-\(rand(7))-\(rand(10))"
+    }
+
+    /// Fetch real buvid3/buvid4 visitor IDs required by anti-bot checks.
+    /// Retries up to `retry` times on failure. When `completion` is supplied it is
+    /// always called exactly once (on the main queue) after the fetch finishes —
+    /// used to retry a request that hit a risk-control page.
+    private func fetchBuvid3(retry: Int = 3, completion: (() -> Void)? = nil) {
+        guard let url = URL(string: "https://api.bilibili.com/x/frontend/finger/spi") else {
+            DispatchQueue.main.async { completion?() }
+            return
+        }
         var req = URLRequest(url: url)
         for (k, v) in baseHeaders { req.setValue(v, forHTTPHeaderField: k) }
         session.dataTask(with: req) { [weak self] data, _, error in
             guard let self = self else { return }
-            if error != nil {
+            let retryLater: (() -> Void) = {
                 if retry > 0 {
                     DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                        self.fetchBuvid3(retry: retry - 1)
+                        self.fetchBuvid3(retry: retry - 1, completion: completion)
                     }
+                } else {
+                    DispatchQueue.main.async { completion?() }
                 }
+            }
+            if error != nil {
+                retryLater()
                 return
             }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let d = json["data"] as? [String: Any] else {
-                if retry > 0 {
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                        self.fetchBuvid3(retry: retry - 1)
-                    }
-                }
+                retryLater()
                 return
             }
             let b3 = d["b_3"] as? String
@@ -153,6 +183,7 @@ final class BiliAPI {
             DispatchQueue.main.async {
                 if let b3 = b3, !b3.isEmpty { self.visitorCookies["buvid3"] = b3 }
                 if let b4 = b4, !b4.isEmpty { self.visitorCookies["buvid4"] = b4 }
+                completion?()
             }
         }.resume()
     }
@@ -165,6 +196,16 @@ final class BiliAPI {
 
     private func saveCookies() {
         UserDefaults.standard.set(cookies, forKey: "BiliBili.cookies")
+    }
+
+    private func loadVisitorCookies() {
+        if let stored = UserDefaults.standard.dictionary(forKey: "BiliBili.visitorCookies") as? [String: String] {
+            visitorCookies = stored
+        }
+    }
+
+    private func saveVisitorCookies() {
+        UserDefaults.standard.set(visitorCookies, forKey: "BiliBili.visitorCookies")
     }
 
     func clearCookies() {
@@ -399,29 +440,14 @@ final class BiliAPI {
         return videos.filter { $0.duration >= s }
     }
 
-    /// Fetch one or more duration buckets. Single-bucket fetches retry once on an
-    /// empty result (guards against transient risk-control / network misses);
-    /// multi-bucket fetches run in parallel and merge, preserving bucket order.
+    /// Fetch one or more duration buckets. Multi-bucket fetches run in parallel
+    /// and merge, preserving bucket order.
     private func fetchSearchBuckets(_ buckets: [Int], params: [String: String], type: SearchType, completion: @escaping ([Video]) -> Void) {
         let url = "https://api.bilibili.com/x/web-interface/search/type"
         if buckets.count == 1 {
             var p = params
             p["duration"] = String(buckets[0])
-            request(url, params: p, useWBI: false) { [weak self] data, _, _ in
-                guard let self = self else { return }
-                let videos = self.parseSearch(data, type: type)
-                if videos.isEmpty {
-                    // Retry once after a short delay in case it was transient.
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) {
-                        self.request(url, params: p, useWBI: false) { data2, _, _ in
-                            let retry = self.parseSearch(data2, type: type)
-                            DispatchQueue.main.async { completion(retry) }
-                        }
-                    }
-                } else {
-                    DispatchQueue.main.async { completion(videos) }
-                }
-            }
+            fetchSearchPage(url: url, params: p, type: type, completion: completion)
             return
         }
         var columnResults = Array(repeating: [Video](), count: buckets.count)
@@ -430,12 +456,9 @@ final class BiliAPI {
             var p = params
             p["duration"] = String(bucket)
             group.enter()
-            request(url, params: p, useWBI: false) { [weak self] data, _, _ in
-                let videos = self?.parseSearch(data, type: type) ?? []
-                DispatchQueue.main.async {
-                    columnResults[index] = videos
-                    group.leave()
-                }
+            fetchSearchPage(url: url, params: p, type: type) { videos in
+                columnResults[index] = videos
+                group.leave()
             }
         }
         group.notify(queue: .main) {
@@ -448,6 +471,28 @@ final class BiliAPI {
                 }
             }
             completion(merged)
+        }
+    }
+
+    /// Fetch a single search page. If the body isn't JSON it means Bilibili served
+    /// a risk-control HTML page (missing/expired buvid cookies) — refresh the
+    /// visitor IDs and retry once, so search self-heals instead of showing an
+    /// empty "没有匹配内容".
+    private func fetchSearchPage(url: String, params: [String: String], type: SearchType, completion: @escaping ([Video]) -> Void) {
+        request(url, params: params, useWBI: false) { [weak self] data, _, _ in
+            guard let self = self else { return }
+            let videos = self.parseSearch(data, type: type)
+            let isHTML = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } == nil
+            if videos.isEmpty, isHTML {
+                self.fetchBuvid3(retry: 1) {
+                    self.request(url, params: params, useWBI: false) { d2, _, _ in
+                        let retry = self.parseSearch(d2, type: type)
+                        DispatchQueue.main.async { completion(retry) }
+                    }
+                }
+            } else {
+                DispatchQueue.main.async { completion(videos) }
+            }
         }
     }
 
