@@ -17,6 +17,13 @@ final class AppStore: ObservableObject {
     @Published var history: [HistoryItem] = []
     @Published var lastBlockedCount: Int = 0
 
+    /// Page-transition animation used by every `.immersive()` overlay. Exposed in
+    /// 动画实验室 so the feel can be tuned on the real screens; persisted so the
+    /// choice survives relaunch.
+    @Published var animation: OverlayAnimationSettings = OverlayAnimationSettings() {
+        didSet { animation.save() }
+    }
+
     /// Number of immersive full-screen overlays currently presented
     /// (video player, UP空间, 设置, 搜索...). When > 0 the bottom tab bar hides
     /// so the overlay covers the whole screen. Uses a counter because overlays
@@ -35,6 +42,7 @@ final class AppStore: ObservableObject {
     init() {
         self.settings = FilterSettings()
         loadSettings()
+        loadAnimation()
         loadUser()
         loadHistory()
     }
@@ -108,6 +116,12 @@ final class AppStore: ObservableObject {
         if let encoded = try? JSONEncoder().encode(settings) {
             UserDefaults.standard.set(encoded, forKey: settingsKey)
         }
+    }
+
+    // MARK: - Animation persistence
+
+    private func loadAnimation() {
+        animation = OverlayAnimationSettings.persisted
     }
 
     // MARK: - Word management

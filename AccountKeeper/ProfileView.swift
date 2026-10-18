@@ -12,6 +12,7 @@ struct ProfileView: View {
     @Binding var showingSearch: Bool
     @State private var showingLogin = false
     @State private var showingSettings = false
+    @State private var showingAnimationLab = false
     @State private var showingHistory = false
     @State private var selectedVideo: Video?
     @State private var showingLogoutAlert = false
@@ -56,6 +57,10 @@ struct ProfileView: View {
 
                         // Filter config center entry
                         filterConfigEntry
+                            .padding(.horizontal, 16)
+
+                        // Page-transition animation lab
+                        animationLabEntry
                             .padding(.horizontal, 16)
                             .padding(.bottom, 24)
                     }
@@ -128,6 +133,14 @@ struct ProfileView: View {
         .overlay {
             if showingFavorites {
                 FavoritesListView(onDismiss: { dismissImmersive { showingFavorites = false } })
+                    .environmentObject(store)
+                    .immersive()
+                    .zIndex(30)
+            }
+        }
+        .overlay {
+            if showingAnimationLab {
+                AnimationLabView(onDismiss: { dismissImmersive { showingAnimationLab = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(30)
@@ -509,6 +522,40 @@ struct ProfileView: View {
                         .fontWeight(.bold)
                         .foregroundStyle(.primary)
                     Text("16档时长多选屏蔽、日文过滤、侮辱词库管理")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .background(Color.white.opacity(0.6))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.biliBorder, lineWidth: 1)
+            )
+        }
+    }
+
+    // MARK: - Animation lab entry
+
+    private var animationLabEntry: some View {
+        Button {
+            showingAnimationLab = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "wand.and.stars")
+                    .font(.title3)
+                    .foregroundColor(.biliBlue)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("动画实验室")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+                    Text("内建多种进场动画，参数可调，现场试完再定")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

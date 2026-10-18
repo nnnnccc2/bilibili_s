@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.18), value: store.immersiveDepth)
+        .animation(store.animation.enterAnimation, value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -121,43 +121,55 @@ struct PressableCardStyle: ButtonStyle {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// The transition is deliberately unnoticeable — no slide, no scale, no spring.
-/// Like a ligament it is short and taut: the page is simply *there*, arriving on
-/// a fast, firm dissolve. Anything with direction, bounce, or a long ramp draws
-/// attention to the animation itself, which is exactly what we don't want.
+/// The motion itself is not hard-coded here: it is read from `store.animation`,
+/// which 动画实验室（设置页）exposes so the feel can be tried on the real screens
+/// before being decided. It defaults to the quiet "韧带" dissolve — no direction,
+/// no bounce, just the page being there.
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
-/// doesn't wrap its state change in `withAnimation`; the exit uses an opacity
+/// doesn't wrap its state change in `withAnimation`; the exit uses a matching
 /// removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
-    var duration: Double = 0.18
     @State private var appeared = false
 
-    /// 快速响应：缓出曲线，起手即动、立即到位，没有 easeInOut 那种慢慢加速的迟滞。
-    private var enterCurve: Animation {
-        .easeOut(duration: duration)
-    }
+    private var config: OverlayAnimationSettings { store.animation }
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .transition(.asymmetric(insertion: .identity, removal: .opacity))
+            .offset(y: appeared ? 0 : CGFloat(config.rise))
+            .scaleEffect(appeared ? 1 : CGFloat(config.scaleFrom))
+            .transition(.asymmetric(
+                insertion: .identity,
+                removal: exitTransition))
             .onAppear {
                 store.pushImmersive()
-                withAnimation(enterCurve) { appeared = true }
+                withAnimation(config.enterAnimation) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
+    }
+
+    /// Mirrors the entrance on the way out, with the same distance and pop.
+    private var exitTransition: AnyTransition {
+        var transition: AnyTransition = .opacity
+        if config.rise > 0 {
+            transition = transition.combined(with: .offset(y: CGFloat(config.rise) * 0.6))
+        }
+        if config.scaleFrom != 1 {
+            transition = transition.combined(with: .scale(scale: CGFloat(config.scaleFrom)))
+        }
+        return transition
     }
 }
 
 extension View {
-    func immersive(duration: Double = 0.18) -> some View {
-        modifier(ImmersiveOverlay(duration: duration))
+    func immersive() -> some View {
+        modifier(ImmersiveOverlay())
     }
 }
 
-/// Animates an overlay dismissal so it leaves on the same smooth, quiet dissolve.
-func dismissImmersive(_ action: @escaping () -> Void, duration: Double = 0.16) {
-    withAnimation(.easeOut(duration: duration)) { action() }
+/// Animates an overlay dismissal with the same configured motion as the entrance.
+func dismissImmersive(_ action: @escaping () -> Void) {
+    withAnimation(OverlayAnimationSettings.persisted.exitAnimation) { action() }
 }
