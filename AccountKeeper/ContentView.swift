@@ -118,17 +118,22 @@ struct PressableCardStyle: ButtonStyle {
 
 // MARK: - Immersive overlay transition (resilient only)
 
-/// 全屏浮层进场的固定手感：干净、直接。
-/// 这是一个主打信息过滤、去除杂质的应用，动画也应干练克制——
-/// 内容从极近的位置（0.97）快速归位，不模糊、不淡入、不加阴影，
-/// 只靠一层极淡的暗底填充空隙，让注意力直接落在内容上。
+/// 全屏浮层进场的固定手感：干净、像清水。
+/// 这是一个主打信息过滤、去除杂质的应用，动画应如清水般通透轻盈——
+/// 内容从极近的位置（0.97）快速归位，略带一丝透明（0.9→1）如清水覆过，
+/// 不模糊、不加厚重阴影，只靠一层极淡暗底与一丝柔影自然托出厚度。
 /// 缩放锚点在顶部，视频上沿全程贴住屏幕顶端，无位移。
 /// 时长为原始韧性动画的 0.7 倍（原始 response 0.42 → 0.294）。
 private enum ResilientTransition {
     static let startScale: CGFloat = 0.97
     static let startOffset: CGFloat = 0
-    static let startDim: Double = 0.15
-    // 0.7 × 原始 0.42 = 0.294；阻尼 0.86 → 克制回弹，干脆落定，干练不拖泥带水。
+    static let startDim: Double = 0.10
+    // 内容起始透明度：0.9 → 1，如清水般略带通透，不做浓重淡入。
+    static let startOpacity: Double = 0.9
+    // 极淡柔影：自然托出厚度，不抢戏、不厚重。
+    static let shadowRadius: CGFloat = 12
+    static let shadowOpacity: Double = 0.15
+    // 0.7 × 原始 0.42 = 0.294；阻尼 0.86 → 克制回弹，干脆落定。
     static let enterAnimation: Animation = .spring(response: 0.294, dampingFraction: 0.86)
 }
 
@@ -139,7 +144,7 @@ private enum ResilientTransition {
 ///
 /// 进场：内容从 0.97 放大铺满，干脆落定。
 ///   - 缩放锚点 .top：顶部边缘始终贴住屏幕顶端，视频不会先沉后升，刘海区无位移。
-///   - 不模糊、不淡入、无阴影：内容始终实心可见，符合去除杂质的干净定位。
+///   - 不模糊：内容略带通透（0.9→1）如清水，配极淡柔影自然托出厚度。
 ///   - 视频页（backdrop != nil）：黑色底即时铺满（不参与动画），刘海区全程黑色、绝不跳色。
 ///   - 其他页：极淡暗底随进场淡入，轻量连接前后两页。
 /// 退场：统一干净的快速淡出。
@@ -174,8 +179,11 @@ struct ImmersiveOverlay: ViewModifier {
                 // 锚点在顶部：上沿全程贴顶，缩放只向下展开，杜绝位移。
                 .scaleEffect(appeared ? 1 : ResilientTransition.startScale, anchor: .top)
                 .offset(y: appeared ? 0 : ResilientTransition.startOffset)
-                // 内容始终实心，不做透明度/模糊/阴影，保持干净。
-                .opacity(1)
+                // 极淡柔影：自然厚度，不厚重。
+                .shadow(color: .black.opacity(ResilientTransition.shadowOpacity),
+                        radius: ResilientTransition.shadowRadius)
+                // 内容略带通透如清水（0.9→1），不模糊、不浓重淡入。
+                .opacity(appeared ? 1 : ResilientTransition.startOpacity)
         }
         .transition(.asymmetric(
             insertion: .identity,
