@@ -34,6 +34,8 @@
 		A1B2C3D4E5F60001007A0022 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0022 /* CachedAsyncImage.swift */; };
 		A1B2C3D4E5F60001007A0023 /* PlayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0023 /* PlayerManager.swift */; };
 		A1B2C3D4E5F60001007A0024 /* PlayerLayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0024 /* PlayerLayerView.swift */; };
+		A1B2C3D4E5F60001007A0025 /* OverlayAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0025 /* OverlayAnimation.swift */; };
+		A1B2C3D4E5F60001007A0026 /* AnimationLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0026 /* AnimationLabView.swift */; };
 		A1B2C3D4E5F60001007A0016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0016 /* Assets.xcassets */; };
 		A1B2C3D4E5F60001007A0017 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60011007A0017 /* Preview Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -77,6 +79,8 @@
 		A1B2C3D4E5F60011007A0022 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0023 /* PlayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0024 /* PlayerLayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLayerView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60011007A0025 /* OverlayAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayAnimation.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60011007A0026 /* AnimationLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationLabView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0017 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60011007A0018 /* AccountKeeper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AccountKeeper.entitlements; sourceTree = "<group>"; };
@@ -129,6 +133,8 @@
 				A1B2C3D4E5F60011007A0022 /* CachedAsyncImage.swift */,
 				A1B2C3D4E5F60011007A0023 /* PlayerManager.swift */,
 				A1B2C3D4E5F60011007A0024 /* PlayerLayerView.swift */,
+				A1B2C3D4E5F60011007A0025 /* OverlayAnimation.swift */,
+				A1B2C3D4E5F60011007A0026 /* AnimationLabView.swift */,
 				A1B2C3D4E5F60011007A0016 /* Assets.xcassets */,
 				A1B2C3D4E5F60011007A0018 /* AccountKeeper.entitlements */,
 				A1B2C3D4E5F60031007A0003 /* Preview Content */,
@@ -221,6 +227,8 @@
 				A1B2C3D4E5F60001007A0022 /* CachedAsyncImage.swift in Sources */,
 				A1B2C3D4E5F60001007A0023 /* PlayerManager.swift in Sources */,
 				A1B2C3D4E5F60001007A0024 /* PlayerLayerView.swift in Sources */,
+				A1B2C3D4E5F60001007A0025 /* OverlayAnimation.swift in Sources */,
+				A1B2C3D4E5F60001007A0026 /* AnimationLabView.swift in Sources */,
 				A1B2C3D4E5F60001007A0014 /* SettingsView.swift in Sources */,
 				A1B2C3D4E5F60001007A0013 /* CategoryView.swift in Sources */,
 				A1B2C3D4E5F60001007A0012 /* FollowingView.swift in Sources */,

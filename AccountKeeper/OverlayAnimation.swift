@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - Curve
 
