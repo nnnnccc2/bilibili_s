@@ -118,21 +118,18 @@ struct PressableCardStyle: ButtonStyle {
 
 // MARK: - Immersive overlay transition (resilient only)
 
-/// 全屏浮层进场的固定手感：韧性（弹簧式）。
-/// 新页面从离边缘一段距离的位置（0.96）快速放大铺满，短小精悍、稳定快速。
-/// 缩放锚点在顶部，视频上沿全程贴住屏幕顶端，不会出现"先沉下去再顶上去"的位移。
-/// 全程不做模糊、不做透明度过渡，内容始终实心，配一层阴影营造厚度感。
-/// 前后两页之间的空隙由一层暗色填充，视频页为即时全黑底，压掉刘海处的跳色。
+/// 全屏浮层进场的固定手感：干净、直接。
+/// 这是一个主打信息过滤、去除杂质的应用，动画也应干练克制——
+/// 内容从极近的位置（0.97）快速归位，不模糊、不淡入、不加阴影，
+/// 只靠一层极淡的暗底填充空隙，让注意力直接落在内容上。
+/// 缩放锚点在顶部，视频上沿全程贴住屏幕顶端，无位移。
 /// 时长为原始韧性动画的 0.7 倍（原始 response 0.42 → 0.294）。
 private enum ResilientTransition {
-    static let startScale: CGFloat = 0.96
+    static let startScale: CGFloat = 0.97
     static let startOffset: CGFloat = 0
-    static let startDim: Double = 0.30
-    // 内容下方的阴影：给浮层一定厚度，让它看起来是"压"在前一页之上。
-    static let shadowRadius: CGFloat = 24
-    static let shadowOpacity: Double = 0.35
-    // 0.7 × 原始 0.42 = 0.294；阻尼 0.80 → 弹簧式短小精悍，略带回弹后快速落定，不粘滞。
-    static let enterAnimation: Animation = .spring(response: 0.294, dampingFraction: 0.80)
+    static let startDim: Double = 0.15
+    // 0.7 × 原始 0.42 = 0.294；阻尼 0.86 → 克制回弹，干脆落定，干练不拖泥带水。
+    static let enterAnimation: Animation = .spring(response: 0.294, dampingFraction: 0.86)
 }
 
 // MARK: - Immersive overlay helper
@@ -140,12 +137,11 @@ private enum ResilientTransition {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// 进场：内容从 0.96 放大铺满，弹簧式干脆落位。
+/// 进场：内容从 0.97 放大铺满，干脆落定。
 ///   - 缩放锚点 .top：顶部边缘始终贴住屏幕顶端，视频不会先沉后升，刘海区无位移。
-///   - 全程不模糊、不淡入：内容始终实心可见，靠缩放与底色填充完成过渡，无闪烁不确定感。
-///   - 阴影：给浮层厚度，像一片实体压在前一页之上。
+///   - 不模糊、不淡入、无阴影：内容始终实心可见，符合去除杂质的干净定位。
 ///   - 视频页（backdrop != nil）：黑色底即时铺满（不参与动画），刘海区全程黑色、绝不跳色。
-///   - 其他页：暗色底随进场淡入，连接前后两页。
+///   - 其他页：极淡暗底随进场淡入，轻量连接前后两页。
 /// 退场：统一干净的快速淡出。
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
@@ -164,7 +160,7 @@ struct ImmersiveOverlay: ViewModifier {
     }
 
     /// 视频页底色即时铺满（不做透明度动画），杜绝刘海跳色；
-    /// 其他页底色随进场淡入，营造连接感。
+    /// 其他页底色随进场淡入，轻量连接。
     private var fillOpacity: Double {
         backdrop != nil ? fillTarget : (appeared ? fillTarget : 0)
     }
@@ -175,13 +171,10 @@ struct ImmersiveOverlay: ViewModifier {
                 .ignoresSafeArea()
                 .opacity(fillOpacity)
             content
-                // 锚点在顶部：上沿全程贴顶，缩放只向下展开，杜绝"先沉后升"的位移。
+                // 锚点在顶部：上沿全程贴顶，缩放只向下展开，杜绝位移。
                 .scaleEffect(appeared ? 1 : ResilientTransition.startScale, anchor: .top)
                 .offset(y: appeared ? 0 : ResilientTransition.startOffset)
-                // 阴影给浮层厚度，让它像实体一样压在前一页之上。
-                .shadow(color: .black.opacity(ResilientTransition.shadowOpacity),
-                        radius: ResilientTransition.shadowRadius)
-                // 内容始终实心，不做透明度/模糊动画，消除闪烁与不确定感。
+                // 内容始终实心，不做透明度/模糊/阴影，保持干净。
                 .opacity(1)
         }
         .transition(.asymmetric(
