@@ -57,6 +57,10 @@ struct ProfileView: View {
                         // Filter config center entry
                         filterConfigEntry
                             .padding(.horizontal, 16)
+
+                        // Page-transition animation switch
+                        animationEntry
+                            .padding(.horizontal, 16)
                             .padding(.bottom, 24)
                     }
                     .padding(.top, 8)
@@ -525,5 +529,51 @@ struct ProfileView: View {
                     .stroke(Color.biliBorder, lineWidth: 1)
             )
         }
+    }
+
+    /// 全屏页面的连接动画开关。放在这里是因为它要能直接看到、直接试。
+    private var animationEntry: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                Image(systemName: "sparkles")
+                    .font(.title3)
+                    .foregroundColor(.biliBlue)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("页面过渡动画")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+                    Text("把前后两个页面接起来：溶解 / 浮起 / 推移")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Toggle("", isOn: $store.overlayTransition.enabled)
+                    .labelsHidden()
+                    .tint(.biliBlue)
+            }
+
+            if store.overlayTransition.enabled {
+                Picker("方式", selection: $store.overlayTransition.connector) {
+                    ForEach(OverlayConnector.allCases) { connector in
+                        Text(connector.title).tag(connector)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(.biliBlue)
+
+                Text(store.overlayTransition.connector.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.biliBorder, lineWidth: 1)
+        )
     }
 }
