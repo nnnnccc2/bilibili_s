@@ -118,9 +118,9 @@ struct PressableCardStyle: ButtonStyle {
 
 // MARK: - Immersive overlay transition (resilient only)
 
-/// 全屏浮层进场的固定手感：韧性（活塞式）。
-/// 新页面从离边缘一段距离的位置（0.96）快速放大铺满，像活塞弹入一样干脆落位；
-/// 高阻尼保证落点结实、不拖泥带水。
+/// 全屏浮层进场的固定手感：韧性（弹簧式）。
+/// 新页面从离边缘一段距离的位置（0.96）快速放大铺满，短小精悍、稳定快速。
+/// 缩放锚点在顶部，视频上沿全程贴住屏幕顶端，不会出现"先沉下去再顶上去"的位移。
 /// 前后两页之间的空隙由一层暗色填充，视频页为即时全黑底，压掉刘海处的跳色。
 /// 时长为原始韧性动画的 0.7 倍（原始 response 0.42 → 0.294）。
 private enum ResilientTransition {
@@ -128,8 +128,8 @@ private enum ResilientTransition {
     static let startOffset: CGFloat = 0
     static let startBlur: CGFloat = 0
     static let startDim: Double = 0.25
-    // 0.7 × 原始 0.42 = 0.294；高阻尼 0.90 → 活塞式干脆落位，几乎无回弹。
-    static let enterAnimation: Animation = .spring(response: 0.294, dampingFraction: 0.90)
+    // 0.7 × 原始 0.42 = 0.294；阻尼 0.80 → 弹簧式短小精悍，略带回弹后快速落定，不粘滞。
+    static let enterAnimation: Animation = .spring(response: 0.294, dampingFraction: 0.80)
 }
 
 // MARK: - Immersive overlay helper
@@ -137,9 +137,10 @@ private enum ResilientTransition {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// 进场：内容从 0.96 放大铺满，活塞式干脆落位。
+/// 进场：内容从 0.96 放大铺满，弹簧式干脆落位。
+///   - 缩放锚点 .top：顶部边缘始终贴住屏幕顶端，视频不会先沉后升，刘海区无位移。
 ///   - 视频页（backdrop != nil）：黑色底即时铺满（不参与动画），内容只做缩放、不淡入，
-///     像活塞一样直接弹入，刘海区域全程黑色、绝不跳色。
+///     刘海区域全程黑色、绝不跳色。
 ///   - 其他页：暗色底与内容一起淡入，连接前后两页。
 /// 退场：统一干净的快速淡出。
 ///
@@ -164,7 +165,7 @@ struct ImmersiveOverlay: ViewModifier {
         backdrop != nil ? fillTarget : (appeared ? fillTarget : 0)
     }
 
-    /// 视频页内容不淡入（已有全黑底托着），只做缩放 → 活塞式弹入；
+    /// 视频页内容不淡入（已有全黑底托着），只做缩放 → 弹簧式弹入；
     /// 其他页内容从透明淡入，与底色衔接。
     private var contentStartOpacity: Double {
         backdrop != nil ? 1 : 0
@@ -176,7 +177,8 @@ struct ImmersiveOverlay: ViewModifier {
                 .ignoresSafeArea()
                 .opacity(fillOpacity)
             content
-                .scaleEffect(appeared ? 1 : ResilientTransition.startScale)
+                // 锚点在顶部：上沿全程贴顶，缩放只向下展开，杜绝"先沉后升"的位移。
+                .scaleEffect(appeared ? 1 : ResilientTransition.startScale, anchor: .top)
                 .offset(y: appeared ? 0 : ResilientTransition.startOffset)
                 .blur(radius: appeared ? 0 : ResilientTransition.startBlur)
                 .opacity(appeared ? 1 : contentStartOpacity)
