@@ -116,37 +116,118 @@ struct PressableCardStyle: ButtonStyle {
         .environmentObject(AppStore())
 }
 
+// MARK: - Overlay connection transition
+
+/// 全屏浮层的“连接”方式——把旧页面和新页面接起来。
+/// 可在 关于 → 页面过渡 里开关与切换；退场统一是干净的快速淡出。
+enum OverlayConnector: String, CaseIterable, Identifiable, Codable {
+    case liquid     // 液体溶解
+    case lift       // 轻微浮起
+    case push       // 柔边推移
+    case liftFade   // 浮起 + 溶解
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .liquid: return "液体溶解"
+        case .lift: return "轻微浮起"
+        case .push: return "柔边推移"
+        case .liftFade: return "浮起 + 溶解"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .liquid: return "淡入时由虚到实，像水面平复；不动几何，刘海和边缘不会露色。"
+        case .lift: return "新页面从 99% 轻推到 100%，像从旧页面浮出来，幅度很小。"
+        case .push: return "新页面从下方极短地推进来，随即归位，做出「沟槽」层次。"
+        case .liftFade: return "轻微浮起的同时由虚到实，连接感最强。"
+        }
+    }
+}
+
+/// 浮层进场的手感配置。持久化到 UserDefaults，随 App 启动恢复。
+struct OverlayTransition: Codable, Hashable {
+    var enabled: Bool = false
+    var connector: OverlayConnector = .liquid
+
+    // —— 起始姿态（只作用在进场；退场始终是快速淡出）——
+    var startScale: CGFloat {
+        guard enabled else { return 1 }
+        switch connector {
+        case .lift, .liftFade: return 0.99
+        case .liquid, .push: return 1
+        }
+    }
+
+    var startOffset: CGFloat {
+        guard enabled, connector == .push else { return 0 }
+        return 8
+    }
+
+    var startBlur: CGFloat {
+        guard enabled else { return 0 }
+        switch connector {
+        case .liquid: return 10
+        case .liftFade: return 6
+        case .lift, .push: return 0
+        }
+    }
+
+    var enterAnimation: Animation {
+        guard enabled else { return .easeOut(duration: 0.15) }
+        switch connector {
+        case .lift, .liftFade: return .spring(response: 0.28, dampingFraction: 0.9)
+        case .liquid, .push: return .easeOut(duration: 0.18)
+        }
+    }
+
+    // —— 持久化 ——
+    private static let storageKey = "BiliBili.overlayTransition"
+
+    static var persisted: OverlayTransition {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let value = try? JSONDecoder().decode(OverlayTransition.self, from: data)
+        else { return OverlayTransition() }
+        return value
+    }
+
+    func save() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        UserDefaults.standard.set(data, forKey: Self.storageKey)
+    }
+}
+
 // MARK: - Immersive overlay helper
 
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// Fixed feel: 干净的快速淡入淡出，不缩放、不位移。
-///
-/// 全屏覆盖层一旦改变几何（缩放 / 位移），刘海与屏幕边缘就会短暂露出下层，
-/// 出现闪色；缩放视频层还会带来粘滞感。所以这里只动透明度——
-/// 起手快、收尾干净，覆盖层的边缘始终贴着屏幕。
+/// 进场：内容立刻显现（很快），若在 关于 里打开了「页面过渡」，再叠一层连接动画
+/// （溶解 / 浮起 / 推移），把前后两页接起来。
+/// 退场：统一干净的快速淡出——不改几何，所以刘海与屏幕边缘不会露色。
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
-/// doesn't wrap its state change in `withAnimation`; the exit fades out through a
-/// removal transition animated by `dismissImmersive`.
+/// doesn't wrap its state change in `withAnimation`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
     @State private var appeared = false
 
-    /// 进场 / 退场：都很短，只做透明度，起步即快、结束干脆。
-    fileprivate static let enter = Animation.easeOut(duration: 0.15)
-    fileprivate static let exit = Animation.easeOut(duration: 0.12)
+    private var transition: OverlayTransition { store.overlayTransition }
 
     func body(content: Content) -> some View {
         content
+            .scaleEffect(appeared ? 1 : transition.startScale)
+            .offset(y: appeared ? 0 : transition.startOffset)
+            .blur(radius: appeared ? 0 : transition.startBlur)
             .opacity(appeared ? 1 : 0)
             .transition(.asymmetric(
                 insertion: .identity,
                 removal: .opacity))
             .onAppear {
                 store.pushImmersive()
-                withAnimation(Self.enter) { appeared = true }
+                withAnimation(transition.enterAnimation) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
@@ -158,7 +239,7 @@ extension View {
     }
 }
 
-/// Animates an overlay dismissal with the matching exit feel.
+/// Animates an overlay dismissal with the shared exit feel.
 func dismissImmersive(_ action: @escaping () -> Void) {
-    withAnimation(ImmersiveOverlay.exit) { action() }
+    withAnimation(.easeOut(duration: 0.12)) { action() }
 }

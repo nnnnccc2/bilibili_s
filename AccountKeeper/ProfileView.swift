@@ -121,6 +121,7 @@ struct ProfileView: View {
         .overlay {
             if showingAbout {
                 SettingsView(onDismiss: { dismissImmersive { showingAbout = false } })
+                    .environmentObject(store)
                     .immersive()
                     .zIndex(30)
             }

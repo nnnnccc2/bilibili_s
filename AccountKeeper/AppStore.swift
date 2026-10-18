@@ -26,6 +26,12 @@ final class AppStore: ObservableObject {
     func pushImmersive() { immersiveDepth += 1 }
     func popImmersive() { immersiveDepth = max(0, immersiveDepth - 1) }
 
+    /// How the full-screen overlays connect the previous page to the new one.
+    /// Toggled and switched in 关于 → 页面过渡; persisted across launches.
+    @Published var overlayTransition: OverlayTransition = OverlayTransition() {
+        didSet { overlayTransition.save() }
+    }
+
     // MARK: - Persistence keys
 
     private let settingsKey = "BiliBili.filterSettings"
@@ -35,6 +41,7 @@ final class AppStore: ObservableObject {
     init() {
         self.settings = FilterSettings()
         loadSettings()
+        overlayTransition = OverlayTransition.persisted
         loadUser()
         loadHistory()
     }
