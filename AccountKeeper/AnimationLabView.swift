@@ -2,9 +2,8 @@
 //  AnimationLabView.swift
 //  BiliBili
 //
-//  "动画实验室": try every built-in page-transition animation and tune its
-//  parameters, then keep whichever feels right. Changes apply immediately, so
-//  the real screens (视频页 / UP主页 / 搜索 / 设置) can be used as the preview.
+//  "动画实验室": 逐个试遍内置的每一种页面过渡动画，并现场调参，
+//  即时生效——真机上的视频页 / UP主页 / 搜索 / 设置 本身就是预览台。
 //
 
 import Foundation
@@ -21,48 +20,11 @@ struct AnimationLabView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(OverlayAnimationStyle.allCases.filter { $0 != .custom }) { style in
-                        presetRow(style)
-                    }
-                } header: {
-                    Text("预设")
-                } footer: {
-                    Text("点任意预设会立刻播一次预览。改动下面任何参数都会变成「自定义」。")
-                }
-
-                Section {
-                    paramSlider("时长", \.duration, range: 0.1...0.6, format: "%.2f 秒")
-                    if store.animation.curve == .spring {
-                        paramSlider("回弹", \.bounce, range: 0.4...1.0, format: "%.2f")
-                    }
-                    paramSlider("上冲位移", \.rise, range: 0...240, format: "%.0f pt")
-                    paramSlider("起始缩放", \.scaleFrom, range: 0.9...1.1, format: "%.2f")
-
-                    Picker("曲线", selection: curveBinding) {
-                        ForEach(OverlayAnimationCurve.allCases) { curve in
-                            Text(curve.title).tag(curve)
-                        }
-                    }
-                } header: {
-                    Text("参数")
-                } footer: {
-                    Text(store.animation.curve.detail)
-                }
-
-                Section {
-                    Button("预览当前动画") { showingPreview = true }
-                } header: {
-                    Text("试用")
-                } footer: {
-                    Text("设置立即生效，也可以直接去视频页 / UP主页 / 搜索 / 设置 打开体验。回弹越小越弹；「起始缩放」小于 1 时画面会从边缘往里弹，会看到身后页面的一圈边，设成 1.00 可去掉。")
-                }
-
-                Section {
-                    Button("恢复默认（弹出）", role: .destructive) {
-                        store.animation = OverlayAnimationSettings()
-                    }
-                }
+                catalogSection(.platform)
+                catalogSection(.common)
+                parameterSection
+                trialSection
+                resetSection
             }
             .navigationTitle("动画实验室")
             .navigationBarTitleDisplayMode(.inline)
@@ -79,6 +41,81 @@ struct AnimationLabView: View {
                 AnimationPreviewPage(onDismiss: { dismissImmersive { showingPreview = false } })
                     .immersive()
                     .zIndex(30)
+            }
+        }
+    }
+
+    // MARK: - Sections
+
+    @ViewBuilder
+    private func catalogSection(_ category: OverlayMotionCategory) -> some View {
+        let styles = OverlayAnimationStyle.allCases.filter { $0.category == category }
+        Section {
+            ForEach(styles) { style in
+                presetRow(style)
+            }
+        } header: {
+            Text(category.title)
+        } footer: {
+            Text(category.footer)
+        }
+    }
+
+    @ViewBuilder
+    private var parameterSection: some View {
+        let style = store.animation.style
+        Section {
+            paramSlider("时长", \.duration, range: 0...0.6, format: "%.2f 秒")
+            if store.animation.curve.isSpringLike {
+                paramSlider("回弹", \.bounce, range: 0.3...1.0, format: "%.2f")
+            }
+            if style.usesHorizontalTravel {
+                paramSlider("水平位移", \.travelX, range: -420...420, format: "%.0f pt")
+            }
+            if style.usesVerticalTravel {
+                paramSlider("垂直位移", \.travelY, range: -420...420, format: "%.0f pt")
+            }
+            if style.usesScale {
+                paramSlider("起始缩放", \.scaleFrom, range: 0.8...1.2, format: "%.2f")
+            }
+            if style.usesRotation {
+                paramSlider("起始旋转", \.rotationFrom, range: -180...180, format: "%.0f°")
+            }
+            if style.usesBlur {
+                paramSlider("起始模糊", \.blurFrom, range: 0...40, format: "%.0f")
+            }
+            if style.usesOpacity {
+                paramSlider("起始透明度", \.opacityFrom, range: 0...1, format: "%.2f")
+            }
+
+            Picker("曲线", selection: curveBinding) {
+                ForEach(OverlayAnimationCurve.allCases) { curve in
+                    Text(curve.title).tag(curve)
+                }
+            }
+        } header: {
+            Text("参数 · \(style.title)")
+        } footer: {
+            Text(store.animation.curve.detail)
+        }
+    }
+
+    @ViewBuilder
+    private var trialSection: some View {
+        Section {
+            Button("预览当前动画") { showingPreview = true }
+        } header: {
+            Text("试用")
+        } footer: {
+            Text("设置立即生效，也可以直接去视频页 / UP主页 / 搜索 / 设置 打开体验。改动下面任何参数都会变成「自定义」。")
+        }
+    }
+
+    @ViewBuilder
+    private var resetSection: some View {
+        Section {
+            Button("恢复默认（弹出）", role: .destructive) {
+                store.animation = OverlayAnimationSettings()
             }
         }
     }
@@ -153,9 +190,7 @@ struct AnimationLabView: View {
 
     // MARK: - Actions
 
-    /// Applies a preset and immediately plays it, so each one can be felt
-    /// without leaving the lab. If a preview is already on screen it is taken
-    /// down first, then replayed.
+    /// 应用一套预设并立刻播一次，省得来回切页面。若预览还开着就先收掉再重播。
     private func select(_ style: OverlayAnimationStyle) {
         guard let parameters = style.parameters else { return }
         var config = store.animation
@@ -179,8 +214,7 @@ struct AnimationLabView: View {
 
 // MARK: - Preview page
 
-/// Throwaway page the lab uses to play the current animation once. Closes itself
-/// so the next preset can be tried right away.
+/// 实验室用来播一次当前动画的临时页面，自动关闭，方便接着试下一个。
 private struct AnimationPreviewPage: View {
     var onDismiss: () -> Void
 

@@ -122,44 +122,42 @@ struct PressableCardStyle: ButtonStyle {
 /// While it is presented the bottom tab bar is hidden.
 ///
 /// The motion itself is not hard-coded here: it is read from `store.animation`,
-/// which 动画实验室（设置页）exposes so the feel can be tried on the real screens
-/// before being decided. It defaults to the quiet "韧带" dissolve — no direction,
-/// no bounce, just the page being there.
+/// which 动画实验室（设置页）exposes so every built-in animation can be tried on
+/// the real screens before being decided.
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
-/// doesn't wrap its state change in `withAnimation`; the exit uses a matching
-/// removal transition animated by `dismissImmersive`.
+/// doesn't wrap its state change in `withAnimation`; the exit replays the very
+/// same motion through a removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
     @State private var appeared = false
 
     private var config: OverlayAnimationSettings { store.animation }
+    private var motion: OverlayMotion { config.entryMotion }
 
     func body(content: Content) -> some View {
         content
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : CGFloat(config.rise))
-            .scaleEffect(appeared ? 1 : CGFloat(config.scaleFrom))
+            .rotation3DEffect(
+                .degrees(appeared ? 0 : (motion.rotationAxis == .y ? motion.rotation : 0)),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.5)
+            .rotation3DEffect(
+                .degrees(appeared ? 0 : (motion.rotationAxis == .x ? motion.rotation : 0)),
+                axis: (x: 1, y: 0, z: 0),
+                perspective: 0.5)
+            .rotationEffect(.degrees(appeared ? 0 : (motion.rotationAxis == .z ? motion.rotation : 0)))
+            .offset(appeared ? .zero : motion.offset)
+            .scaleEffect(appeared ? 1 : motion.scale)
+            .blur(radius: appeared ? 0 : motion.blur)
+            .opacity(appeared ? 1 : motion.opacity)
             .transition(.asymmetric(
                 insertion: .identity,
-                removal: exitTransition))
+                removal: config.removalTransition))
             .onAppear {
                 store.pushImmersive()
                 withAnimation(config.enterAnimation) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
-    }
-
-    /// Mirrors the entrance on the way out, with the same distance and pop.
-    private var exitTransition: AnyTransition {
-        var transition: AnyTransition = .opacity
-        if config.rise > 0 {
-            transition = transition.combined(with: .offset(y: CGFloat(config.rise) * 0.6))
-        }
-        if config.scaleFrom != 1 {
-            transition = transition.combined(with: .scale(scale: CGFloat(config.scaleFrom)))
-        }
-        return transition
     }
 }
 
