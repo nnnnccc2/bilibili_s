@@ -544,7 +544,7 @@ struct ProfileView: View {
                         .font(.headline)
                         .fontWeight(.bold)
                         .foregroundStyle(.primary)
-                    Text("把前后两个页面接起来：溶解 / 浮起 / 推移")
+                    Text("把前后两个页面接起来，可现场切换（8 款）")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

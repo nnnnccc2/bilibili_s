@@ -119,9 +119,13 @@ struct PressableCardStyle: ButtonStyle {
 // MARK: - Overlay connection transition
 
 /// 全屏浮层的“连接”方式——把旧页面和新页面接起来。
-/// 可在 关于 → 页面过渡 里开关与切换；退场统一是干净的快速淡出。
+/// 可在 我的 → 页面过渡 里开关与切换；退场统一是干净的快速淡出。
 enum OverlayConnector: String, CaseIterable, Identifiable, Codable {
     case liquid     // 液体溶解
+    case natural    // 自然
+    case certain    // 笃定
+    case resilient  // 韧性
+    case chain      // 链式
     case lift       // 轻微浮起
     case push       // 柔边推移
     case liftFade   // 浮起 + 溶解
@@ -131,6 +135,10 @@ enum OverlayConnector: String, CaseIterable, Identifiable, Codable {
     var title: String {
         switch self {
         case .liquid: return "液体溶解"
+        case .natural: return "自然"
+        case .certain: return "笃定"
+        case .resilient: return "韧性"
+        case .chain: return "链式"
         case .lift: return "轻微浮起"
         case .push: return "柔边推移"
         case .liftFade: return "浮起 + 溶解"
@@ -140,6 +148,10 @@ enum OverlayConnector: String, CaseIterable, Identifiable, Codable {
     var detail: String {
         switch self {
         case .liquid: return "淡入时由虚到实，像水面平复；不动几何，刘海和边缘不会露色。"
+        case .natural: return "很快显现、收尾柔和，像绳子把两页自然系在一起。"
+        case .certain: return "起手快、落点稳，没有回弹，干净利落，有确定感。"
+        case .resilient: return "轻微回弹后稳稳落位，像被绳子拉住，有韧性。"
+        case .chain: return "带一点弹性从下方拉进来，像铁链绷直后落定。"
         case .lift: return "新页面从 99% 轻推到 100%，像从旧页面浮出来，幅度很小。"
         case .push: return "新页面从下方极短地推进来，随即归位，做出「沟槽」层次。"
         case .liftFade: return "轻微浮起的同时由虚到实，连接感最强。"
@@ -156,14 +168,20 @@ struct OverlayTransition: Codable, Hashable {
     var startScale: CGFloat {
         guard enabled else { return 1 }
         switch connector {
-        case .lift, .liftFade: return 0.99
+        case .resilient: return 0.985
+        case .natural: return 0.992
+        case .certain, .chain, .lift, .liftFade: return 0.99
         case .liquid, .push: return 1
         }
     }
 
     var startOffset: CGFloat {
-        guard enabled, connector == .push else { return 0 }
-        return 8
+        guard enabled else { return 0 }
+        switch connector {
+        case .push: return 8
+        case .chain: return 6
+        case .liquid, .natural, .certain, .resilient, .lift, .liftFade: return 0
+        }
     }
 
     var startBlur: CGFloat {
@@ -171,15 +189,20 @@ struct OverlayTransition: Codable, Hashable {
         switch connector {
         case .liquid: return 10
         case .liftFade: return 6
-        case .lift, .push: return 0
+        case .natural: return 4
+        case .certain, .resilient, .chain, .lift, .push: return 0
         }
     }
 
     var enterAnimation: Animation {
-        guard enabled else { return .easeOut(duration: 0.30) }
+        guard enabled else { return .easeOut(duration: 0.45) }
         switch connector {
-        case .lift, .liftFade: return .spring(response: 0.28, dampingFraction: 0.9)
-        case .liquid, .push: return .easeOut(duration: 0.18)
+        case .liquid, .push: return .easeOut(duration: 0.40)
+        case .natural: return .easeInOut(duration: 0.45)
+        case .certain: return .easeOut(duration: 0.42)
+        case .resilient: return .spring(response: 0.42, dampingFraction: 0.78)
+        case .chain: return .spring(response: 0.45, dampingFraction: 0.82)
+        case .lift, .liftFade: return .spring(response: 0.40, dampingFraction: 0.9)
         }
     }
 
@@ -241,5 +264,5 @@ extension View {
 
 /// Animates an overlay dismissal with the shared exit feel.
 func dismissImmersive(_ action: @escaping () -> Void) {
-    withAnimation(.easeOut(duration: 0.24)) { action() }
+    withAnimation(.easeOut(duration: 0.36)) { action() }
 }
