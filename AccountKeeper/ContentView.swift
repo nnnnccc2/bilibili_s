@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.2), value: store.immersiveDepth)
+        .animation(.easeOut(duration: 0.15), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -121,29 +121,29 @@ struct PressableCardStyle: ButtonStyle {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// Fixed feel, no longer configurable: 内容快速、干脆地显现，不做上下左右的切入；
-/// 只用很轻微的一档缩放（0.96 → 1）压出一点纵深，所以既利落又不显得平。
+/// Fixed feel: 干净的快速淡入淡出，不缩放、不位移。
+///
+/// 全屏覆盖层一旦改变几何（缩放 / 位移），刘海与屏幕边缘就会短暂露出下层，
+/// 出现闪色；缩放视频层还会带来粘滞感。所以这里只动透明度——
+/// 起手快、收尾干净，覆盖层的边缘始终贴着屏幕。
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
-/// doesn't wrap its state change in `withAnimation`; the exit replays the same
-/// motion through a removal transition animated by `dismissImmersive`.
+/// doesn't wrap its state change in `withAnimation`; the exit fades out through a
+/// removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
     @State private var appeared = false
 
-    /// 起始缩放：越接近 1 越轻，这里是几乎察觉不到、但能提供纵深的一档。
-    fileprivate static let scaleFrom: CGFloat = 0.96
-    /// 进场 / 退场：短促的 easeOut，起步快、收尾稳，没有回弹的拖泥带水。
-    fileprivate static let enter = Animation.easeOut(duration: 0.2)
-    fileprivate static let exit = Animation.easeOut(duration: 0.16)
+    /// 进场 / 退场：都很短，只做透明度，起步即快、结束干脆。
+    fileprivate static let enter = Animation.easeOut(duration: 0.15)
+    fileprivate static let exit = Animation.easeOut(duration: 0.12)
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .scaleEffect(appeared ? 1 : Self.scaleFrom)
             .transition(.asymmetric(
                 insertion: .identity,
-                removal: .opacity.combined(with: .scale(scale: Self.scaleFrom))))
+                removal: .opacity))
             .onAppear {
                 store.pushImmersive()
                 withAnimation(Self.enter) { appeared = true }
