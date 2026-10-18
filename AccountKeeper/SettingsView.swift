@@ -9,31 +9,12 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var store: AppStore
 
     var onDismiss: (() -> Void)? = nil
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Toggle("页面连接动画", isOn: $store.overlayTransition.enabled)
-                    if store.overlayTransition.enabled {
-                        Picker("方式", selection: $store.overlayTransition.connector) {
-                            ForEach(OverlayConnector.allCases) { connector in
-                                Text(connector.title).tag(connector)
-                            }
-                        }
-                        Text(store.overlayTransition.connector.detail)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("页面过渡")
-                } footer: {
-                    Text("打开后，进入视频 / UP主页 / 搜索 / 设置等全屏页面时，会用一段过渡把前后两页接起来；关掉则是纯快速淡入。")
-                }
-
                 Section("关于") {
                     HStack {
                         Text("应用名称")

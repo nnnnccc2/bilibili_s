@@ -116,144 +116,18 @@ struct PressableCardStyle: ButtonStyle {
         .environmentObject(AppStore())
 }
 
-// MARK: - Overlay connection transition
+// MARK: - Immersive overlay transition (resilient only)
 
-/// 全屏浮层的“连接”方式——把旧页面和新页面接起来。
-/// 可在 我的 → 页面过渡 里开关与切换；退场统一是干净的快速淡出。
-enum OverlayConnector: String, CaseIterable, Identifiable, Codable {
-    case liquid     // 液体溶解
-    case natural    // 自然
-    case certain    // 笃定
-    case resilient  // 韧性
-    case chain      // 链式
-    case lift       // 轻微浮起
-    case push       // 柔边推移
-    case liftFade   // 浮起 + 溶解
-    case zoom       // 放大进入
-    case card       // 卡片升起
-    case pip        // 画中画
-    case curtain    // 幕帘
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .liquid: return "液体溶解"
-        case .natural: return "自然"
-        case .certain: return "笃定"
-        case .resilient: return "韧性"
-        case .chain: return "链式"
-        case .lift: return "轻微浮起"
-        case .push: return "柔边推移"
-        case .liftFade: return "浮起 + 溶解"
-        case .zoom: return "放大进入"
-        case .card: return "卡片升起"
-        case .pip: return "画中画"
-        case .curtain: return "幕帘"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .liquid: return "淡入时由虚到实，像水面平复；不动几何，刘海和边缘不会露色。"
-        case .natural: return "很快显现、收尾柔和，像绳子把两页自然系在一起。"
-        case .certain: return "起手快、落点稳，没有回弹，干净利落，有确定感。"
-        case .resilient: return "轻微回弹后稳稳落位，像被绳子拉住，有韧性。"
-        case .chain: return "带一点弹性从下方拉进来，像铁链绷直后落定。"
-        case .lift: return "新页面从 99% 轻推到 100%，像从旧页面浮出来，幅度很小。"
-        case .push: return "新页面从下方极短地推进来，随即归位，做出「沟槽」层次。"
-        case .liftFade: return "轻微浮起的同时由虚到实，连接感最强。"
-        case .zoom: return "新页面从 90% 迅速放大铺满，起始就离边缘一段距离，再一把合上。"
-        case .card: return "新页面像一张小卡片（约 92%）浮在旧页面之上，迅速长到全屏、空隙随之合拢。"
-        case .pip: return "新页面从更小的画面（约 86%）快速放大成主画面，两页的关系最清楚。"
-        case .curtain: return "新页面从 94% 均匀铺开，前后两页的边缘在这段距离里被合上。"
-        }
-    }
-}
-
-/// 浮层进场的手感配置。持久化到 UserDefaults，随 App 启动恢复。
-struct OverlayTransition: Codable, Hashable {
-    var enabled: Bool = false
-    var connector: OverlayConnector = .liquid
-
-    // —— 起始姿态（只作用在进场；退场始终是快速淡出）——
-    var startScale: CGFloat {
-        guard enabled else { return 1 }
-        switch connector {
-        case .pip: return 0.86
-        case .zoom: return 0.90
-        case .card: return 0.92
-        case .curtain: return 0.94
-        case .resilient: return 0.985
-        case .natural: return 0.992
-        case .certain, .chain, .lift, .liftFade: return 0.99
-        case .liquid, .push: return 1
-        }
-    }
-
-    var startOffset: CGFloat {
-        guard enabled else { return 0 }
-        switch connector {
-        case .push: return 8
-        case .chain: return 6
-        default: return 0
-        }
-    }
-
-    var startBlur: CGFloat {
-        guard enabled else { return 0 }
-        switch connector {
-        case .liquid: return 10
-        case .liftFade: return 6
-        case .natural: return 4
-        default: return 0
-        }
-    }
-
-    /// 进场时盖在下层页面上的暗色，让两个界面之间的空隙有内容、也压掉边缘的跳色。
-    var startDim: Double {
-        guard enabled else { return 0 }
-        switch connector {
-        case .liquid, .zoom: return 0
-        case .natural: return 0.15
-        case .certain, .lift, .push, .liftFade: return 0.2
-        case .curtain, .resilient: return 0.25
-        case .chain: return 0.3
-        case .card: return 0.35
-        case .pip: return 0.45
-        }
-    }
-
-    var enterAnimation: Animation {
-        guard enabled else { return .easeOut(duration: 0.32) }
-        switch connector {
-        case .liquid, .push: return .easeOut(duration: 0.28)
-        case .natural: return .easeInOut(duration: 0.32)
-        case .certain: return .easeOut(duration: 0.29)
-        case .resilient: return .spring(response: 0.25, dampingFraction: 0.78)
-        case .chain: return .spring(response: 0.32, dampingFraction: 0.82)
-        case .lift, .liftFade: return .spring(response: 0.28, dampingFraction: 0.9)
-        case .zoom: return .easeOut(duration: 0.26)
-        case .card: return .easeOut(duration: 0.28)
-        case .pip: return .spring(response: 0.30, dampingFraction: 0.85)
-        case .curtain: return .easeInOut(duration: 0.30)
-        }
-    }
-
-    // —— 持久化 ——
-    private static let storageKey = "BiliBili.overlayTransition"
-
-    static var persisted: OverlayTransition {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let value = try? JSONDecoder().decode(OverlayTransition.self, from: data)
-        else { return OverlayTransition() }
-        return value
-    }
-
-    func save() {
-        guard let data = try? JSONEncoder().encode(self) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storageKey)
-    }
+/// 全屏浮层进场的固定手感：韧性。
+/// 新页面从离边缘一小段距离的位置（0.985）放大铺满，带轻微回弹后稳稳落位；
+/// 前后两页之间的空隙由一层暗色填充，压掉刘海处的跳色。
+/// 时长为原始韧性动画的 0.7 倍（原始 response 0.42 → 0.294）。
+private enum ResilientTransition {
+    static let startScale: CGFloat = 0.985
+    static let startOffset: CGFloat = 0
+    static let startBlur: CGFloat = 0
+    static let startDim: Double = 0.25
+    static let enterAnimation: Animation = .spring(response: 0.294, dampingFraction: 0.78)
 }
 
 // MARK: - Immersive overlay helper
@@ -261,8 +135,7 @@ struct OverlayTransition: Codable, Hashable {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// 进场：内容很快显现；打开「页面过渡」后，新页面会从离边缘一段距离的位置
-/// 迅速放大铺满，前后两页之间的空隙由一层暗色填充（也压掉刘海处的跳色）。
+/// 进场：内容从 0.985 放大铺满，带韧性回弹；空隙由暗色填充（视频页为全黑底）。
 /// 退场：统一干净的快速淡出。
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
@@ -274,26 +147,21 @@ struct ImmersiveOverlay: ViewModifier {
     /// 覆盖层后面垫的底色。视频页传 .black，保证刘海区域始终是黑的、不跳色。
     var backdrop: Color? = nil
 
-    private var transition: OverlayTransition { store.overlayTransition }
-
     /// 空隙里要填充的颜色与目标不透明度。
     private var fillColor: Color { backdrop ?? .black }
     private var fillTarget: Double {
-        guard transition.enabled else { return 0 }
-        return backdrop != nil ? 1 : transition.startDim
+        backdrop != nil ? 1 : ResilientTransition.startDim
     }
 
     func body(content: Content) -> some View {
         ZStack {
-            if fillTarget > 0 {
-                fillColor
-                    .ignoresSafeArea()
-                    .opacity(appeared ? fillTarget : 0)
-            }
+            fillColor
+                .ignoresSafeArea()
+                .opacity(appeared ? fillTarget : 0)
             content
-                .scaleEffect(appeared ? 1 : transition.startScale)
-                .offset(y: appeared ? 0 : transition.startOffset)
-                .blur(radius: appeared ? 0 : transition.startBlur)
+                .scaleEffect(appeared ? 1 : ResilientTransition.startScale)
+                .offset(y: appeared ? 0 : ResilientTransition.startOffset)
+                .blur(radius: appeared ? 0 : ResilientTransition.startBlur)
                 .opacity(appeared ? 1 : 0)
         }
         .transition(.asymmetric(
@@ -301,7 +169,7 @@ struct ImmersiveOverlay: ViewModifier {
             removal: .opacity))
         .onAppear {
             store.pushImmersive()
-            withAnimation(transition.enterAnimation) { appeared = true }
+            withAnimation(ResilientTransition.enterAnimation) { appeared = true }
         }
         .onDisappear { store.popImmersive() }
     }
