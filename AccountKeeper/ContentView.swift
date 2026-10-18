@@ -195,14 +195,14 @@ struct OverlayTransition: Codable, Hashable {
     }
 
     var enterAnimation: Animation {
-        guard enabled else { return .easeOut(duration: 0.45) }
+        guard enabled else { return .easeOut(duration: 0.32) }
         switch connector {
-        case .liquid, .push: return .easeOut(duration: 0.40)
-        case .natural: return .easeInOut(duration: 0.45)
-        case .certain: return .easeOut(duration: 0.42)
-        case .resilient: return .spring(response: 0.42, dampingFraction: 0.78)
-        case .chain: return .spring(response: 0.45, dampingFraction: 0.82)
-        case .lift, .liftFade: return .spring(response: 0.40, dampingFraction: 0.9)
+        case .liquid, .push: return .easeOut(duration: 0.28)
+        case .natural: return .easeInOut(duration: 0.32)
+        case .certain: return .easeOut(duration: 0.29)
+        case .resilient: return .spring(response: 0.29, dampingFraction: 0.78)
+        case .chain: return .spring(response: 0.32, dampingFraction: 0.82)
+        case .lift, .liftFade: return .spring(response: 0.28, dampingFraction: 0.9)
         }
     }
 
@@ -264,5 +264,5 @@ extension View {
 
 /// Animates an overlay dismissal with the shared exit feel.
 func dismissImmersive(_ action: @escaping () -> Void) {
-    withAnimation(.easeOut(duration: 0.36)) { action() }
+    withAnimation(.easeOut(duration: 0.25)) { action() }
 }
