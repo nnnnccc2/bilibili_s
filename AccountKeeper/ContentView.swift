@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.15), value: store.immersiveDepth)
+        .animation(MiniBiliAnimation.tabBar, value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -92,7 +92,7 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
-            .animation(.spring(response: 0.22, dampingFraction: 0.85), value: selectedTab)
+            .animation(MiniBiliAnimation.tabSelect, value: selectedTab)
         }
         .buttonStyle(.plain)
     }
@@ -107,7 +107,7 @@ struct PressableCardStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+            .animation(MiniBiliAnimation.press, value: configuration.isPressed)
     }
 }
 
@@ -116,25 +116,37 @@ struct PressableCardStyle: ButtonStyle {
         .environmentObject(AppStore())
 }
 
-// MARK: - Immersive overlay transition (resilient only)
+// MARK: - MiniBili animation system
 
-/// 全屏浮层进场的固定手感：干净、像清水。
-/// 这是一个主打信息过滤、去除杂质的应用，动画应如清水般通透轻盈——
-/// 内容从极近的位置（0.97）快速归位，略带一丝透明（0.9→1）如清水覆过，
-/// 不模糊、不加厚重阴影，只靠一层极淡暗底与一丝柔影自然托出厚度。
-/// 缩放锚点在顶部，视频上沿全程贴住屏幕顶端，无位移。
-/// 时长为原始韧性动画的 0.7 倍（原始 response 0.42 → 0.294）。
-private enum ResilientTransition {
-    static let startScale: CGFloat = 0.97
-    static let startOffset: CGFloat = 0
-    static let startDim: Double = 0.10
-    // 内容起始透明度：0.9 → 1，如清水般略带通透，不做浓重淡入。
-    static let startOpacity: Double = 0.9
-    // 极淡柔影：自然托出厚度，不抢戏、不厚重。
+/// MiniBili 全局动画体系：干净、通透、干脆。
+/// 所有页面过渡与交互反馈都统一走这套手感，保证全应用动画语言一致。
+private enum MiniBiliAnimation {
+
+    // MARK: 沉浸式浮层过渡（页面进出）
+
+    /// 进场起始缩放：从极近位置归位，如清水覆过。
+    static let enterStartScale: CGFloat = 0.97
+    /// 进场起始透明度：0.9 → 1，略带通透如清水，不做浓重淡入。
+    static let enterStartOpacity: Double = 0.9
+    /// 非视频页空隙填充的暗度：极淡，清水感。
+    static let enterDim: Double = 0.10
+    /// 极淡柔影：自然托出厚度，不厚重。
     static let shadowRadius: CGFloat = 12
     static let shadowOpacity: Double = 0.15
-    // 0.7 × 原始 0.42 = 0.294；阻尼 0.86 → 克制回弹，干脆落定。
-    static let enterAnimation: Animation = .spring(response: 0.294, dampingFraction: 0.86)
+
+    /// 进场弹簧：原始韧性 0.42 的 0.7 倍（0.294），阻尼 0.86 干脆落定。
+    static let enter: Animation = .spring(response: 0.294, dampingFraction: 0.86)
+    /// 退场：干净快速淡出。
+    static let exit: Animation = .easeOut(duration: 0.22)
+
+    // MARK: 标签栏与交互
+
+    /// 标签栏隐藏/显示。
+    static let tabBar: Animation = .easeOut(duration: 0.20)
+    /// 标签选中反馈。
+    static let tabSelect: Animation = .spring(response: 0.25, dampingFraction: 0.86)
+    /// 按压反馈：极快，响应即时。
+    static let press: Animation = .easeOut(duration: 0.08)
 }
 
 // MARK: - Immersive overlay helper
@@ -161,7 +173,7 @@ struct ImmersiveOverlay: ViewModifier {
     /// 空隙里要填充的颜色与目标不透明度。
     private var fillColor: Color { backdrop ?? .black }
     private var fillTarget: Double {
-        backdrop != nil ? 1 : ResilientTransition.startDim
+        backdrop != nil ? 1 : MiniBiliAnimation.enterDim
     }
 
     /// 视频页底色即时铺满（不做透明度动画），杜绝刘海跳色；
@@ -177,20 +189,19 @@ struct ImmersiveOverlay: ViewModifier {
                 .opacity(fillOpacity)
             content
                 // 锚点在顶部：上沿全程贴顶，缩放只向下展开，杜绝位移。
-                .scaleEffect(appeared ? 1 : ResilientTransition.startScale, anchor: .top)
-                .offset(y: appeared ? 0 : ResilientTransition.startOffset)
+                .scaleEffect(appeared ? 1 : MiniBiliAnimation.enterStartScale, anchor: .top)
                 // 极淡柔影：自然厚度，不厚重。
-                .shadow(color: .black.opacity(ResilientTransition.shadowOpacity),
-                        radius: ResilientTransition.shadowRadius)
+                .shadow(color: .black.opacity(MiniBiliAnimation.shadowOpacity),
+                        radius: MiniBiliAnimation.shadowRadius)
                 // 内容略带通透如清水（0.9→1），不模糊、不浓重淡入。
-                .opacity(appeared ? 1 : ResilientTransition.startOpacity)
+                .opacity(appeared ? 1 : MiniBiliAnimation.enterStartOpacity)
         }
         .transition(.asymmetric(
             insertion: .identity,
             removal: .opacity))
         .onAppear {
             store.pushImmersive()
-            withAnimation(ResilientTransition.enterAnimation) { appeared = true }
+            withAnimation(MiniBiliAnimation.enter) { appeared = true }
         }
         .onDisappear { store.popImmersive() }
     }
@@ -202,7 +213,7 @@ extension View {
     }
 }
 
-/// Animates an overlay dismissal with the shared exit feel.
+/// Animates an overlay dismissal with the shared MiniBili exit feel.
 func dismissImmersive(_ action: @escaping () -> Void) {
-    withAnimation(.easeOut(duration: 0.25)) { action() }
+    withAnimation(MiniBiliAnimation.exit) { action() }
 }
