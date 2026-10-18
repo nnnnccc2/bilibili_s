@@ -177,6 +177,9 @@ enum OverlayAnimationStyle: String, CaseIterable, Identifiable, Codable {
     case cardPush
     case flipX
     case flipY
+    case efficient
+    case reliable
+    case modalPop
     // —— 自定义 ——
     case custom
 
@@ -188,7 +191,7 @@ enum OverlayAnimationStyle: String, CaseIterable, Identifiable, Codable {
              .moveTrailing, .slide, .push, .blurReplace:
             return .platform
         case .pop, .zoomOut, .rise, .drop, .fadeScale, .crossDissolve,
-             .cardPush, .flipX, .flipY:
+             .cardPush, .flipX, .flipY, .efficient, .reliable, .modalPop:
             return .common
         case .custom:
             return .custom
@@ -216,6 +219,9 @@ enum OverlayAnimationStyle: String, CaseIterable, Identifiable, Codable {
         case .cardPush: return "卡片推入"
         case .flipX: return "横向翻转"
         case .flipY: return "纵向翻转"
+        case .efficient: return "高效专业"
+        case .reliable: return "稳定可靠"
+        case .modalPop: return "模态弹出"
         case .custom: return "自定义"
         }
     }
@@ -241,6 +247,9 @@ enum OverlayAnimationStyle: String, CaseIterable, Identifiable, Codable {
         case .cardPush: return "右侧推入，Material 卡片式"
         case .flipX: return "绕水平轴 3D 翻转进场"
         case .flipY: return "绕垂直轴 3D 翻转进场"
+        case .efficient: return "快速、克制、不拖沓，专业工具的确认感"
+        case .reliable: return "匀速稳重、没有花哨，内容稳稳到位"
+        case .modalPop: return "居中由小弹大，像弹窗 / 模态卡片出现"
         case .custom: return "自由组合下列所有参数"
         }
     }
@@ -305,6 +314,15 @@ enum OverlayAnimationStyle: String, CaseIterable, Identifiable, Codable {
         case .flipY:
             return P(duration: 0.44, curve: .spring, bounce: 0.8, travelX: 0, travelY: 0,
                      scale: 1, rotation: -90, blur: 0, opacity: 0)
+        case .efficient:
+            return P(duration: 0.2, curve: .easeOut, travelX: 0, travelY: 10,
+                     scale: 1, rotation: 0, blur: 0, opacity: 0)
+        case .reliable:
+            return P(duration: 0.3, curve: .easeInOut, bounce: 0.9, travelX: 0, travelY: 0,
+                     scale: 0.98, rotation: 0, blur: 0, opacity: 0)
+        case .modalPop:
+            return P(duration: 0.34, curve: .spring, bounce: 0.5, travelX: 0, travelY: 0,
+                     scale: 0.86, rotation: 0, blur: 0, opacity: 0)
         case .custom:
             return nil
         }
@@ -320,14 +338,14 @@ enum OverlayAnimationStyle: String, CaseIterable, Identifiable, Codable {
 
     var usesVerticalTravel: Bool {
         switch self {
-        case .moveBottom, .moveTop, .push, .rise, .drop, .pop, .custom: return true
+        case .moveBottom, .moveTop, .push, .rise, .drop, .pop, .efficient, .custom: return true
         default: return false
         }
     }
 
     var usesScale: Bool {
         switch self {
-        case .scale, .pop, .zoomOut, .fadeScale, .custom: return true
+        case .scale, .pop, .zoomOut, .fadeScale, .reliable, .modalPop, .custom: return true
         default: return false
         }
     }
@@ -355,7 +373,7 @@ enum OverlayAnimationStyle: String, CaseIterable, Identifiable, Codable {
             return .identity
         case .fade, .crossDissolve:
             return OverlayMotion(opacity: s.opacityFrom)
-        case .scale, .pop, .zoomOut, .fadeScale:
+        case .scale, .pop, .zoomOut, .fadeScale, .reliable, .modalPop:
             return OverlayMotion(scale: s.scaleFrom, opacity: s.opacityFrom)
         case .moveBottom, .push:
             return OverlayMotion(offset: CGSize(width: 0, height: s.travelY), opacity: s.opacityFrom)
@@ -367,7 +385,7 @@ enum OverlayAnimationStyle: String, CaseIterable, Identifiable, Codable {
             return OverlayMotion(offset: CGSize(width: s.travelX, height: 0), opacity: s.opacityFrom)
         case .blurReplace:
             return OverlayMotion(blur: s.blurFrom, opacity: s.opacityFrom)
-        case .rise:
+        case .rise, .efficient:
             return OverlayMotion(offset: CGSize(width: 0, height: s.travelY),
                                  scale: s.scaleFrom, opacity: s.opacityFrom)
         case .drop:
