@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(store.animation.enterAnimation, value: store.immersiveDepth)
+        .animation(.easeOut(duration: 0.2), value: store.immersiveDepth)
         .overlay {
             if showingSearch {
                 SearchView(onDismiss: { dismissImmersive { showingSearch = false } })
@@ -121,41 +121,32 @@ struct PressableCardStyle: ButtonStyle {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// The motion itself is not hard-coded here: it is read from `store.animation`,
-/// which 动画实验室（设置页）exposes so every built-in animation can be tried on
-/// the real screens before being decided.
+/// Fixed feel, no longer configurable: 内容快速、干脆地显现，不做上下左右的切入；
+/// 只用很轻微的一档缩放（0.96 → 1）压出一点纵深，所以既利落又不显得平。
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
-/// doesn't wrap its state change in `withAnimation`; the exit replays the very
-/// same motion through a removal transition animated by `dismissImmersive`.
+/// doesn't wrap its state change in `withAnimation`; the exit replays the same
+/// motion through a removal transition animated by `dismissImmersive`.
 struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
     @State private var appeared = false
 
-    private var config: OverlayAnimationSettings { store.animation }
-    private var motion: OverlayMotion { config.entryMotion }
+    /// 起始缩放：越接近 1 越轻，这里是几乎察觉不到、但能提供纵深的一档。
+    fileprivate static let scaleFrom: CGFloat = 0.96
+    /// 进场 / 退场：短促的 easeOut，起步快、收尾稳，没有回弹的拖泥带水。
+    fileprivate static let enter = Animation.easeOut(duration: 0.2)
+    fileprivate static let exit = Animation.easeOut(duration: 0.16)
 
     func body(content: Content) -> some View {
         content
-            .rotation3DEffect(
-                .degrees(appeared ? 0 : (motion.rotationAxis == .y ? motion.rotation : 0)),
-                axis: (x: 0, y: 1, z: 0),
-                perspective: 0.5)
-            .rotation3DEffect(
-                .degrees(appeared ? 0 : (motion.rotationAxis == .x ? motion.rotation : 0)),
-                axis: (x: 1, y: 0, z: 0),
-                perspective: 0.5)
-            .rotationEffect(.degrees(appeared ? 0 : (motion.rotationAxis == .z ? motion.rotation : 0)))
-            .offset(appeared ? .zero : motion.offset)
-            .scaleEffect(appeared ? 1 : motion.scale)
-            .blur(radius: appeared ? 0 : motion.blur)
-            .opacity(appeared ? 1 : motion.opacity)
+            .opacity(appeared ? 1 : 0)
+            .scaleEffect(appeared ? 1 : Self.scaleFrom)
             .transition(.asymmetric(
                 insertion: .identity,
-                removal: config.removalTransition))
+                removal: .opacity.combined(with: .scale(scale: Self.scaleFrom))))
             .onAppear {
                 store.pushImmersive()
-                withAnimation(config.enterAnimation) { appeared = true }
+                withAnimation(Self.enter) { appeared = true }
             }
             .onDisappear { store.popImmersive() }
     }
@@ -167,7 +158,7 @@ extension View {
     }
 }
 
-/// Animates an overlay dismissal with the same configured motion as the entrance.
+/// Animates an overlay dismissal with the matching exit feel.
 func dismissImmersive(_ action: @escaping () -> Void) {
-    withAnimation(OverlayAnimationSettings.persisted.exitAnimation) { action() }
+    withAnimation(ImmersiveOverlay.exit) { action() }
 }
