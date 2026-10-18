@@ -129,6 +129,10 @@ enum OverlayConnector: String, CaseIterable, Identifiable, Codable {
     case lift       // 轻微浮起
     case push       // 柔边推移
     case liftFade   // 浮起 + 溶解
+    case zoom       // 放大进入
+    case card       // 卡片升起
+    case pip        // 画中画
+    case curtain    // 幕帘
 
     var id: String { rawValue }
 
@@ -142,6 +146,10 @@ enum OverlayConnector: String, CaseIterable, Identifiable, Codable {
         case .lift: return "轻微浮起"
         case .push: return "柔边推移"
         case .liftFade: return "浮起 + 溶解"
+        case .zoom: return "放大进入"
+        case .card: return "卡片升起"
+        case .pip: return "画中画"
+        case .curtain: return "幕帘"
         }
     }
 
@@ -155,6 +163,10 @@ enum OverlayConnector: String, CaseIterable, Identifiable, Codable {
         case .lift: return "新页面从 99% 轻推到 100%，像从旧页面浮出来，幅度很小。"
         case .push: return "新页面从下方极短地推进来，随即归位，做出「沟槽」层次。"
         case .liftFade: return "轻微浮起的同时由虚到实，连接感最强。"
+        case .zoom: return "新页面从 90% 迅速放大铺满，起始就离边缘一段距离，再一把合上。"
+        case .card: return "新页面像一张小卡片（约 92%）浮在旧页面之上，迅速长到全屏、空隙随之合拢。"
+        case .pip: return "新页面从更小的画面（约 86%）快速放大成主画面，两页的关系最清楚。"
+        case .curtain: return "新页面从 94% 均匀铺开，前后两页的边缘在这段距离里被合上。"
         }
     }
 }
@@ -168,6 +180,10 @@ struct OverlayTransition: Codable, Hashable {
     var startScale: CGFloat {
         guard enabled else { return 1 }
         switch connector {
+        case .pip: return 0.86
+        case .zoom: return 0.90
+        case .card: return 0.92
+        case .curtain: return 0.94
         case .resilient: return 0.985
         case .natural: return 0.992
         case .certain, .chain, .lift, .liftFade: return 0.99
@@ -180,7 +196,7 @@ struct OverlayTransition: Codable, Hashable {
         switch connector {
         case .push: return 8
         case .chain: return 6
-        case .liquid, .natural, .certain, .resilient, .lift, .liftFade: return 0
+        default: return 0
         }
     }
 
@@ -190,7 +206,21 @@ struct OverlayTransition: Codable, Hashable {
         case .liquid: return 10
         case .liftFade: return 6
         case .natural: return 4
-        case .certain, .resilient, .chain, .lift, .push: return 0
+        default: return 0
+        }
+    }
+
+    /// 进场时盖在下层页面上的暗色，让两个界面之间的空隙有内容、也压掉边缘的跳色。
+    var startDim: Double {
+        guard enabled else { return 0 }
+        switch connector {
+        case .liquid, .zoom: return 0
+        case .natural: return 0.15
+        case .certain, .lift, .push, .liftFade: return 0.2
+        case .curtain, .resilient: return 0.25
+        case .chain: return 0.3
+        case .card: return 0.35
+        case .pip: return 0.45
         }
     }
 
@@ -200,9 +230,13 @@ struct OverlayTransition: Codable, Hashable {
         case .liquid, .push: return .easeOut(duration: 0.28)
         case .natural: return .easeInOut(duration: 0.32)
         case .certain: return .easeOut(duration: 0.29)
-        case .resilient: return .spring(response: 0.29, dampingFraction: 0.78)
+        case .resilient: return .spring(response: 0.25, dampingFraction: 0.78)
         case .chain: return .spring(response: 0.32, dampingFraction: 0.82)
         case .lift, .liftFade: return .spring(response: 0.28, dampingFraction: 0.9)
+        case .zoom: return .easeOut(duration: 0.26)
+        case .card: return .easeOut(duration: 0.28)
+        case .pip: return .spring(response: 0.30, dampingFraction: 0.85)
+        case .curtain: return .easeInOut(duration: 0.30)
         }
     }
 
@@ -227,9 +261,9 @@ struct OverlayTransition: Codable, Hashable {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// 进场：内容立刻显现（很快），若在 关于 里打开了「页面过渡」，再叠一层连接动画
-/// （溶解 / 浮起 / 推移），把前后两页接起来。
-/// 退场：统一干净的快速淡出——不改几何，所以刘海与屏幕边缘不会露色。
+/// 进场：内容很快显现；打开「页面过渡」后，新页面会从离边缘一段距离的位置
+/// 迅速放大铺满，前后两页之间的空隙由一层暗色填充（也压掉刘海处的跳色）。
+/// 退场：统一干净的快速淡出。
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
 /// doesn't wrap its state change in `withAnimation`.
@@ -237,28 +271,45 @@ struct ImmersiveOverlay: ViewModifier {
     @EnvironmentObject var store: AppStore
     @State private var appeared = false
 
+    /// 覆盖层后面垫的底色。视频页传 .black，保证刘海区域始终是黑的、不跳色。
+    var backdrop: Color? = nil
+
     private var transition: OverlayTransition { store.overlayTransition }
 
+    /// 空隙里要填充的颜色与目标不透明度。
+    private var fillColor: Color { backdrop ?? .black }
+    private var fillTarget: Double {
+        guard transition.enabled else { return 0 }
+        return backdrop != nil ? 1 : transition.startDim
+    }
+
     func body(content: Content) -> some View {
-        content
-            .scaleEffect(appeared ? 1 : transition.startScale)
-            .offset(y: appeared ? 0 : transition.startOffset)
-            .blur(radius: appeared ? 0 : transition.startBlur)
-            .opacity(appeared ? 1 : 0)
-            .transition(.asymmetric(
-                insertion: .identity,
-                removal: .opacity))
-            .onAppear {
-                store.pushImmersive()
-                withAnimation(transition.enterAnimation) { appeared = true }
+        ZStack {
+            if fillTarget > 0 {
+                fillColor
+                    .ignoresSafeArea()
+                    .opacity(appeared ? fillTarget : 0)
             }
-            .onDisappear { store.popImmersive() }
+            content
+                .scaleEffect(appeared ? 1 : transition.startScale)
+                .offset(y: appeared ? 0 : transition.startOffset)
+                .blur(radius: appeared ? 0 : transition.startBlur)
+                .opacity(appeared ? 1 : 0)
+        }
+        .transition(.asymmetric(
+            insertion: .identity,
+            removal: .opacity))
+        .onAppear {
+            store.pushImmersive()
+            withAnimation(transition.enterAnimation) { appeared = true }
+        }
+        .onDisappear { store.popImmersive() }
     }
 }
 
 extension View {
-    func immersive() -> some View {
-        modifier(ImmersiveOverlay())
+    func immersive(backdrop: Color? = nil) -> some View {
+        modifier(ImmersiveOverlay(backdrop: backdrop))
     }
 }
 

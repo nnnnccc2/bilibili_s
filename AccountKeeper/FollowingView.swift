@@ -121,7 +121,7 @@ struct FollowingView: View {
                 VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .immersive()
+                    .immersive(backdrop: .black)
                     .id(video.id)
                     .zIndex(10)
             }
