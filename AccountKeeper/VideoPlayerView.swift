@@ -91,7 +91,7 @@ struct VideoPlayerView: View {
                     PlayerLayerView(player: player)
                         .ignoresSafeArea()
                         .opacity(isReady ? 1 : 0)
-                        .animation(.easeIn(duration: 0.18), value: isReady)
+                        .animation(MiniBiliAnimation.uiReveal, value: isReady)
                     gestureIndicatorView
                     interactionLayer
                         .ignoresSafeArea()
@@ -413,7 +413,7 @@ struct VideoPlayerView: View {
             if let player = player {
                 PlayerLayerView(player: player)
                     .opacity(isReady ? 1 : 0)
-                    .animation(.easeIn(duration: 0.18), value: isReady)
+                    .animation(MiniBiliAnimation.uiReveal, value: isReady)
             } else {
                 VStack(spacing: 8) {
                     if isBuffering {
@@ -526,7 +526,7 @@ struct VideoPlayerView: View {
     // MARK: - Controls helpers
 
     private func toggleControls() {
-        withAnimation(.easeInOut(duration: 0.15)) {
+        withAnimation(MiniBiliAnimation.uiReveal) {
             showControls.toggle()
         }
         if showControls { scheduleHideControls() }
@@ -536,7 +536,7 @@ struct VideoPlayerView: View {
         controlsTimer?.invalidate()
         controlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
             DispatchQueue.main.async {
-                withAnimation(.easeInOut(duration: 0.2)) { showControls = false }
+                withAnimation(MiniBiliAnimation.uiReveal) { showControls = false }
             }
         }
     }
@@ -879,7 +879,7 @@ struct VideoPlayerView: View {
             switch observed.status {
             case .readyToPlay:
                 DispatchQueue.main.async {
-                    withAnimation(.easeIn(duration: 0.18)) { self.isReady = true }
+                    withAnimation(MiniBiliAnimation.uiReveal) { self.isReady = true }
                 }
             case .failed:
                 if allowFallback {

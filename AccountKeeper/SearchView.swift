@@ -269,7 +269,7 @@ struct SearchView: View {
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
-                .animation(.easeOut(duration: 0.2), value: results.count)
+                .animation(MiniBiliAnimation.contentAppear, value: results.count)
             }
 
             if isLoadingMore {

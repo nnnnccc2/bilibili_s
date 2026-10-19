@@ -120,7 +120,7 @@ struct PressableCardStyle: ButtonStyle {
 
 /// MiniBili 全局动画体系：干净、通透、干脆。
 /// 所有页面过渡与交互反馈都统一走这套手感，保证全应用动画语言一致。
-private enum MiniBiliAnimation {
+enum MiniBiliAnimation {
 
     // MARK: 沉浸式浮层过渡（页面进出）
 
@@ -147,6 +147,13 @@ private enum MiniBiliAnimation {
     static let tabSelect: Animation = .spring(response: 0.25, dampingFraction: 0.86)
     /// 按压反馈：极快，响应即时。
     static let press: Animation = .easeOut(duration: 0.08)
+
+    // MARK: 内容与控件
+
+    /// 内容出现（搜索结果、列表）。
+    static let contentAppear: Animation = .easeOut(duration: 0.20)
+    /// 界面控件显示/隐藏（播放器控制条、就绪态等）。
+    static let uiReveal: Animation = .easeInOut(duration: 0.18)
 }
 
 // MARK: - Immersive overlay helper
