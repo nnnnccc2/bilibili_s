@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:PiliPlus/core/constants/constants.dart';
+import 'package:PiliPlus/core/theme/minibili_theme.dart';
 import 'package:PiliPlus/features/home/domain/entities/home_tab_config.dart';
 import 'package:PiliPlus/features/home/presentation/providers/home_tab_controller.dart';
 import 'package:PiliPlus/features/home/presentation/widgets/home_app_bar.dart';
@@ -119,32 +120,69 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  /// 构建 TabBar
+  /// 构建 MiniBili 风格 TabBar
+  ///
+  /// 胶囊式标签：选中项为白色背景+蓝色文字，未选中为透明+灰色文字
   Widget _buildTabBar(HomeTabConfig config, ThemeData theme) {
-    Widget tabBarWidget = Padding(
-      padding: const EdgeInsets.only(top: 4),
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
       child: SizedBox(
-        height: 42,
-        width: double.infinity,
-        child: TabBar(
-          controller: _tabController,
-          tabs: config.tabs.map((e) => Tab(text: e.label)).toList(),
-          isScrollable: true,
-          dividerColor: Colors.transparent,
-          dividerHeight: 0,
-          splashBorderRadius: StyleString.mdRadius,
-          tabAlignment: TabAlignment.center,
-          onTap: (index) {
-            feedBack();
-            if (!_tabController.indexIsChanging) {
-              _handleTabTap(index);
-            }
+        height: 36,
+        child: AnimatedBuilder(
+          animation: _tabController,
+          builder: (context, child) {
+            return ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: config.tabs.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, index) {
+                final isSelected = _tabController.index == index;
+                final tab = config.tabs[index];
+                return GestureDetector(
+                  onTap: () {
+                    feedBack();
+                    if (_tabController.index != index) {
+                      _tabController.animateTo(index);
+                      _handleTabTap(index);
+                    }
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? MiniBiliColors.biliCard
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(18),
+                      border: isSelected
+                          ? Border.all(
+                              color: MiniBiliColors.biliBorder,
+                              width: 0.5,
+                            )
+                          : null,
+                    ),
+                    child: Text(
+                      tab.label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: isSelected
+                            ? MiniBiliColors.biliBlue
+                            : MiniBiliColors.biliTabText,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
           },
         ),
       ),
     );
-
-    return tabBarWidget;
   }
 
   /// 处理标签点击

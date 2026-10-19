@@ -1,6 +1,7 @@
 import 'package:PiliPlus/app/router/app_routes.dart';
 import 'package:PiliPlus/shared/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/core/constants/constants.dart';
+import 'package:PiliPlus/core/theme/minibili_theme.dart';
 import 'package:PiliPlus/features/account/domain/entities/account_state.dart';
 import 'package:PiliPlus/features/account/presentation/providers/account_provider.dart';
 import 'package:PiliPlus/features/home/domain/entities/home_tab_config.dart';
@@ -16,9 +17,9 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 
 /// 首页顶部栏
 ///
-/// 包含：
-/// - 用户头像
-/// - 搜索框
+/// MiniBili 风格：
+/// - 用户头像（圆形）
+/// - 搜索框（圆角胶囊，半透明背景）
 /// - 消息按钮（带未读角标）
 class HomeAppBar extends ConsumerWidget {
   final HomeTabConfig config;
@@ -84,18 +85,6 @@ class UserAvatar extends ConsumerWidget {
           height: 34,
           src: accountState.face,
         ),
-        Positioned.fill(
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: () => _handleTap(context, ref),
-              splashColor: theme.colorScheme.primaryContainer.withValues(
-                alpha: 0.3,
-              ),
-              customBorder: const CircleBorder(),
-            ),
-          ),
-        ),
         if (accountState.isAnonymous)
           Positioned(
             right: -4,
@@ -105,12 +94,12 @@ class UserAvatar extends ConsumerWidget {
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: theme.colorScheme.secondaryContainer,
+                  color: MiniBiliColors.biliMutedSurface,
                 ),
                 child: Icon(
                   size: 14,
                   MdiIcons.incognito,
-                  color: theme.colorScheme.onSecondaryContainer,
+                  color: MiniBiliColors.biliSubtext,
                 ),
               ),
             ),
@@ -125,21 +114,18 @@ class UserAvatar extends ConsumerWidget {
     WidgetRef ref,
     ThemeData theme,
   ) {
-    return SizedBox(
-      width: 38,
-      height: 38,
-      child: IconButton(
-        tooltip: '点击登录',
-        style: IconButton.styleFrom(
-          padding: EdgeInsets.zero,
-          backgroundColor: theme.colorScheme.onInverseSurface,
-        ),
-        onPressed: () => _handleTap(context, ref),
-        icon: Icon(
-          Icons.person_rounded,
-          size: 22,
-          color: theme.colorScheme.primary,
-        ),
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: MiniBiliColors.biliMutedSurface,
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.person_rounded,
+        size: 20,
+        color: MiniBiliColors.biliBlue,
       ),
     );
   }
@@ -161,20 +147,24 @@ class SearchBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final searchState = ref.watch(searchSuggestionControllerProvider);
 
-    const borderRadius = BorderRadius.all(Radius.circular(25));
-    return SizedBox(
-      height: 44,
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: MiniBiliColors.biliCard.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(
+          color: MiniBiliColors.biliBorder,
+          width: 0.5,
+        ),
+      ),
       child: Material(
-        borderRadius: borderRadius,
-        color: theme.colorScheme.onSecondaryContainer.withValues(alpha: 0.05),
+        type: MaterialType.transparency,
         child: InkWell(
-          borderRadius: borderRadius,
-          splashColor: theme.colorScheme.primaryContainer.withValues(
-            alpha: 0.3,
-          ),
+          borderRadius: BorderRadius.circular(19),
+          splashColor: MiniBiliColors.biliBlue.withOpacity(0.08),
+          highlightColor: Colors.transparent,
           onTap: () => PageUtils.pushNamed(
             AppRoutes.search,
             parameters:
@@ -187,16 +177,20 @@ class SearchBar extends ConsumerWidget {
               const SizedBox(width: 14),
               Icon(
                 Icons.search_outlined,
-                color: theme.colorScheme.onSecondaryContainer,
+                size: 20,
+                color: MiniBiliColors.biliMuted,
                 semanticLabel: '搜索',
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   searchState.defaultSearch,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: theme.colorScheme.outline),
+                  style: TextStyle(
+                    color: MiniBiliColors.biliMuted,
+                    fontSize: 14,
+                  ),
                 ),
               ),
               const SizedBox(width: 5),
@@ -223,24 +217,53 @@ class MsgBadge extends ConsumerWidget {
 
     final unreadMessage = ref.watch(unreadMessageControllerProvider);
     final isNumBadge = msgBadgeMode == DynamicBadgeMode.number;
+    final hasUnread =
+        msgBadgeMode != DynamicBadgeMode.hidden && unreadMessage.hasUnread;
 
-    return IconButton(
-      tooltip: '消息',
-      onPressed: () {
+    return GestureDetector(
+      onTap: () {
         ref.read(unreadMessageControllerProvider.notifier).clear();
         ref.read(unreadMessageControllerProvider.notifier).resetCheckTime();
         PageUtils.pushNamed(AppRoutes.whisper);
       },
-      icon: Badge(
-        isLabelVisible:
-            msgBadgeMode != DynamicBadgeMode.hidden && unreadMessage.hasUnread,
-        alignment: isNumBadge
-            ? const Alignment(0.0, -0.85)
-            : const Alignment(1.0, -0.85),
-        label: isNumBadge && unreadMessage.hasUnread
-            ? Text(unreadMessage.displayText)
-            : null,
-        child: const Icon(Icons.notifications_none),
+      child: Container(
+        width: 38,
+        height: 38,
+        alignment: Alignment.center,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              Icons.notifications_none,
+              size: 24,
+              color: MiniBiliColors.biliText,
+            ),
+            if (hasUnread)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: isNumBadge
+                      ? Text(
+                          unreadMessage.displayText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

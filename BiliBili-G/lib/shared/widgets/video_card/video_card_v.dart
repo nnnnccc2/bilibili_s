@@ -4,6 +4,7 @@ import 'package:PiliPlus/shared/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/shared/widgets/stat/stat.dart';
 import 'package:PiliPlus/shared/widgets/video_popup_menu.dart';
 import 'package:PiliPlus/core/constants/constants.dart';
+import 'package:PiliPlus/core/theme/minibili_theme.dart';
 import 'package:PiliPlus/http/search.dart';
 import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/models/common/stat_type.dart';
@@ -79,16 +80,25 @@ class VideoCardV extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Card(
+          Container(
             clipBehavior: Clip.hardEdge,
-            shape: const RoundedRectangleBorder(
-              borderRadius: StyleString.mdRadius,
+            decoration: BoxDecoration(
+              color: MiniBiliColors.biliCard.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: MiniBiliColors.biliBorder,
+                width: 0.5,
+              ),
             ),
-            child: InkWell(
-              onTap: () => onPushDetail(Utils.makeHeroTag(videoItem.aid)),
-              onLongPress: onLongPress,
-              onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
-              child: Column(
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                splashColor: Colors.transparent,
+                highlightColor: MiniBiliColors.biliBlue.withOpacity(0.06),
+                onTap: () => onPushDetail(Utils.makeHeroTag(videoItem.aid)),
+                onLongPress: onLongPress,
+                onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AspectRatio(
@@ -126,6 +136,7 @@ class VideoCardV extends StatelessWidget {
               ),
             ),
           ),
+        ),
           if (videoItem.goto == 'av')
             Positioned(
               right: -5,

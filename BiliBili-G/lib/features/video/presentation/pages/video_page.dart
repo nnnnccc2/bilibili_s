@@ -11,6 +11,7 @@ import 'package:PiliPlus/shared/widgets/image_viewer/hero_dialog_route.dart';
 import 'package:PiliPlus/shared/widgets/keep_alive_wrapper.dart';
 import 'package:PiliPlus/shared/widgets/scroll_physics.dart';
 import 'package:PiliPlus/core/constants/constants.dart';
+import 'package:PiliPlus/core/theme/minibili_theme.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/episode_panel_type.dart';
 import 'package:PiliPlus/models/pgc/pgc_info_model/result.dart';
@@ -1211,16 +1212,30 @@ class _VideoDetailPageVState extends ConsumerState<VideoDetailPageV>
 
     final flag = !needIndicator || tabs.length == 1;
     Widget tabBar() => TabBar(
-      labelColor: flag ? themeData.colorScheme.onSurface : null,
-      indicator: flag ? const BoxDecoration() : null,
+      labelColor: flag ? themeData.colorScheme.onSurface : MiniBiliColors.biliBlue,
+      unselectedLabelColor: MiniBiliColors.biliTabText,
+      indicator: flag
+          ? const BoxDecoration()
+          : BoxDecoration(
+              color: MiniBiliColors.biliCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: MiniBiliColors.biliBorder,
+                width: 0.5,
+              ),
+            ),
+      indicatorSize: TabBarIndicatorSize.label,
+      indicatorPadding: const EdgeInsets.symmetric(vertical: 6),
       padding: EdgeInsets.zero,
       controller: videoDetailController.tabCtr,
       labelStyle:
           TabBarTheme.of(context).labelStyle?.copyWith(fontSize: 13) ??
-          const TextStyle(fontSize: 13),
-      labelPadding: const EdgeInsets.symmetric(horizontal: 10.0),
+          const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 14.0),
       dividerColor: Colors.transparent,
       dividerHeight: 0,
+      splashBorderRadius: BorderRadius.circular(16),
       onTap: (value) {
         void animToTop() {
           if (onTap != null) {
