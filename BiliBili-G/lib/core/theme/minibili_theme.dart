@@ -163,6 +163,24 @@ abstract final class MiniBiliTheme {
         ),
         hintStyle: TextStyle(color: MiniBiliColors.biliMuted),
       ),
+      // TabBar 主题 — MiniBili 胶囊风格，全局生效
+      tabBarTheme: TabBarTheme(
+        labelColor: MiniBiliColors.biliBlue,
+        unselectedLabelColor: MiniBiliColors.biliTabText,
+        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        unselectedLabelStyle:
+            const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+        indicator: BoxDecoration(
+          color: MiniBiliColors.biliCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: MiniBiliColors.biliBorder,
+            width: 0.5,
+          ),
+        ),
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: Colors.transparent,
+      ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.white.withOpacity(0.85),
         selectedItemColor: MiniBiliColors.biliBlue,
@@ -295,6 +313,23 @@ abstract final class MiniBiliTheme {
           borderSide:
               BorderSide(color: MiniBiliColors.biliBlue, width: 1.5),
         ),
+      ),
+      tabBarTheme: TabBarTheme(
+        labelColor: MiniBiliColors.biliBlue,
+        unselectedLabelColor: Colors.white.withOpacity(0.6),
+        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        unselectedLabelStyle:
+            const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+        indicator: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.08),
+            width: 0.5,
+          ),
+        ),
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: Colors.transparent,
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: const Color(0xFF1E293B).withOpacity(0.85),

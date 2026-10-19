@@ -161,10 +161,7 @@ class _DynamicsPageState extends ConsumerState<DynamicsPage>
             isScrollable: true,
             tabAlignment: TabAlignment.center,
             dividerColor: Colors.transparent,
-            labelColor: theme.colorScheme.primary,
-            indicatorColor: theme.colorScheme.primary,
             controller: _tabController,
-            unselectedLabelColor: theme.colorScheme.onSurface,
             labelStyle:
                 TabBarTheme.of(context).labelStyle?.copyWith(fontSize: 13) ??
                 const TextStyle(fontSize: 13),
