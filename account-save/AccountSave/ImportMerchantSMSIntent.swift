@@ -18,14 +18,14 @@ struct ImportMerchantSMSIntent: AppIntent {
     @Parameter(title: "账号名")
     var accountName: String
 
-    @Parameter(title: "发送号码")
+    @Parameter(title: "发件人")
     var sender: String
 
     @Parameter(title: "短信内容")
     var content: String
 
     static var parameterSummary: some ParameterSummary {
-        Summary("把 \(\.$sender) 的短信保存到账号 \(\.$accountName)")
+        Summary("把 \(\.$sender) 的短信「\(\.$content)」保存到账号 \(\.$accountName)")
     }
 
     @MainActor
