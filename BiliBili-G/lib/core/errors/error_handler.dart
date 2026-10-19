@@ -42,7 +42,8 @@ class ErrorHandler {
     return switch (error.type) {
       DioExceptionType.connectionTimeout ||
       DioExceptionType.sendTimeout ||
-      DioExceptionType.receiveTimeout => NetworkException('网络连接超时'),
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.transformTimeout => NetworkException('网络连接超时'),
       DioExceptionType.connectionError => NetworkException('网络连接失败'),
       DioExceptionType.badResponse => _handleBadResponse(error),
       DioExceptionType.cancel => NetworkException('请求已取消'),

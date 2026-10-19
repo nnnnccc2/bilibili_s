@@ -128,6 +128,51 @@ jobs:
           done
           echo "flutter_html patch complete"
 
+      - name: Patch extended_nested_scroll_view to add ExtendedVisibilityDetector
+        run: |
+          find $PUB_CACHE -path "*extended_nested_scroll_view*lib/extended_nested_scroll_view.dart" 2>/dev/null | while read FILE; do
+            echo "Patching extended_nested_scroll_view: $FILE"
+            if ! grep -q "ExtendedVisibilityDetector" "$FILE"; then
+              # Ensure material import exists
+              if ! grep -q "package:flutter/material.dart" "$FILE"; then
+                sed -i '' '1i\
+import 'package:flutter/material.dart';
+' "$FILE"
+              fi
+              # Append a simple ExtendedVisibilityDetector widget
+              cat >> "$FILE" <<'WIDGET_EOF'
+
+class ExtendedVisibilityDetector extends StatelessWidget {
+  final Key? uniqueKey;
+  final Widget child;
+  const ExtendedVisibilityDetector({super.key, this.uniqueKey, required this.child});
+  @override
+  Widget build(BuildContext context) => child;
+}
+WIDGET_EOF
+              echo "Added ExtendedVisibilityDetector"
+            else
+              echo "ExtendedVisibilityDetector already present"
+            fi
+          done
+          echo "extended_nested_scroll_view patch complete"
+
+      - name: Patch chat_bottom_container to add keepChatPanel/restoreChatPanel
+        run: |
+          find $PUB_CACHE -path "*chat_bottom_container*panel_container.dart" 2>/dev/null | while read FILE; do
+            echo "Patching chat_bottom_container: $FILE"
+            if ! grep -q "keepChatPanel" "$FILE"; then
+              # Add no-op keepChatPanel and restoreChatPanel methods to the controller class
+              perl -i -pe '
+                if (/void _detachState\(\) \{/) {
+                  $_ = "\tvoid keepChatPanel() {}\n\tvoid restoreChatPanel() {}\n" . $_;
+                }
+              ' "$FILE"
+              echo "Added keepChatPanel/restoreChatPanel"
+            fi
+          done
+          echo "chat_bottom_container patch complete"
+
       - name: Build iOS (release, unsigned)
         run: |
           flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json

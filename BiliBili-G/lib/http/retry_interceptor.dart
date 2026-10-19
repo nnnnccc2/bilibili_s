@@ -53,6 +53,7 @@ class RetryInterceptor extends Interceptor {
         case DioExceptionType.connectionError:
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
+        case DioExceptionType.transformTimeout:
         case DioExceptionType.unknown:
           if ((err.requestOptions.extra['_rt'] ??= 0) < _count &&
               err.error
