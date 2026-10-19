@@ -1,0 +1,127 @@
+name: Build AccountSave IPA
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'account-save/**'
+      - '.github/workflows/build-account-save-ipa.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'account-save/**'
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Build AccountSave IPA
+    runs-on: macos-14
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using Xcode at: $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+
+      - name: Record compile time
+        id: compile_time
+        run: |
+          COMPILE_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          echo "compile_time=$COMPILE_TIME"
+          echo "compile_time=$COMPILE_TIME" >> $GITHUB_OUTPUT
+
+      - name: Build for iOS Device (arm64)
+        id: build
+        run: |
+          xcodebuild build \
+            -project account-save/AccountSave.xcodeproj \
+            -scheme AccountSave \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            ARCHS="arm64" \
+            VALID_ARCHS="arm64" 2>&1 | tee build.log
+
+      - name: Report build failure log to issue
+        if: failure() && steps.build.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Posting build log to issue..."
+          gh issue create --title "account-save build failure log" \
+            --body "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"$'\n\n''```'$'\n'"$(tail -n 120 build.log 2>/dev/null)"$'\n''```' || true
+
+      - name: Locate built .app
+        id: find_app
+        run: |
+          APP_PATH=$(find build -name "AccountSave.app" -path "*Release-iphoneos*" | head -1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find build -name "AccountSave.app" -path "*iphoneos*" | head -1)
+          fi
+          echo "Found app at: $APP_PATH"
+          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "=== App contents ==="
+          ls -la "$APP_PATH"
+
+      - name: Inject compile time into Info.plist
+        run: |
+          APP_PATH="${{ steps.find_app.outputs.app_path }}"
+          COMPILE_TIME="${{ steps.compile_time.outputs.compile_time }}"
+          INFO_PLIST="$APP_PATH/Info.plist"
+          echo "Injecting compile time: $COMPILE_TIME"
+          /usr/libexec/PlistBuddy -c "Add :BuildCompileTime string '$COMPILE_TIME'" "$INFO_PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :BuildCompileTime '$COMPILE_TIME'" "$INFO_PLIST"
+          /usr/libexec/PlistBuddy -c "Print :BuildCompileTime" "$INFO_PLIST"
+
+      - name: Ad-hoc sign app
+        run: |
+          APP_PATH="${{ steps.find_app.outputs.app_path }}"
+          echo "Signing app: $APP_PATH"
+          codesign --force --deep --sign - "$APP_PATH"
+          echo "=== Verify app signature ==="
+          codesign -dv "$APP_PATH" 2>&1 | head -20
+          echo "Signing complete"
+
+      - name: Package into IPA
+        run: |
+          APP_PATH="${{ steps.find_app.outputs.app_path }}"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/AccountSave.app
+          zip -r AccountSave.ipa Payload/ -x "*.DS_Store"
+          echo "IPA created: AccountSave.ipa"
+          ls -la AccountSave.ipa
+          echo "=== IPA contents ==="
+          unzip -l AccountSave.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AccountSave-iOS18-ipa
+          path: AccountSave.ipa
+          retention-days: 30
+
+      - name: Publish IPA to GitHub Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release delete account-save --yes --cleanup-tag 2>/dev/null || echo "No existing release to delete"
+          sleep 2
+          gh release create account-save AccountSave.ipa \
+            --title "账号保存 iOS 18 Build" \
+            --notes "**账号保存（短信收纳盒）iOS 18** — 通过快捷指令收短信、按账号归类并保存在本机。架构 arm64 · 部署目标 iOS 18.0 · ad-hoc 签名。使用 Sideloadly / AltStore 配合 Apple ID 重签名后安装。"
+          echo "Release created successfully"
+          gh release view account-save --json assets --jq '.assets[].name'
