@@ -74,6 +74,17 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Patch connectivity_plus for iOS 18 (isUltraConstrained -> isConstrained)
+        run: |
+          FILE=$(find $PUB_CACHE -path "*connectivity_plus*/Sources/connectivity_plus/PathMonitorConnectivityProvider.swift" 2>/dev/null | head -1)
+          if [ -n "$FILE" ]; then
+            echo "Patching: $FILE"
+            sed -i '' 's/isUltraConstrained/isConstrained/g' "$FILE"
+            echo "Patched successfully"
+          else
+            echo "connectivity_plus file not found, skipping patch"
+          fi
+
       - name: Build iOS (release, unsigned)
         run: |
           flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json
