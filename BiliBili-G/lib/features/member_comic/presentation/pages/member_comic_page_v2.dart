@@ -1,0 +1,90 @@
+import 'package:PiliPlus/shared/widgets/flutter/refresh_indicator.dart';
+import 'package:PiliPlus/shared/widgets/loading_widget/http_error.dart';
+import 'package:PiliPlus/features/member_comic/presentation/providers/member_comic_controller.dart';
+import 'package:PiliPlus/features/member_comic/presentation/widgets/item.dart';
+import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/shared/skeleton/video_card_h.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:PiliPlus/core/storage/storage_pref.dart';
+import 'package:PiliPlus/utils/waterfall.dart';
+
+class MemberComicPage extends ConsumerStatefulWidget {
+  const MemberComicPage({
+    super.key,
+    required this.mid,
+  });
+
+  final int mid;
+
+  @override
+  ConsumerState<MemberComicPage> createState() => _MemberComicPageState();
+}
+
+class _MemberComicPageState extends ConsumerState<MemberComicPage>
+    with AutomaticKeepAliveClientMixin {
+  late final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: Pref.smallCardWidth * 2,
+    mainAxisSpacing: 2,
+    crossAxisSpacing: 0,
+    childAspectRatio: (16 / 9) * 2.2,
+  );
+
+  Widget get gridSkeleton => SliverGrid.builder(
+    gridDelegate: gridDelegate,
+    itemBuilder: (_, _) => const VideoCardHSkeleton(),
+    itemCount: 10,
+  );
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final state = ref.watch(memberComicControllerProvider(widget.mid));
+    final controller = ref.read(memberComicControllerProvider(widget.mid).notifier);
+    final listState = state.listState;
+
+    return refreshIndicator(
+      onRefresh: () => controller.onRefresh(widget.mid),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
+            ),
+            sliver: _buildBody(listState, state, controller),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    LoadingState listState,
+    MemberComicState state,
+    MemberComicController controller,
+  ) {
+    return switch (listState) {
+      Loading() => gridSkeleton,
+      Success(:final response) =>
+        response != null && response.isNotEmpty
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    controller.onLoadMore(widget.mid);
+                  }
+                  return MemberComicItem(item: response[index]);
+                },
+                itemCount: response.length,
+              )
+            : HttpError(onReload: () => controller.onReload(widget.mid)),
+      Error(:final errMsg) => HttpError(
+        errMsg: errMsg,
+        onReload: () => controller.onReload(widget.mid),
+      ),
+    };
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+}
