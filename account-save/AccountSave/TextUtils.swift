@@ -34,6 +34,22 @@ enum VerificationCode {
     }
 }
 
+/// 从短信内容里提取中国大陆手机号，用作账号的注册（接收）手机号。
+enum PhoneNumber {
+    /// 匹配 1 开头、11 位、前后不接其他数字的手机号；找不到返回 nil。
+    static func extract(from content: String) -> String? {
+        let pattern = "(?<![0-9])(1[3-9][0-9]{9})(?![0-9])"
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(content.startIndex..., in: content)
+        guard let result = expression.firstMatch(in: content, range: range),
+              result.numberOfRanges > 1,
+              let phoneRange = Range(result.range(at: 1), in: content) else {
+            return nil
+        }
+        return String(content[phoneRange])
+    }
+}
+
 /// 时间展示与导出共用的格式化。
 enum DateText {
     private static let absoluteFormatter = makeFormatter("M月d日 HH:mm")

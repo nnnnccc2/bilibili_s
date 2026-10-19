@@ -14,16 +14,46 @@ struct AccountDetailView: View {
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
 
-    private let cardShape: RoundedRectangle = RoundedRectangle(cornerRadius: 14, style: .continuous)
+    private let cardShape: RoundedRectangle = RoundedRectangle(cornerRadius: 12, style: .continuous)
+
+    private var messages: [SMSMessage] { account.sortedMessages }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                headerCard
-                messagesCard
+        List {
+            headerCard
+                .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
+            if messages.isEmpty {
+                Text("暂无短信")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
+                    .background(Color(.secondarySystemGroupedBackground), in: cardShape)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 16, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            } else {
+                ForEach(messages) { message in
+                    MessageRowView(message: message)
+                        .background(Color(.secondarySystemGroupedBackground), in: cardShape)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                delete(message)
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                            }
+                        }
+                }
             }
-            .padding(16)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
         .navigationTitle(account.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -69,29 +99,6 @@ struct AccountDetailView: View {
         .background(Color(.secondarySystemGroupedBackground), in: cardShape)
     }
 
-    @ViewBuilder
-    private var messagesCard: some View {
-        let messages = account.sortedMessages
-        if messages.isEmpty {
-            Text("暂无短信")
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
-                .background(Color(.secondarySystemGroupedBackground), in: cardShape)
-        } else {
-            VStack(spacing: 0) {
-                ForEach(messages.indices, id: \.self) { index in
-                    if index > 0 {
-                        Divider().padding(.leading, 16)
-                    }
-                    MessageRowView(message: messages[index])
-                }
-            }
-            .background(Color(.secondarySystemGroupedBackground), in: cardShape)
-        }
-    }
-
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
@@ -131,6 +138,11 @@ struct AccountDetailView: View {
         } catch {
             exportError = error.localizedDescription
         }
+    }
+
+    private func delete(_ message: SMSMessage) {
+        modelContext.delete(message)
+        try? modelContext.save()
     }
 
     private func deleteAccount() {

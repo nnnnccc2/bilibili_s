@@ -11,6 +11,7 @@ struct SMSInboxView: View {
     @State private var isShowingGuide = false
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
+    @State private var accountToDelete: Account?
 
     var body: some View {
         NavigationStack {
@@ -37,6 +38,17 @@ struct SMSInboxView: View {
         } message: {
             Text(exportError ?? "")
         }
+        .confirmationDialog(
+            "删除账号",
+            isPresented: isConfirmingAccountDelete,
+            titleVisibility: .visible,
+            presenting: accountToDelete
+        ) { account in
+            Button("删除账号", role: .destructive) { delete(account) }
+            Button("取消", role: .cancel) {}
+        } message: { account in
+            Text("删除「\(account.name)」后，该账号下的 \(account.messages.count) 条短信也会一并删除，且无法恢复。")
+        }
     }
 
     @ViewBuilder
@@ -61,7 +73,7 @@ struct SMSInboxView: View {
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
-                            delete(account)
+                            accountToDelete = account
                         } label: {
                             Label("删除", systemImage: "trash")
                         }
@@ -126,6 +138,14 @@ struct SMSInboxView: View {
         Binding(
             get: { exportError != nil },
             set: { if !$0 { exportError = nil } }
+        )
+    }
+
+    /// 触发删除确认弹窗：有待删账号时弹出，关闭后清空。
+    private var isConfirmingAccountDelete: Binding<Bool> {
+        Binding(
+            get: { accountToDelete != nil },
+            set: { if !$0 { accountToDelete = nil } }
         )
     }
 

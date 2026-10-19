@@ -23,7 +23,7 @@ struct AccountEditorView: View {
                 }
 
                 Section {
-                    Text("账号名用于快捷指令弹窗输入后归类短信；注册手机号只用于导出的账号表格。")
+                    Text("账号名用于快捷指令弹窗输入后归类短信；注册手机号用于导出的账号表格，留空时收到短信会自动从短信内容中识别填写。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

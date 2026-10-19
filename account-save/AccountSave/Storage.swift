@@ -26,6 +26,10 @@ enum SMSSaver {
         receivedAt: Date = Date()
     ) throws -> Account {
         let account = try findOrCreate(name: normalized(accountName), in: context)
+        // 账号还没填注册手机号时，尝试从短信内容里识别出手机号自动补上。
+        if account.phoneNumber.isEmpty, let phone = PhoneNumber.extract(from: content) {
+            account.phoneNumber = phone
+        }
         let message = SMSMessage(sender: sender, content: content, receivedAt: receivedAt, account: account)
         context.insert(message)
         try context.save()
