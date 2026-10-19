@@ -86,8 +86,13 @@ jobs:
         run: |
           find $PUB_CACHE -path "*device_info_plus*FPPDeviceInfoPlusPlugin.m" 2>/dev/null | while read FILE; do
             echo "Patching: $FILE"
-            # Replace isiOSAppOnVision with a guarded call that returns NO on unsupported SDKs
+            # The source uses a local `info` variable: [info isiOSAppOnVision]
+            # Replace it with NO since the selector is unavailable on iOS 18 SDK
+            sed -i '' 's/\[info isiOSAppOnVision\]/NO/g' "$FILE"
+            # Also handle the fallback pattern just in case
             sed -i '' 's/\[\[NSProcessInfo processInfo\] isiOSAppOnVision\]/NO/g' "$FILE"
+            echo "--- Patched file (isiOSAppOnVision lines) ---"
+            grep -n "isiOSAppOnVision" "$FILE" || echo "no matches"
           done
           echo "device_info_plus patch complete"
 
