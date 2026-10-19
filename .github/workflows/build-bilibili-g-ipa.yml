@@ -133,11 +133,9 @@ jobs:
           find $PUB_CACHE -path "*extended_nested_scroll_view*lib/extended_nested_scroll_view.dart" 2>/dev/null | while read FILE; do
             echo "Patching extended_nested_scroll_view: $FILE"
             if ! grep -q "ExtendedVisibilityDetector" "$FILE"; then
-              # Ensure material import exists
+              # Ensure material import exists at top of file
               if ! grep -q "package:flutter/material.dart" "$FILE"; then
-                sed -i '' '1i\
-import 'package:flutter/material.dart';
-' "$FILE"
+                perl -i -pe 'print "import '\''package:flutter/material.dart'\'';\n" if $. == 1' "$FILE"
               fi
               # Append a simple ExtendedVisibilityDetector widget
               cat >> "$FILE" <<'WIDGET_EOF'
