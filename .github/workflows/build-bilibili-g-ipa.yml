@@ -135,21 +135,21 @@ jobs:
             if ! grep -q "ExtendedVisibilityDetector" "$FILE"; then
               # Ensure material import exists at top of file
               if ! grep -q "package:flutter/material.dart" "$FILE"; then
-                printf "import 'package:flutter/material.dart';\n" > /tmp/ensv_header.dart
+                echo "import 'package:flutter/material.dart';" > /tmp/ensv_header.dart
                 cat "$FILE" >> /tmp/ensv_header.dart
                 mv /tmp/ensv_header.dart "$FILE"
               fi
               # Append a simple ExtendedVisibilityDetector widget
-              cat >> "$FILE" <<'WIDGET_EOF'
-
-class ExtendedVisibilityDetector extends StatelessWidget {
-  final Key? uniqueKey;
-  final Widget child;
-  const ExtendedVisibilityDetector({super.key, this.uniqueKey, required this.child});
-  @override
-  Widget build(BuildContext context) => child;
-}
-WIDGET_EOF
+              {
+                echo ""
+                echo "class ExtendedVisibilityDetector extends StatelessWidget {"
+                echo "  final Key? uniqueKey;"
+                echo "  final Widget child;"
+                echo "  const ExtendedVisibilityDetector({super.key, this.uniqueKey, required this.child});"
+                echo "  @override"
+                echo "  Widget build(BuildContext context) => child;"
+                echo "}"
+              } >> "$FILE"
               echo "Added ExtendedVisibilityDetector"
             else
               echo "ExtendedVisibilityDetector already present"
