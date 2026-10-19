@@ -45,14 +45,14 @@ jobs:
       - name: Extract version and create pili_release.json
         run: |
           set -e
-          VERSION_NAME=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version:\s*([0-9.]+).*/\1/')
+          VERSION_NAME=$(awk -F'[ +]' '/^version:/{print $2}' pubspec.yaml)
           VERSION_CODE=$(git rev-list --count HEAD)
           COMMIT_HASH=$(git rev-parse HEAD)
           BUILD_TIME=$(date +%s)
           echo "version=$VERSION_NAME"
           echo "versionCode=$VERSION_CODE"
-          # Update pubspec.yaml version
-          sed -i.bak "s/^version:.*/version: ${VERSION_NAME}+${VERSION_CODE}/" pubspec.yaml
+          # Update pubspec.yaml version using perl (BSD sed -i compatible)
+          perl -i -pe "s/^version:.*/version: ${VERSION_NAME}+${VERSION_CODE}/" pubspec.yaml
           # Create pili_release.json
           cat > pili_release.json <<EOF
           {"pili.name":"${VERSION_NAME}","pili.code":${VERSION_CODE},"pili.hash":"${COMMIT_HASH}","pili.time":${BUILD_TIME}}
