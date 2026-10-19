@@ -1,0 +1,362 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B20000000000000000000040 /* AccountSaveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000020 /* AccountSaveApp.swift */; };
+		B20000000000000000000041 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000021 /* Models.swift */; };
+		B20000000000000000000042 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000022 /* Storage.swift */; };
+		B20000000000000000000043 /* TextUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000023 /* TextUtils.swift */; };
+		B20000000000000000000044 /* MerchantIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000024 /* MerchantIcon.swift */; };
+		B20000000000000000000045 /* ImportMerchantSMSIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000025 /* ImportMerchantSMSIntent.swift */; };
+		B20000000000000000000046 /* CabArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000026 /* CabArchive.swift */; };
+		B20000000000000000000047 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000027 /* ExportService.swift */; };
+		B20000000000000000000048 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000028 /* ShareSheet.swift */; };
+		B20000000000000000000049 /* SMSInboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000029 /* SMSInboxView.swift */; };
+		B2000000000000000000004A /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000002A /* AccountDetailView.swift */; };
+		B2000000000000000000004B /* AccountEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000002B /* AccountEditorView.swift */; };
+		B2000000000000000000004C /* ConfigImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000002C /* ConfigImportView.swift */; };
+		B2000000000000000000004D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000002D /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B20000000000000000000020 /* AccountSaveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSaveApp.swift; sourceTree = "<group>"; };
+		B20000000000000000000021 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		B20000000000000000000022 /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
+		B20000000000000000000023 /* TextUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextUtils.swift; sourceTree = "<group>"; };
+		B20000000000000000000024 /* MerchantIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantIcon.swift; sourceTree = "<group>"; };
+		B20000000000000000000025 /* ImportMerchantSMSIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportMerchantSMSIntent.swift; sourceTree = "<group>"; };
+		B20000000000000000000026 /* CabArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CabArchive.swift; sourceTree = "<group>"; };
+		B20000000000000000000027 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
+		B20000000000000000000028 /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		B20000000000000000000029 /* SMSInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMSInboxView.swift; sourceTree = "<group>"; };
+		B2000000000000000000002A /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDetailView.swift; sourceTree = "<group>"; };
+		B2000000000000000000002B /* AccountEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountEditorView.swift; sourceTree = "<group>"; };
+		B2000000000000000000002C /* ConfigImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigImportView.swift; sourceTree = "<group>"; };
+		B2000000000000000000002D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B2000000000000000000002E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B20000000000000000000009 /* AccountSave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AccountSave.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B2000000000000000000000F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B20000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000004 /* AccountSave */,
+				B20000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B20000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000009 /* AccountSave.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B20000000000000000000004 /* AccountSave */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000020 /* AccountSaveApp.swift */,
+				B20000000000000000000021 /* Models.swift */,
+				B20000000000000000000022 /* Storage.swift */,
+				B20000000000000000000023 /* TextUtils.swift */,
+				B20000000000000000000024 /* MerchantIcon.swift */,
+				B20000000000000000000025 /* ImportMerchantSMSIntent.swift */,
+				B20000000000000000000026 /* CabArchive.swift */,
+				B20000000000000000000027 /* ExportService.swift */,
+				B20000000000000000000028 /* ShareSheet.swift */,
+				B20000000000000000000029 /* SMSInboxView.swift */,
+				B2000000000000000000002A /* AccountDetailView.swift */,
+				B2000000000000000000002B /* AccountEditorView.swift */,
+				B2000000000000000000002C /* ConfigImportView.swift */,
+				B2000000000000000000002D /* Assets.xcassets */,
+				B2000000000000000000002E /* Info.plist */,
+			);
+			path = AccountSave;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B2000000000000000000000D /* AccountSave */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B20000000000000000000012 /* Build configuration list for PBXNativeTarget "AccountSave" */;
+			buildPhases = (
+				B2000000000000000000000E /* Sources */,
+				B2000000000000000000000F /* Frameworks */,
+				B20000000000000000000010 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AccountSave;
+			productName = AccountSave;
+			productReference = B20000000000000000000009 /* AccountSave.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B20000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					B2000000000000000000000D = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = B20000000000000000000011 /* Build configuration list for PBXProject "AccountSave" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B20000000000000000000002;
+			productRefGroup = B20000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B2000000000000000000000D /* AccountSave */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B20000000000000000000010 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B2000000000000000000004D /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B2000000000000000000000E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B20000000000000000000040 /* AccountSaveApp.swift in Sources */,
+				B20000000000000000000041 /* Models.swift in Sources */,
+				B20000000000000000000042 /* Storage.swift in Sources */,
+				B20000000000000000000043 /* TextUtils.swift in Sources */,
+				B20000000000000000000044 /* MerchantIcon.swift in Sources */,
+				B20000000000000000000045 /* ImportMerchantSMSIntent.swift in Sources */,
+				B20000000000000000000046 /* CabArchive.swift in Sources */,
+				B20000000000000000000047 /* ExportService.swift in Sources */,
+				B20000000000000000000048 /* ShareSheet.swift in Sources */,
+				B20000000000000000000049 /* SMSInboxView.swift in Sources */,
+				B2000000000000000000004A /* AccountDetailView.swift in Sources */,
+				B2000000000000000000004B /* AccountEditorView.swift in Sources */,
+				B2000000000000000000004C /* ConfigImportView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		B20000000000000000000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B20000000000000000000014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B20000000000000000000015 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AccountSave/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.AccountSave;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B20000000000000000000016 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AccountSave/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.AccountSave;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B20000000000000000000011 /* Build configuration list for PBXProject "AccountSave" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B20000000000000000000013 /* Debug */,
+				B20000000000000000000014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B20000000000000000000012 /* Build configuration list for PBXNativeTarget "AccountSave" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B20000000000000000000015 /* Debug */,
+				B20000000000000000000016 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B20000000000000000000001 /* Project object */;
+}
