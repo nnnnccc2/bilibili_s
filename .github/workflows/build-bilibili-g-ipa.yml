@@ -135,9 +135,8 @@ jobs:
             if ! grep -q "ExtendedVisibilityDetector" "$FILE"; then
               # Ensure material import exists at top of file
               if ! grep -q "package:flutter/material.dart" "$FILE"; then
-                echo "import 'package:flutter/material.dart';" > /tmp/ensv_header.dart
-                cat "$FILE" >> /tmp/ensv_header.dart
-                mv /tmp/ensv_header.dart "$FILE"
+                # Insert material import after the library directive (library must be first)
+                perl -i -pe 's/^(library;.*)$/$1\nimport "package:flutter\/material.dart";/' "$FILE"
               fi
               # Append a simple ExtendedVisibilityDetector widget
               {
