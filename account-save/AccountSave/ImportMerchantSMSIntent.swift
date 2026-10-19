@@ -24,6 +24,7 @@ struct ImportMerchantSMSIntent: AppIntent {
     @Parameter(title: "短信内容")
     var content: String
 
+    /// 三个参数都必须出现在摘要里，否则快捷指令界面不会显示对应的输入框。
     static var parameterSummary: some ParameterSummary {
         Summary("把 \(\.$sender) 的短信「\(\.$content)」保存到账号 \(\.$accountName)")
     }
