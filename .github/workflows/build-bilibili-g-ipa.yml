@@ -96,6 +96,38 @@ jobs:
           done
           echo "device_info_plus patch complete"
 
+      - name: Patch getx to add missing context getters (theme/size/mediaQuery/isDarkMode/width)
+        run: |
+          find $PUB_CACHE -path "*getx*get_navigation/src/extension_navigation.dart" 2>/dev/null | while read FILE; do
+            echo "Patching getx: $FILE"
+            # Insert getters before the closing brace of the Nav extension (before "static GetMaterialController _getxController")
+            perl -i -pe '
+              if (/static GetMaterialController _getxController = GetMaterialController\(\);/) {
+                $_ = "\tThemeData get theme => context != null ? Theme.of(context!) : ThemeData.light();\n" .
+                     "\tSize get size => context != null ? MediaQuery.sizeOf(context!) : Size.zero;\n" .
+                     "\tMediaQueryData get mediaQuery => context != null ? MediaQuery.of(context!) : const MediaQueryData();\n" .
+                     "\tbool get isDarkMode => theme.brightness == Brightness.dark;\n" .
+                     "\tdouble get width => size.width;\n" .
+                     "\tdouble get height => size.height;\n" .
+                     $_;
+              }
+            ' "$FILE"
+            echo "--- Patched getters ---"
+            grep -n "get theme\|get size\|get mediaQuery\|get isDarkMode\|get width" "$FILE" | head -10
+          done
+          echo "getx patch complete"
+
+      - name: Patch flutter_html to remove removed qs.matches call
+        run: |
+          find $PUB_CACHE -path "*flutter_html*styled_element.dart" 2>/dev/null | while read FILE; do
+            echo "Patching flutter_html: $FILE"
+            # qs.matches was removed in html 0.15.4+; replace with false (catch already returns false)
+            sed -i '' 's/return qs\.matches(element, selector);/return false;/g' "$FILE"
+            echo "--- Patched ---"
+            grep -n "matches" "$FILE" | head -5
+          done
+          echo "flutter_html patch complete"
+
       - name: Build iOS (release, unsigned)
         run: |
           flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json

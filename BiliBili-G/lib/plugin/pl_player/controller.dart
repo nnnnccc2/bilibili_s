@@ -214,7 +214,7 @@ class PlPlayerController with BlockConfigMixin {
 
   late final bool autoPiP = Pref.autoPiP;
   bool get isPipMode =>
-      (Platform.isAndroid && Floating().isPipMode) ||
+      (Platform.isAndroid && false) ||
       (PlatformUtils.isDesktop && isDesktopPip);
   // Desktop PiP functionality is disabled due to missing window_manager dependency
   late bool isDesktopPip = false;
@@ -681,9 +681,6 @@ class PlPlayerController with BlockConfigMixin {
 
     final player = await Player.create(
       configuration: PlayerConfiguration(
-        bufferSize: Pref.expandBuffer
-            ? (isLive ? 64 * 1024 * 1024 : 32 * 1024 * 1024)
-            : (isLive ? 16 * 1024 * 1024 : 4 * 1024 * 1024),
         logLevel: kDebugMode ? .warn : .error,
         options: opt,
       ),
@@ -1675,9 +1672,12 @@ class PlPlayerController with BlockConfigMixin {
     }
   }
 
-  void takeScreenshot() {
+  void takeScreenshot() async {
     ToastUtils.showToast('截图中');
-    videoPlayerController?.screenshot(format: .png).then((value) {
+    final image = await videoPlayerController?.screenshot();
+    if (image != null) {
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final value = byteData?.buffer.asUint8List();
       if (value != null) {
         ToastUtils.showToast('点击弹窗保存截图');
         showDialog(
@@ -1718,7 +1718,9 @@ class PlPlayerController with BlockConfigMixin {
       } else {
         ToastUtils.showToast('截图失败');
       }
-    });
+    } else {
+      ToastUtils.showToast('截图失败');
+    }
   }
 
   bool onPopInvokedWithResult(bool didPop, Object? result) {

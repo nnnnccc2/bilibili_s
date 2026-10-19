@@ -72,7 +72,7 @@ abstract final class MiniBiliTheme {
         scrolledUnderElevation: 0,
         centerTitle: true,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: MiniBiliColors.biliCard.withOpacity(0.92),
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -141,7 +141,7 @@ abstract final class MiniBiliTheme {
         scrolledUnderElevation: 0,
         centerTitle: true,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF1E293B).withOpacity(0.92),
         elevation: 0,
         shape: RoundedRectangleBorder(

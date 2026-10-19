@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' show max;
+import 'dart:ui' as ui;
 import 'package:PiliPlus/utils/toast_utils.dart';
 
 import 'package:PiliPlus/app/app.dart';
@@ -381,16 +382,20 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
                     final plPlayerController = Get.find<VideoDetailController>(
                       tag: heroTag,
                     );
-                    final res = await plPlayerController
+                    final image = await plPlayerController
                         .plPlayerController
                         .videoPlayerController
-                        ?.screenshot(format: media_kit.ScreenshotFormat.png);
-                    if (res != null) {
-                      final file = File(
-                        '$tmpDirPath/${Utils.generateRandomString(8)}.png',
-                      );
-                      await file.writeAsBytes(res);
-                      imageList.add(FilePicModel(path: file.path));
+                        ?.screenshot();
+                    if (image != null) {
+                      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+                      final res = byteData?.buffer.asUint8List();
+                      if (res != null) {
+                        final file = File(
+                          '$tmpDirPath/${Utils.generateRandomString(8)}.png',
+                        );
+                        await file.writeAsBytes(res);
+                        imageList.add(FilePicModel(path: file.path));
+                      }
                     } else {
                       debugPrint('null screenshot');
                     }
