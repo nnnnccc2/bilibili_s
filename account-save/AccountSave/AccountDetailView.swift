@@ -14,46 +14,33 @@ struct AccountDetailView: View {
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
 
-    private let cardShape: RoundedRectangle = RoundedRectangle(cornerRadius: 12, style: .continuous)
+    private let cardRadius: CGFloat = 10
 
     private var messages: [SMSMessage] { account.sortedMessages }
 
     var body: some View {
-        List {
-            headerCard
-                .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+        ScrollView {
+            VStack(spacing: 14) {
+                headerCard
 
-            if messages.isEmpty {
-                Text("暂无短信")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 32)
-                    .background(Color(.secondarySystemGroupedBackground), in: cardShape)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 16, trailing: 16))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-            } else {
-                ForEach(messages) { message in
-                    MessageRowView(message: message)
+                if messages.isEmpty {
+                    Text("暂无短信")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
                         .background(Color(.secondarySystemGroupedBackground), in: cardShape)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                delete(message)
-                            } label: {
-                                Label("删除", systemImage: "trash")
-                            }
+                } else {
+                    ForEach(messages) { message in
+                        SwipeDeleteMessageRow(message: message, radius: cardRadius) {
+                            delete(message)
                         }
+                    }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
         .navigationTitle(account.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -64,18 +51,21 @@ struct AccountDetailView: View {
         .sheet(item: $shareItem) { item in
             ShareSheet(items: [item.url])
         }
-        .confirmationDialog(
-            "删除账号后，该账号下的短信也会一并删除。",
-            isPresented: $isConfirmingDelete,
-            titleVisibility: .visible
-        ) {
-            Button("删除账号", role: .destructive) { deleteAccount() }
+        .alert("删除商家会话?", isPresented: $isConfirmingDelete) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) { deleteAccount() }
+        } message: {
+            Text("将删除 \(account.name) 的会话和所有短信。")
         }
         .alert("导出失败", isPresented: exportErrorBinding) {
             Button("好", role: .cancel) {}
         } message: {
             Text(exportError ?? "")
         }
+    }
+
+    private var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
     }
 
     private var headerCard: some View {
@@ -141,14 +131,91 @@ struct AccountDetailView: View {
     }
 
     private func delete(_ message: SMSMessage) {
-        modelContext.delete(message)
-        try? modelContext.save()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            modelContext.delete(message)
+            try? modelContext.save()
+        }
     }
 
     private func deleteAccount() {
         modelContext.delete(account)
         try? modelContext.save()
         dismiss()
+    }
+}
+
+/// 可左滑出删除按钮的短信卡片：滑出的红色区块与卡片同圆角。
+struct SwipeDeleteMessageRow: View {
+    let message: SMSMessage
+    let radius: CGFloat
+    let onDelete: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @State private var isRevealed = false
+
+    private let buttonWidth: CGFloat = 88
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Button(action: deleteNow) {
+                VStack(spacing: 4) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 19, weight: .regular))
+                    Text("删除")
+                        .font(.system(size: 15))
+                }
+                .foregroundStyle(.white)
+                .frame(width: buttonWidth)
+                .frame(maxHeight: .infinity)
+                .background(Color(.systemRed))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            MessageRowView(message: message)
+                .background(Color(.secondarySystemGroupedBackground))
+                .offset(x: offset)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: closeIfNeeded)
+                .gesture(dragGesture)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .frame(maxWidth: .infinity)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { value in
+                let projected = base + value.translation.width
+                offset = min(0, max(-buttonWidth - 30, projected))
+            }
+            .onEnded { value in
+                let projected = base + value.translation.width
+                if projected <= -buttonWidth - 30 {
+                    deleteNow()
+                } else if projected < -buttonWidth * 0.5 {
+                    withAnimation(.easeOut(duration: 0.18)) { offset = -buttonWidth }
+                    isRevealed = true
+                } else {
+                    withAnimation(.easeOut(duration: 0.18)) { offset = 0 }
+                    isRevealed = false
+                }
+            }
+    }
+
+    /// 已滑出时以 -buttonWidth 为基准继续计算拖动距离。
+    private var base: CGFloat { isRevealed ? -buttonWidth : 0 }
+
+    private func closeIfNeeded() {
+        guard isRevealed else { return }
+        withAnimation(.easeOut(duration: 0.18)) { offset = 0 }
+        isRevealed = false
+    }
+
+    private func deleteNow() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            onDelete()
+        }
     }
 }
 

@@ -7,7 +7,6 @@ struct SMSInboxView: View {
     @Query(sort: \Account.createdAt, order: .reverse) private var accounts: [Account]
 
     @State private var searchText = ""
-    @State private var isAddingAccount = false
     @State private var isShowingGuide = false
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
@@ -24,9 +23,6 @@ struct SMSInboxView: View {
                 )
                 .toolbar { toolbarContent }
         }
-        .sheet(isPresented: $isAddingAccount) {
-            AccountEditorView(account: nil)
-        }
         .sheet(isPresented: $isShowingGuide) {
             ConfigImportView()
         }
@@ -38,16 +34,15 @@ struct SMSInboxView: View {
         } message: {
             Text(exportError ?? "")
         }
-        .confirmationDialog(
-            "删除账号",
+        .alert(
+            "删除商家会话?",
             isPresented: isConfirmingAccountDelete,
-            titleVisibility: .visible,
             presenting: accountToDelete
         ) { account in
-            Button("删除账号", role: .destructive) { delete(account) }
             Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) { delete(account) }
         } message: { account in
-            Text("删除「\(account.name)」后，该账号下的 \(account.messages.count) 条短信也会一并删除，且无法恢复。")
+            Text("将删除 \(account.name) 的会话和所有短信。")
         }
     }
 
@@ -106,12 +101,6 @@ struct SMSInboxView: View {
                 isShowingGuide = true
             } label: {
                 Image(systemName: "questionmark.circle")
-            }
-
-            Button {
-                isAddingAccount = true
-            } label: {
-                Image(systemName: "plus")
             }
         }
     }

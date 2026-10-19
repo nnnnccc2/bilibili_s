@@ -1,13 +1,12 @@
 import SwiftUI
 import SwiftData
 
-/// 新建 / 编辑账号：账号名与注册手机号。
+/// 编辑账号：账号名与注册手机号。
 struct AccountEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    /// 传入账号表示编辑，传 nil 表示新建。
-    let account: Account?
+    let account: Account
 
     @State private var name = ""
     @State private var phoneNumber = ""
@@ -28,7 +27,7 @@ struct AccountEditorView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle(account == nil ? "新建账号" : "编辑账号")
+            .navigationTitle("编辑账号")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -40,8 +39,8 @@ struct AccountEditorView: View {
                 }
             }
             .onAppear {
-                name = account?.name ?? ""
-                phoneNumber = account?.phoneNumber ?? ""
+                name = account.name
+                phoneNumber = account.phoneNumber
             }
         }
     }
@@ -51,15 +50,8 @@ struct AccountEditorView: View {
     }
 
     private func save() {
-        let phone = phoneNumber.trimmingCharacters(in: .whitespaces)
-
-        if let account {
-            account.name = trimmedName
-            account.phoneNumber = phone
-        } else {
-            modelContext.insert(Account(name: trimmedName, phoneNumber: phone))
-        }
-
+        account.name = trimmedName
+        account.phoneNumber = phoneNumber.trimmingCharacters(in: .whitespaces)
         try? modelContext.save()
         dismiss()
     }

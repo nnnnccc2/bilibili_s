@@ -4,9 +4,9 @@ import Foundation
 enum ExportService {
     /// 账号列表：`.xlsx`，Excel / Numbers 可直接打开查看。
     static func exportAccounts(_ accounts: [Account]) throws -> URL {
-        var rows: [[String]] = [["账号名", "注册手机号", "短信数量"]]
+        var rows: [[String]] = [["账号名", "注册手机号"]]
         for account in accounts.sorted(by: { $0.createdAt < $1.createdAt }) {
-            rows.append([account.name, account.phoneNumber, String(account.messages.count)])
+            rows.append([account.name, account.phoneNumber])
         }
         let data = Spreadsheet.makeXLSX(sheetName: "账号列表", rows: rows)
         return try write(data, named: "账号列表_\(DateText.stamp()).xlsx")
