@@ -86,7 +86,7 @@ dependencies:
   extended_nested_scroll_view:
     git:
       url: https://github.com/bggRGjQaUbCoE/extended_nested_scroll_view.git
-      ref: mod
+      ref: master
   # 上拉加载
   # loading_more_list: ^7.1.0
   # 下拉刷新
