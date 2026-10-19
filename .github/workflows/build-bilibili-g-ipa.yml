@@ -80,7 +80,16 @@ jobs:
             echo "Patching: $FILE"
             sed -i '' 's/isUltraConstrained/isConstrained/g' "$FILE"
           done
-          echo "Patch complete"
+          echo "connectivity_plus patch complete"
+
+      - name: Patch device_info_plus for iOS SDK (isiOSAppOnVision guard)
+        run: |
+          find $PUB_CACHE -path "*device_info_plus*FPPDeviceInfoPlusPlugin.m" 2>/dev/null | while read FILE; do
+            echo "Patching: $FILE"
+            # Replace isiOSAppOnVision with a guarded call that returns NO on unsupported SDKs
+            sed -i '' 's/\[\[NSProcessInfo processInfo\] isiOSAppOnVision\]/NO/g' "$FILE"
+          done
+          echo "device_info_plus patch complete"
 
       - name: Build iOS (release, unsigned)
         run: |
