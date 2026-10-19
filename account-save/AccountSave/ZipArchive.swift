@@ -1,9 +1,9 @@
 import Foundation
 
-/// 极简归档写入器：只使用「存储（不压缩）」方式的标准 ZIP 容器。
+/// 极简 ZIP 容器写入器：条目以「存储（不压缩）」方式写入。
 ///
-/// 导出文件后缀为 `.cab`，内部是标准 ZIP，macOS、iOS 与常见的解压工具都能直接解开。
-enum CabArchive {
+/// 用于生成 `.xlsx` 这类本质上就是 ZIP 的文件，无需任何第三方库。
+enum ZipArchive {
     struct Entry {
         let name: String
         let data: Data

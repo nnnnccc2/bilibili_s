@@ -1,54 +1,36 @@
 import Foundation
 
-/// 导出账号表格与短信归档。
+/// 导出账号列表与短信。
 enum ExportService {
-    /// 账号表格：CSV 文本，Excel / Numbers / WPS 均可直接打开。
+    /// 账号列表：`.xlsx`，Excel / Numbers 可直接打开查看。
     static func exportAccounts(_ accounts: [Account]) throws -> URL {
-        var lines = ["账号名,注册手机号"]
+        var rows: [[String]] = [["账号名", "注册手机号", "短信数量"]]
         for account in accounts.sorted(by: { $0.createdAt < $1.createdAt }) {
-            lines.append("\(field(account.name)),\(field(account.phoneNumber))")
+            rows.append([account.name, account.phoneNumber, String(account.messages.count)])
         }
-        let csv = "\u{FEFF}" + lines.joined(separator: "\r\n") + "\r\n"
-        return try write(Data(csv.utf8), named: "账号表格_\(DateText.stamp()).csv")
+        let data = Spreadsheet.makeXLSX(sheetName: "账号列表", rows: rows)
+        return try write(data, named: "账号列表_\(DateText.stamp()).xlsx")
     }
 
-    /// 全部短信：`.cab` 归档，内含 `messages.csv` 与 `messages.json`。
+    /// 全部短信：CSV 文本，Excel / Numbers / WPS 均可直接打开。
     static func exportMessages(_ accounts: [Account]) throws -> URL {
         var lines = ["账号名,注册手机号,发件号码,短信内容,接收时间,验证码"]
-        var records: [[String: String]] = []
 
         for account in accounts.sorted(by: { $0.createdAt < $1.createdAt }) {
             for message in account.sortedMessages {
-                let code = VerificationCode.extract(from: message.content) ?? ""
                 lines.append([
                     field(account.name),
                     field(account.phoneNumber),
                     field(message.sender),
                     field(message.content),
                     field(DateText.full(message.receivedAt)),
-                    field(code)
+                    field(VerificationCode.extract(from: message.content) ?? "")
                 ].joined(separator: ","))
-                records.append([
-                    "账号名": account.name,
-                    "注册手机号": account.phoneNumber,
-                    "发件号码": message.sender,
-                    "短信内容": message.content,
-                    "接收时间": DateText.full(message.receivedAt),
-                    "验证码": code
-                ])
             }
         }
 
         let csv = "\u{FEFF}" + lines.joined(separator: "\r\n") + "\r\n"
-        let json = try JSONSerialization.data(
-            withJSONObject: records,
-            options: [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]
-        )
-        let archive = CabArchive.build(entries: [
-            CabArchive.Entry(name: "messages.csv", data: Data(csv.utf8)),
-            CabArchive.Entry(name: "messages.json", data: json)
-        ])
-        return try write(archive, named: "短信_\(DateText.stamp()).cab")
+        return try write(Data(csv.utf8), named: "短信_\(DateText.stamp()).csv")
     }
 
     private static func write(_ data: Data, named name: String) throws -> URL {

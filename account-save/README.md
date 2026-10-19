@@ -10,8 +10,8 @@ iOS 18 本地短信收纳 App：短信不会由 App 主动读取（iOS 不允许
 - 首页「短信收纳盒」：搜索短信或账号，按最近短信时间排序，支持删除
 - 账号详情：账号名、注册手机号、号码数 / 短信数，短信列表按时间倒序，自动识别验证码并一键复制
 - 账号维护：新建账号、编辑账号名与注册手机号（接收短信的手机号）
-- 导出账号（表格）：CSV 文件，列为 `账号名,注册手机号`
-- 导出短信（.cab）：标准 ZIP 容器（`.cab` 后缀），内含 `messages.csv` 与 `messages.json`
+- 导出账号列表（Excel）：`.xlsx` 文件，列为 `账号名,注册手机号,短信数量`
+- 导出短信（CSV）：一行一条短信，列为 `账号名,注册手机号,发件号码,短信内容,接收时间,验证码`
 - 无「凭证」功能，无任何网络请求，数据全部保存在本机
 
 ## 目录结构
@@ -26,8 +26,9 @@ account-save/
     ├── ImportMerchantSMSIntent.swift  # 快捷指令动作「导入商家短信」
     ├── TextUtils.swift            # 验证码识别与时间格式化
     ├── MerchantIcon.swift         # 账号图标（底色 + 缩写）
-    ├── CabArchive.swift           # .cab 归档写入（ZIP 存储方式）
-    ├── ExportService.swift        # 导出账号表格 / 导出短信
+    ├── ZipArchive.swift           # ZIP 容器写入（存储方式，不压缩）
+    ├── Spreadsheet.swift          # 生成 .xlsx（Excel 账号列表）
+    ├── ExportService.swift        # 导出账号列表 / 导出短信
     ├── SMSInboxView.swift         # 短信收纳盒（首页）
     ├── AccountDetailView.swift    # 账号详情
     ├── AccountEditorView.swift    # 新建 / 编辑账号
@@ -53,10 +54,10 @@ account-save/
 
 | 导出项 | 文件名 | 内容 |
 | --- | --- | --- |
-| 导出账号 | `账号表格_yyyyMMdd_HHmmss.csv` | UTF-8 BOM 的 CSV，列为 `账号名,注册手机号` |
-| 导出短信 | `短信_yyyyMMdd_HHmmss.cab` | 标准 ZIP 容器（存储方式不压缩），内含 `messages.csv`（账号名,注册手机号,发件号码,短信内容,接收时间,验证码）与 `messages.json` |
+| 导出账号列表 | `账号列表_yyyyMMdd_HHmmss.xlsx` | Excel 表格，列为 `账号名,注册手机号,短信数量` |
+| 导出短信 | `短信_yyyyMMdd_HHmmss.csv` | UTF-8 BOM 的 CSV，列为 `账号名,注册手机号,发件号码,短信内容,接收时间,验证码` |
 
-`.cab` 是标准 ZIP，macOS / iOS 可直接解开，Windows 上也可用 7-Zip 等工具打开。
+`.xlsx` 由内置的最小化 OOXML 写入器生成（`Spreadsheet.swift` + `ZipArchive.swift`），Excel / Numbers / WPS 均可直接打开。
 
 ## 构建
 

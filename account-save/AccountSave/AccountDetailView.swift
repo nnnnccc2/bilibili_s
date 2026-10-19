@@ -104,7 +104,7 @@ struct AccountDetailView: View {
                 Button {
                     exportMessages()
                 } label: {
-                    Label("导出该账号短信（.cab）", systemImage: "doc.zipper")
+                    Label("导出该账号短信（CSV）", systemImage: "doc.text")
                 }
                 Divider()
                 Button(role: .destructive) {

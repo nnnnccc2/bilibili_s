@@ -31,7 +31,7 @@ struct ConfigImportView: View {
                     privacyCard
                     sectionTitle("配置步骤")
                     stepsCard
-                    Text("导出账号表格与短信归档：回到「短信收纳盒」，点右上角的分享按钮。")
+                    Text("导出账号列表（Excel）与全部短信（CSV）：回到「短信收纳盒」，点右上角的分享按钮。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

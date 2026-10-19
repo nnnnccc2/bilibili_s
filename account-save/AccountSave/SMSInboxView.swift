@@ -79,12 +79,12 @@ struct SMSInboxView: View {
                 Button {
                     export(kind: .accounts)
                 } label: {
-                    Label("导出账号（表格）", systemImage: "tablecells")
+                    Label("导出账号列表（Excel）", systemImage: "tablecells")
                 }
                 Button {
                     export(kind: .messages)
                 } label: {
-                    Label("导出短信（.cab）", systemImage: "doc.zipper")
+                    Label("导出短信（CSV）", systemImage: "doc.text")
                 }
             } label: {
                 Image(systemName: "square.and.arrow.up")
