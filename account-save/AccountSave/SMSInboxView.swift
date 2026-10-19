@@ -19,7 +19,7 @@ struct SMSInboxView: View {
                 .searchable(
                     text: $searchText,
                     placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "搜索短信或账号"
+                    prompt: "搜索短信或商家"
                 )
                 .toolbar { toolbarContent }
         }
@@ -173,10 +173,10 @@ struct AccountRowView: View {
     let account: Account
 
     var body: some View {
-        HStack(spacing: 12) {
-            MerchantIconView(name: account.name)
+        HStack(alignment: .top, spacing: 12) {
+            MerchantIconView(name: account.name, size: 46)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(account.name)
                     .font(.system(size: 17, weight: .semibold))
                     .lineLimit(1)
@@ -191,6 +191,7 @@ struct AccountRowView: View {
             Text(timestampText)
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
+                .padding(.top, 2)
         }
         .padding(.vertical, 6)
     }
