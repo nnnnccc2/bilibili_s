@@ -287,48 +287,68 @@ struct BiliTopZone: Identifiable, Hashable {
 enum BiliZone {
 
     static let all: [BiliTopZone] = [
-        BiliTopZone(tid: 1, name: "动画", subs: [
-            BiliSubZone(tid: 24, name: "MAD·AMV"),
-            BiliSubZone(tid: 25, name: "MMD·3D"),
-            BiliSubZone(tid: 47, name: "短片·手书·配音"),
-            BiliSubZone(tid: 86, name: "特摄"),
-            BiliSubZone(tid: 210, name: "手办·模玩"),
-            BiliSubZone(tid: 253, name: "动漫杂谈"),
-            BiliSubZone(tid: 27, name: "动画综合"),
-            BiliSubZone(tid: 257, name: "配音")
-        ]),
         BiliTopZone(tid: 13, name: "番剧", subs: [
+            BiliSubZone(tid: 33, name: "连载动画"),
+            BiliSubZone(tid: 32, name: "完结动画"),
             BiliSubZone(tid: 51, name: "资讯"),
             BiliSubZone(tid: 152, name: "官方延伸"),
-            BiliSubZone(tid: 32, name: "完结动画"),
-            BiliSubZone(tid: 33, name: "连载动画")
         ]),
         BiliTopZone(tid: 167, name: "国创", subs: [
             BiliSubZone(tid: 153, name: "国产动画"),
             BiliSubZone(tid: 168, name: "国产原创相关"),
             BiliSubZone(tid: 169, name: "布袋戏"),
+            BiliSubZone(tid: 195, name: "动态漫·广播剧"),
             BiliSubZone(tid: 170, name: "资讯"),
-            BiliSubZone(tid: 195, name: "动态漫·广播剧")
+        ]),
+        BiliTopZone(tid: 65545, name: "放映厅", subs: []),
+        BiliTopZone(tid: 177, name: "纪录片", subs: [
+            BiliSubZone(tid: 37, name: "人文·历史"),
+            BiliSubZone(tid: 178, name: "科学·探索·自然"),
+            BiliSubZone(tid: 179, name: "军事"),
+            BiliSubZone(tid: 180, name: "社会·美食·旅行"),
+        ]),
+        BiliTopZone(tid: 23, name: "电影", subs: [
+            BiliSubZone(tid: 147, name: "华语电影"),
+            BiliSubZone(tid: 145, name: "欧美电影"),
+            BiliSubZone(tid: 146, name: "日本电影"),
+            BiliSubZone(tid: 83, name: "其他国家"),
+        ]),
+        BiliTopZone(tid: 11, name: "电视剧", subs: [
+            BiliSubZone(tid: 185, name: "国产剧"),
+            BiliSubZone(tid: 187, name: "海外剧"),
+        ]),
+        BiliTopZone(tid: 1, name: "动画", subs: [
+            BiliSubZone(tid: 24, name: "MAD·AMV"),
+            BiliSubZone(tid: 25, name: "MMD·3D"),
+            BiliSubZone(tid: 47, name: "同人·手书"),
+            BiliSubZone(tid: 257, name: "配音"),
+            BiliSubZone(tid: 210, name: "模玩·周边"),
+            BiliSubZone(tid: 86, name: "特摄"),
+            BiliSubZone(tid: 253, name: "动漫杂谈"),
+            BiliSubZone(tid: 27, name: "综合"),
         ]),
         BiliTopZone(tid: 3, name: "音乐", subs: [
             BiliSubZone(tid: 28, name: "原创音乐"),
-            BiliSubZone(tid: 31, name: "翻唱"),
-            BiliSubZone(tid: 30, name: "VOCALOID·UTAU"),
-            BiliSubZone(tid: 59, name: "演奏"),
-            BiliSubZone(tid: 193, name: "MV"),
             BiliSubZone(tid: 29, name: "音乐现场"),
-            BiliSubZone(tid: 130, name: "音乐综合"),
+            BiliSubZone(tid: 31, name: "翻唱"),
+            BiliSubZone(tid: 59, name: "演奏"),
             BiliSubZone(tid: 243, name: "乐评盘点"),
-            BiliSubZone(tid: 267, name: "电台")
+            BiliSubZone(tid: 30, name: "VOCALOID·UTAU"),
+            BiliSubZone(tid: 193, name: "MV"),
+            BiliSubZone(tid: 266, name: "音乐粉丝饭拍"),
+            BiliSubZone(tid: 265, name: "AI音乐"),
+            BiliSubZone(tid: 267, name: "电台"),
+            BiliSubZone(tid: 244, name: "音乐教学"),
+            BiliSubZone(tid: 130, name: "音乐综合"),
         ]),
         BiliTopZone(tid: 129, name: "舞蹈", subs: [
             BiliSubZone(tid: 20, name: "宅舞"),
-            BiliSubZone(tid: 154, name: "舞蹈综合"),
-            BiliSubZone(tid: 156, name: "舞蹈教程"),
             BiliSubZone(tid: 198, name: "街舞"),
             BiliSubZone(tid: 199, name: "明星舞蹈"),
             BiliSubZone(tid: 200, name: "国风舞蹈"),
-            BiliSubZone(tid: 255, name: "颜值·网红舞")
+            BiliSubZone(tid: 255, name: "颜值·网红舞"),
+            BiliSubZone(tid: 154, name: "舞蹈综合"),
+            BiliSubZone(tid: 156, name: "舞蹈教程"),
         ]),
         BiliTopZone(tid: 4, name: "游戏", subs: [
             BiliSubZone(tid: 17, name: "单机游戏"),
@@ -338,7 +358,7 @@ enum BiliZone {
             BiliSubZone(tid: 173, name: "桌游棋牌"),
             BiliSubZone(tid: 121, name: "GMV"),
             BiliSubZone(tid: 136, name: "音游"),
-            BiliSubZone(tid: 19, name: "Mugen")
+            BiliSubZone(tid: 19, name: "Mugen"),
         ]),
         BiliTopZone(tid: 36, name: "知识", subs: [
             BiliSubZone(tid: 201, name: "科学科普"),
@@ -348,80 +368,97 @@ enum BiliZone {
             BiliSubZone(tid: 208, name: "校园学习"),
             BiliSubZone(tid: 209, name: "职业职场"),
             BiliSubZone(tid: 229, name: "设计·创意"),
-            BiliSubZone(tid: 122, name: "野生技术协会")
+            BiliSubZone(tid: 122, name: "野生技能协会"),
         ]),
         BiliTopZone(tid: 188, name: "科技", subs: [
             BiliSubZone(tid: 95, name: "数码"),
             BiliSubZone(tid: 230, name: "软件应用"),
             BiliSubZone(tid: 231, name: "计算机技术"),
             BiliSubZone(tid: 232, name: "科工机械"),
-            BiliSubZone(tid: 233, name: "极客DIY")
-        ]),
-        BiliTopZone(tid: 160, name: "生活", subs: [
-            BiliSubZone(tid: 21, name: "日常"),
-            BiliSubZone(tid: 138, name: "搞笑"),
-            BiliSubZone(tid: 254, name: "亲子"),
-            BiliSubZone(tid: 250, name: "出行")
-        ]),
-        BiliTopZone(tid: 119, name: "鬼畜", subs: [
-            BiliSubZone(tid: 22, name: "鬼畜调教"),
-            BiliSubZone(tid: 26, name: "音MAD"),
-            BiliSubZone(tid: 216, name: "鬼畜剧场"),
-            BiliSubZone(tid: 126, name: "人力VOCALOID")
-        ]),
-        BiliTopZone(tid: 155, name: "时尚", subs: [
-            BiliSubZone(tid: 157, name: "美妆护肤"),
-            BiliSubZone(tid: 158, name: "穿搭"),
-            BiliSubZone(tid: 252, name: "仿妆cos")
+            BiliSubZone(tid: 233, name: "极客DIY"),
         ]),
         BiliTopZone(tid: 202, name: "资讯", subs: [
             BiliSubZone(tid: 203, name: "热点"),
             BiliSubZone(tid: 204, name: "环球"),
             BiliSubZone(tid: 205, name: "社会"),
-            BiliSubZone(tid: 206, name: "资讯综合")
+            BiliSubZone(tid: 206, name: "综合"),
+        ]),
+        BiliTopZone(tid: 234, name: "运动", subs: [
+            BiliSubZone(tid: 235, name: "篮球"),
+            BiliSubZone(tid: 249, name: "足球"),
+            BiliSubZone(tid: 164, name: "健身"),
+            BiliSubZone(tid: 236, name: "竞技体育"),
+            BiliSubZone(tid: 237, name: "运动文化"),
+            BiliSubZone(tid: 238, name: "运动综合"),
+        ]),
+        BiliTopZone(tid: 223, name: "汽车", subs: [
+            BiliSubZone(tid: 258, name: "汽车知识科普"),
+            BiliSubZone(tid: 227, name: "购车攻略"),
+            BiliSubZone(tid: 247, name: "新能源车"),
+            BiliSubZone(tid: 245, name: "赛车"),
+            BiliSubZone(tid: 246, name: "改装玩车"),
+            BiliSubZone(tid: 240, name: "摩托车"),
+            BiliSubZone(tid: 248, name: "房车"),
+            BiliSubZone(tid: 176, name: "汽车生活"),
+        ]),
+        BiliTopZone(tid: 160, name: "生活", subs: [
+            BiliSubZone(tid: 138, name: "搞笑"),
+            BiliSubZone(tid: 254, name: "亲子"),
+            BiliSubZone(tid: 250, name: "出行"),
+            BiliSubZone(tid: 251, name: "三农"),
+            BiliSubZone(tid: 239, name: "家居房产"),
+            BiliSubZone(tid: 161, name: "手工"),
+            BiliSubZone(tid: 162, name: "绘画"),
+            BiliSubZone(tid: 21, name: "日常"),
+        ]),
+        BiliTopZone(tid: 211, name: "美食", subs: [
+            BiliSubZone(tid: 76, name: "美食制作"),
+            BiliSubZone(tid: 212, name: "美食侦探"),
+            BiliSubZone(tid: 213, name: "美食测评"),
+            BiliSubZone(tid: 214, name: "田园美食"),
+            BiliSubZone(tid: 215, name: "美食记录"),
+        ]),
+        BiliTopZone(tid: 217, name: "动物圈", subs: [
+            BiliSubZone(tid: 218, name: "喵星人"),
+            BiliSubZone(tid: 219, name: "汪星人"),
+            BiliSubZone(tid: 222, name: "小宠异宠"),
+            BiliSubZone(tid: 221, name: "野生动物"),
+            BiliSubZone(tid: 220, name: "动物二创"),
+            BiliSubZone(tid: 75, name: "动物综合"),
+        ]),
+        BiliTopZone(tid: 65559, name: "VLOG", subs: []),
+        BiliTopZone(tid: 119, name: "鬼畜", subs: [
+            BiliSubZone(tid: 22, name: "鬼畜调教"),
+            BiliSubZone(tid: 26, name: "音MAD"),
+            BiliSubZone(tid: 126, name: "人力VOCALOID"),
+            BiliSubZone(tid: 216, name: "鬼畜剧场"),
+            BiliSubZone(tid: 127, name: "教程演示"),
+        ]),
+        BiliTopZone(tid: 155, name: "时尚", subs: [
+            BiliSubZone(tid: 157, name: "美妆护肤"),
+            BiliSubZone(tid: 252, name: "仿妆cos"),
+            BiliSubZone(tid: 158, name: "穿搭"),
+            BiliSubZone(tid: 159, name: "时尚潮流"),
         ]),
         BiliTopZone(tid: 5, name: "娱乐", subs: [
+            BiliSubZone(tid: 241, name: "娱乐杂谈"),
+            BiliSubZone(tid: 262, name: "CP安利"),
+            BiliSubZone(tid: 263, name: "颜值安利"),
+            BiliSubZone(tid: 242, name: "娱乐粉丝创作"),
+            BiliSubZone(tid: 264, name: "娱乐资讯"),
+            BiliSubZone(tid: 137, name: "明星综合"),
             BiliSubZone(tid: 71, name: "综艺"),
-            BiliSubZone(tid: 137, name: "明星综合")
         ]),
         BiliTopZone(tid: 181, name: "影视", subs: [
             BiliSubZone(tid: 182, name: "影视杂谈"),
             BiliSubZone(tid: 183, name: "影视剪辑"),
+            BiliSubZone(tid: 260, name: "影视整活"),
+            BiliSubZone(tid: 259, name: "AI影像"),
             BiliSubZone(tid: 184, name: "预告·资讯"),
             BiliSubZone(tid: 85, name: "小剧场"),
             BiliSubZone(tid: 256, name: "短片"),
-            BiliSubZone(tid: 261, name: "影视综合")
+            BiliSubZone(tid: 261, name: "影视综合"),
         ]),
-        BiliTopZone(tid: 23, name: "电影", subs: []),
-        BiliTopZone(tid: 11, name: "电视剧", subs: []),
-        BiliTopZone(tid: 177, name: "纪录片", subs: []),
-        BiliTopZone(tid: 223, name: "汽车", subs: [
-            BiliSubZone(tid: 176, name: "汽车生活"),
-            BiliSubZone(tid: 227, name: "购车攻略"),
-            BiliSubZone(tid: 240, name: "摩托车"),
-            BiliSubZone(tid: 245, name: "赛车"),
-            BiliSubZone(tid: 246, name: "改装玩车"),
-            BiliSubZone(tid: 247, name: "新能源车"),
-            BiliSubZone(tid: 248, name: "房车"),
-            BiliSubZone(tid: 258, name: "汽车知识科普")
-        ]),
-        BiliTopZone(tid: 234, name: "运动", subs: [
-            BiliSubZone(tid: 164, name: "健身"),
-            BiliSubZone(tid: 235, name: "篮球"),
-            BiliSubZone(tid: 236, name: "竞技体育"),
-            BiliSubZone(tid: 237, name: "运动文化"),
-            BiliSubZone(tid: 238, name: "运动综合"),
-            BiliSubZone(tid: 249, name: "足球")
-        ]),
-        BiliTopZone(tid: 217, name: "动物圈", subs: [
-            BiliSubZone(tid: 219, name: "汪星人"),
-            BiliSubZone(tid: 218, name: "喵星人"),
-            BiliSubZone(tid: 220, name: "动物二创"),
-            BiliSubZone(tid: 221, name: "野生动物"),
-            BiliSubZone(tid: 222, name: "小宠异宠"),
-            BiliSubZone(tid: 75, name: "动物综合")
-        ]),
-        BiliTopZone(tid: 76, name: "美食", subs: [])
     ]
 
     private static let topByTid: [Int: BiliTopZone] =
@@ -469,7 +506,7 @@ enum BiliZone {
     }()
 
     /// 高频低质分区的一键屏蔽推荐（动画 / 番剧 / 国创 / 游戏 / 美食 / 影视 / 娱乐）。
-    static let recommendedBlockTids: [Int] = [1, 13, 167, 4, 76, 181, 5]
+    static let recommendedBlockTids: [Int] = [1, 13, 167, 4, 211, 181, 5]
 
     static func topZone(tid: Int) -> BiliTopZone? { topByTid[tid] }
 
