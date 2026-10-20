@@ -81,8 +81,14 @@ struct SMSInboxView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
+        ToolbarItem(placement: .topBarTrailing) {
             Menu {
+                Button {
+                    isShowingGuide = true
+                } label: {
+                    Label("配置导入", systemImage: "questionmark.circle")
+                }
+                Divider()
                 Button {
                     export(kind: .accounts)
                 } label: {
@@ -94,13 +100,8 @@ struct SMSInboxView: View {
                     Label("导出短信（CSV）", systemImage: "doc.text")
                 }
             } label: {
-                Image(systemName: "square.and.arrow.up")
-            }
-
-            Button {
-                isShowingGuide = true
-            } label: {
-                Image(systemName: "questionmark.circle")
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 22))
             }
         }
     }

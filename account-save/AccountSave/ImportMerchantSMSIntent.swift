@@ -5,6 +5,8 @@ import SwiftData
 ///
 /// 在快捷指令里把「账号名」设为「每次询问」，运行自动化时就会弹窗输入账号名，
 /// 短信随即保存到该账号条目下。
+/// 「收件人」即接收短信的手机号，用作该账号的注册手机号；留空时会自动尝试
+/// 从短信内容里识别出手机号。
 struct ImportMerchantSMSIntent: AppIntent {
     static var title: LocalizedStringResource { "导入商家短信" }
 
@@ -24,9 +26,14 @@ struct ImportMerchantSMSIntent: AppIntent {
     @Parameter(title: "短信内容")
     var content: String
 
-    /// 三个参数都必须出现在摘要里，否则快捷指令界面不会显示对应的输入框。
+    /// 接收短信的手机号（注册手机号）。快捷指令自动化里选「快捷指令输入 → 收件人」。
+    /// 留空时 App 会尝试从短信内容里自动识别。
+    @Parameter(title: "收件人", default: "")
+    var recipient: String
+
+    /// 所有参数都必须出现在摘要里，否则快捷指令界面不会显示对应的输入框。
     static var parameterSummary: some ParameterSummary {
-        Summary("把 \(\.$sender) 的短信「\(\.$content)」保存到账号 \(\.$accountName)")
+        Summary("把 \(\.$sender) 发给 \(\.$recipient) 的短信「\(\.$content)」保存到账号 \(\.$accountName)")
     }
 
     @MainActor
@@ -37,7 +44,8 @@ struct ImportMerchantSMSIntent: AppIntent {
             in: context,
             accountName: accountName,
             sender: sender,
-            content: content
+            content: content,
+            recipient: recipient
         )
         return .result(dialog: "已保存到账号「\(account.name)」")
     }

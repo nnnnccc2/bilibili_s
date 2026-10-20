@@ -17,18 +17,25 @@ enum AppStore {
 /// 短信写入逻辑。
 enum SMSSaver {
     /// 把一条短信保存到指定账号下；账号不存在时自动新建。
+    /// recipient 为接收短信的手机号（注册手机号），优先填入账号的 phoneNumber。
     @discardableResult
     static func save(
         in context: ModelContext,
         accountName: String,
         sender: String,
         content: String,
+        recipient: String = "",
         receivedAt: Date = Date()
     ) throws -> Account {
         let account = try findOrCreate(name: normalized(accountName), in: context)
-        // 账号还没填注册手机号时，尝试从短信内容里识别出手机号自动补上。
-        if account.phoneNumber.isEmpty, let phone = PhoneNumber.extract(from: content) {
-            account.phoneNumber = phone
+        // 账号的注册手机号优先使用收件人参数；否则尝试从短信内容里识别。
+        if account.phoneNumber.isEmpty {
+            let recipientTrimmed = recipient.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !recipientTrimmed.isEmpty {
+                account.phoneNumber = recipientTrimmed
+            } else if let phone = PhoneNumber.extract(from: content) {
+                account.phoneNumber = phone
+            }
         }
         let message = SMSMessage(sender: sender, content: content, receivedAt: receivedAt, account: account)
         context.insert(message)
