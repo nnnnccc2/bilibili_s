@@ -1,5 +1,6 @@
 import 'package:PiliPlus/shared/widgets/scroll_physics.dart';
 import 'package:PiliPlus/shared/widgets/view_safe_area.dart';
+import 'package:PiliPlus/core/theme/minibili_theme.dart';
 import 'package:PiliPlus/models/common/search/search_type.dart';
 import 'package:PiliPlus/features/search_panel/presentation/pages/article/view.dart';
 import 'package:PiliPlus/features/search_panel/presentation/pages/live/view.dart';
@@ -121,11 +122,15 @@ class _SearchResultPageV2State extends State<SearchResultPageV2>
                 vertical: 8,
               ),
               indicator: BoxDecoration(
-                color: theme.colorScheme.secondaryContainer,
+                color: MiniBiliColors.biliCard,
                 borderRadius: const BorderRadius.all(Radius.circular(20)),
+                border: Border.all(
+                  color: MiniBiliColors.biliBorder,
+                  width: 0.5,
+                ),
               ),
               indicatorSize: TabBarIndicatorSize.tab,
-              labelColor: theme.colorScheme.onSecondaryContainer,
+              labelColor: MiniBiliColors.biliBlue,
               labelStyle:
                   TabBarTheme.of(
                     context,
@@ -133,7 +138,7 @@ class _SearchResultPageV2State extends State<SearchResultPageV2>
                   const TextStyle(fontSize: 13),
               dividerColor: Colors.transparent,
               dividerHeight: 0,
-              unselectedLabelColor: theme.colorScheme.outline,
+              unselectedLabelColor: MiniBiliColors.biliTabText,
               tabAlignment: TabAlignment.start,
               onTap: _handleTabTap,
             ),
