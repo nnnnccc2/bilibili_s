@@ -50,11 +50,7 @@ struct SMSInboxView: View {
             List {
                 ForEach(displayedGroups) { group in
                     NavigationLink {
-                        if group.accounts.count == 1 {
-                            AccountDetailView(account: group.accounts[0])
-                        } else {
-                            AccountGroupDetailView(group: group)
-                        }
+                        AccountGroupDetailView(group: group)
                     } label: {
                         AccountGroupRowView(group: group)
                     }
