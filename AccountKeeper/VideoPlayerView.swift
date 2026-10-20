@@ -189,13 +189,11 @@ struct VideoPlayerView: View {
                 PlayerManager.shared.deactivate(p)
             }
         }
-        .overlay {
-            if showingUPSpace, video.upMid > 0 {
-                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { dismissImmersive({ showingUPSpace = false }) })
+        // UP 空间：系统全屏模态。
+        .fullScreenCover(isPresented: $showingUPSpace) {
+            if video.upMid > 0 {
+                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { showingUPSpace = false })
                     .environmentObject(store)
-                    .ignoresSafeArea()
-                    .immersive()
-                    .zIndex(30)
             }
         }
         .overlay(alignment: .bottom) {

@@ -24,6 +24,7 @@ struct HomeView: View {
     @State private var selectedUPMid: Int = 0
     @State private var selectedUPName: String = ""
     @State private var showingUPSpace = false
+    @Namespace private var playerZoom
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -34,22 +35,18 @@ struct HomeView: View {
                 contentBoard
             }
         }
-        .overlay {
-            if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                    .environmentObject(store)
-                    .ignoresSafeArea()
-                    .immersive(backdrop: .black)
-                    .id(video.id)
-                    .zIndex(10)
-            }
+        // 播放器：系统全屏模态 + iOS 18 zoom 转场（从卡片缩略图放大进入）。
+        .fullScreenCover(item: $selectedVideo) { video in
+            VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                .environmentObject(store)
+                .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
+                .presentationBackground(.black)
         }
-        .overlay {
-            if showingUPSpace, selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }) })
+        // UP 空间：系统全屏模态。
+        .fullScreenCover(isPresented: $showingUPSpace) {
+            if selectedUPMid > 0 {
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
                     .environmentObject(store)
-                    .immersive()
-                    .zIndex(20)
             }
         }
         .onAppear {
@@ -160,6 +157,7 @@ struct HomeView: View {
                                     showingUPSpace = true
                                 }
                             }
+                            .matchedTransitionSource(id: video.id, in: playerZoom)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 selectedVideo = video

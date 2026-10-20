@@ -20,6 +20,7 @@ struct CategoryView: View {
     @State private var selectedUPMid: Int = 0
     @State private var selectedUPName: String = ""
     @State private var showingUPSpace = false
+    @Namespace private var playerZoom
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
@@ -106,6 +107,7 @@ struct CategoryView: View {
                                             showingUPSpace = true
                                         }
                                     }
+                                        .matchedTransitionSource(id: video.id, in: playerZoom)
                                         .contentShape(Rectangle())
                                         .onTapGesture { selectedVideo = video }
                                         .onAppear {
@@ -157,18 +159,17 @@ struct CategoryView: View {
                     }
                 }
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .immersive(backdrop: .black)
-                        .zIndex(10)
-                }
+            // 播放器：系统全屏模态 + iOS 18 zoom 转场。
+            .fullScreenCover(item: $selectedVideo) { video in
+                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                    .environmentObject(store)
+                    .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
+                    .presentationBackground(.black)
             }
-            .sheet(isPresented: $showingUPSpace) {
+            // UP 空间：系统全屏模态。
+            .fullScreenCover(isPresented: $showingUPSpace) {
                 if selectedUPMid > 0 {
-                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
+                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
                         .environmentObject(store)
                 }
             }

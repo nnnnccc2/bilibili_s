@@ -19,6 +19,7 @@ struct ProfileView: View {
     @State private var isLoadingHistory = false
     @State private var favoriteCount: Int = 0
     @State private var showingFavorites = false
+    @Namespace private var historyZoom
 
     private var displayHistory: [HistoryItem] {
         store.currentUser != nil ? remoteHistory : store.history
@@ -76,30 +77,15 @@ struct ProfileView: View {
                 }
             }
         }
-        .overlay {
-            if showingLogin {
-                LoginView(onDismiss: { dismissImmersive { showingLogin = false } })
-                    .environmentObject(store)
-                    .immersive()
-                    .zIndex(30)
-            }
+        // 登录：系统全屏模态。
+        .fullScreenCover(isPresented: $showingLogin) {
+            LoginView(onDismiss: { showingLogin = false })
+                .environmentObject(store)
         }
-        .overlay {
-            if showingSettings {
-                FilterSettingsView(onDismiss: { dismissImmersive { showingSettings = false } })
-                    .environmentObject(store)
-                    .immersive()
-                    .zIndex(30)
-            }
-        }
-        .overlay {
-            if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                    .environmentObject(store)
-                    .ignoresSafeArea()
-                    .immersive(backdrop: .black)
-                    .zIndex(10)
-            }
+        // 过滤设置：系统全屏模态。
+        .fullScreenCover(isPresented: $showingSettings) {
+            FilterSettingsView(onDismiss: { showingSettings = false })
+                .environmentObject(store)
         }
         .alert("退出登录", isPresented: $showingLogoutAlert) {
             Button("取消", role: .cancel) {}
@@ -110,20 +96,14 @@ struct ProfileView: View {
         } message: {
             Text("确定要退出当前账号吗？")
         }
-        .overlay {
-            if showingHistory {
-                historySheet
-                    .immersive()
-                    .zIndex(30)
-            }
+        // 观看历史：系统全屏模态（播放器在历史列表内部以 zoom 转场进入）。
+        .fullScreenCover(isPresented: $showingHistory) {
+            historySheet
         }
-        .overlay {
-            if showingFavorites {
-                FavoritesListView(onDismiss: { dismissImmersive { showingFavorites = false } })
-                    .environmentObject(store)
-                    .immersive()
-                    .zIndex(30)
-            }
+        // 收藏：系统全屏模态。
+        .fullScreenCover(isPresented: $showingFavorites) {
+            FavoritesListView(onDismiss: { showingFavorites = false })
+                .environmentObject(store)
         }
         .onAppear {
             refreshProfile()
@@ -431,7 +411,6 @@ struct ProfileView: View {
                             ForEach(displayHistory) { item in
                                 Button {
                                     playHistoryItem(item)
-                                    dismissImmersive { showingHistory = false }
                                 } label: {
                                     HStack(spacing: 10) {
                                         CachedAsyncImage(
@@ -456,6 +435,7 @@ struct ProfileView: View {
                                         Spacer()
                                     }
                                 }
+                                .matchedTransitionSource(id: item.videoId, in: historyZoom)
                                 .buttonStyle(.plain)
                             }
                         }
@@ -467,10 +447,17 @@ struct ProfileView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismissImmersive { showingHistory = false } }
+                    Button("完成") { showingHistory = false }
                         .foregroundColor(.biliBlue)
                 }
             }
+        }
+        // 播放器：系统全屏模态 + iOS 18 zoom 转场（从历史条目放大进入）。
+        .fullScreenCover(item: $selectedVideo) { video in
+            VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                .environmentObject(store)
+                .navigationTransition(.zoom(sourceID: video.id, in: historyZoom))
+                .presentationBackground(.black)
         }
     }
 

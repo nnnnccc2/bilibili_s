@@ -21,6 +21,7 @@ struct FavoritesListView: View {
     @State private var isLoadingMore = false
     @State private var total = 0
     @State private var selectedVideo: Video?
+    @Namespace private var playerZoom
 
     var body: some View {
         NavigationStack {
@@ -51,15 +52,12 @@ struct FavoritesListView: View {
             }
             .onAppear { loadFolders() }
         }
-        .overlay {
-            if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                    .environmentObject(store)
-                    .ignoresSafeArea()
-                    .immersive(backdrop: .black)
-                    .id(video.id)
-                    .zIndex(10)
-            }
+        // 播放器：系统全屏模态 + iOS 18 zoom 转场。
+        .fullScreenCover(item: $selectedVideo) { video in
+            VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                .environmentObject(store)
+                .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
+                .presentationBackground(.black)
         }
     }
 
@@ -110,6 +108,7 @@ struct FavoritesListView: View {
                         VideoCardView(video: video)
                             .contentShape(Rectangle())
                     }
+                    .matchedTransitionSource(id: video.id, in: playerZoom)
                     .buttonStyle(PressableCardStyle())
                     .onAppear {
                         if video.id == videos.last?.id, hasMore, !isLoadingMore {

@@ -17,15 +17,6 @@ final class AppStore: ObservableObject {
     @Published var history: [HistoryItem] = []
     @Published var lastBlockedCount: Int = 0
 
-    /// Number of immersive full-screen overlays currently presented
-    /// (video player, UP空间, 设置, 搜索...). When > 0 the bottom tab bar hides
-    /// so the overlay covers the whole screen. Uses a counter because overlays
-    /// can be stacked (e.g. 视频 → UP空间).
-    @Published var immersiveDepth: Int = 0
-
-    func pushImmersive() { immersiveDepth += 1 }
-    func popImmersive() { immersiveDepth = max(0, immersiveDepth - 1) }
-
     // MARK: - Persistence keys
 
     private let settingsKey = "BiliBili.filterSettings"

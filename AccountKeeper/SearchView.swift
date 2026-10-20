@@ -29,6 +29,8 @@ struct SearchView: View {
     /// Callback when user taps the cancel button (overlay presentation).
     var onDismiss: (() -> Void)? = nil
 
+    @Namespace private var playerZoom
+
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
@@ -157,22 +159,18 @@ struct SearchView: View {
             }
             .onAppear { loadHotKeywords() }
         }
-        .overlay {
-            if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                    .environmentObject(store)
-                    .ignoresSafeArea()
-                    .immersive()
-                    .id(video.id)
-                    .zIndex(10)
-            }
+        // 播放器：系统全屏模态 + iOS 18 zoom 转场。
+        .fullScreenCover(item: $selectedVideo) { video in
+            VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                .environmentObject(store)
+                .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
+                .presentationBackground(.black)
         }
-        .overlay {
-            if showingUPSpace {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }) })
+        // UP 空间：系统全屏模态。
+        .fullScreenCover(isPresented: $showingUPSpace) {
+            if selectedUPMid > 0 {
+                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
                     .environmentObject(store)
-                    .immersive()
-                    .zIndex(20)
             }
         }
     }
@@ -253,6 +251,7 @@ struct SearchView: View {
                                 showingUPSpace = true
                             }
                         }
+                            .matchedTransitionSource(id: video.id, in: playerZoom)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 selectedVideo = video
