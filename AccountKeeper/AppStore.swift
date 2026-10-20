@@ -146,6 +146,16 @@ final class AppStore: ObservableObject {
         if settings.blockedDurationSeconds == [10, 28, 30] {
             settings.blockedDurationSeconds = [10]
         }
+        // v6：老版本把分区屏蔽和内置词库默认设为关闭，导致「总开关开着却一条都拦不住」。
+        // 这里一次性打开各维度并预置高频低质分区，之后用户手动关闭仍会生效。
+        if (settings.schemaVersion ?? 0) < 6 {
+            settings.enableKeywordFilter = true
+            settings.builtInKeywordsEnabled = true
+            settings.enableTagFilter = true
+            settings.builtInTagsEnabled = true
+            settings.enablePartitionFilter = true
+            settings.blockedTopZoneTids.formUnion(FilterSettings.defaultTopZones)
+        }
         settings.schemaVersion = FilterSettings.currentSchemaVersion
     }
 

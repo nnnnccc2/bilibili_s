@@ -64,7 +64,10 @@ final class BiliAPI {
     private let session: URLSession
     private let baseHeaders: [String: String] = [
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
-        "Referer": "https://www.bilibili.com/"
+        "Referer": "https://www.bilibili.com/",
+        // WAF 对缺少 Origin / Accept 的接口请求容易直接回 412 风控页
+        "Origin": "https://www.bilibili.com",
+        "Accept": "application/json, text/plain, */*"
     ]
 
     /// Cookies after login (SESSDATA, bili_jct, DedeUserID, etc.)
@@ -473,64 +476,63 @@ final class BiliAPI {
 
         for index in targets {
             let bvid = videos[index].id
+            let needTid = videos[index].tid == 0
+            let needTags = videos[index].tags.isEmpty
 
-            if videos[index].tid == 0 {
-                group.enter()
-                lock.lock(); report.viewTried += 1; lock.unlock()
-                fetchViewMetadata(bvid: bvid, anonymous: false) { [weak self] payload, code, message, status, body in
-                    defer { group.leave() }
-                    guard let self = self else { return }
+            group.enter()
+            lock.lock()
+            if needTid { report.viewTried += 1 }
+            if needTags { report.tagTried += 1 }
+            lock.unlock()
+
+            fetchMeta(bvid: bvid) { [weak self] view, tags, code, message, status, body in
+                guard let self = self else { group.leave(); return }
+                lock.lock()
+                var gotTags = !tags.isEmpty
+                var gotTid = false
+                if let view = view {
+                    if needTid {
+                        let tid = self.parseTid(view["tid"])
+                        if tid != 0 { result[index].tid = tid; gotTid = true }
+                        if result[index].category.isEmpty { result[index].category = BiliZone.leafName(tid) ?? "" }
+                    }
+                    if result[index].desc.isEmpty { result[index].desc = view["desc"] as? String ?? "" }
+                    if result[index].duration == 0 { result[index].duration = view["duration"] as? Int ?? 0 }
+                    if result[index].aid == 0 { result[index].aid = view["aid"] as? Int ?? 0 }
+                    if result[index].cid == 0 { result[index].cid = view["cid"] as? Int ?? 0 }
+                }
+                if gotTid { report.viewOK += 1 }
+                if gotTags { report.tagOK += 1; result[index].tags = tags }
+                let failed = (needTid && !gotTid) || (needTags && !gotTags)
+                if !failed {
+                    lock.unlock()
+                    group.leave()
+                    return
+                }
+                lock.unlock()
+
+                // 兜底：view/detail 被 WAF 拦（412）时，用搜索接口按 bvid 反查 typeid + tag
+                self.fetchMetaBySearch(bvid: bvid) { tid2, tags2, code2, message2, status2, body2 in
                     lock.lock()
-                    if let payload = payload {
+                    if needTid && !gotTid && tid2 != 0 {
+                        result[index].tid = tid2
+                        if result[index].category.isEmpty { result[index].category = BiliZone.leafName(tid2) ?? "" }
                         report.viewOK += 1
-                        let tid = self.parseTid(payload["tid"])
-                        let tname = payload["tname"] as? String ?? ""
-                        if tid != 0 { result[index].tid = tid }
-                        if result[index].category.isEmpty {
-                            result[index].category = tname.isEmpty ? (BiliZone.leafName(tid) ?? "") : tname
-                        }
-                        if result[index].desc.isEmpty { result[index].desc = payload["desc"] as? String ?? "" }
-                        if result[index].duration == 0 { result[index].duration = payload["duration"] as? Int ?? 0 }
-                        if result[index].aid == 0 { result[index].aid = payload["aid"] as? Int ?? 0 }
-                        if result[index].cid == 0 { result[index].cid = payload["cid"] as? Int ?? 0 }
-                    } else {
-                        report.lastCode = code
-                        report.lastMessage = message
-                        report.lastStatus = status
-                        report.lastBody = body
+                        gotTid = true
+                    }
+                    if needTags && !gotTags && !tags2.isEmpty {
+                        result[index].tags = tags2
+                        report.tagOK += 1
+                        gotTags = true
+                    }
+                    if (needTid && !gotTid) || (needTags && !gotTags) {
+                        report.lastCode = code2 != 0 ? code2 : code
+                        report.lastMessage = message2.isEmpty ? message : message2
+                        report.lastStatus = status2 != 0 ? status2 : status
+                        report.lastBody = body2.isEmpty ? body : body2
                     }
                     lock.unlock()
-                }
-            }
-
-            if videos[index].tags.isEmpty {
-                group.enter()
-                lock.lock(); report.tagTried += 1; lock.unlock()
-                fetchTags(bvid: bvid, anonymous: false) { [weak self] names, code, message, status, body in
-                    guard let self = self else { group.leave(); return }
-                    if let names = names, !names.isEmpty {
-                        lock.lock()
-                        report.tagOK += 1
-                        if result[index].tags.isEmpty { result[index].tags = names }
-                        lock.unlock()
-                        group.leave()
-                        return
-                    }
-                    // 失败 → 去掉 cookie（游客身份）再试一次
-                    self.fetchTags(bvid: bvid, anonymous: true) { names2, code2, message2, status2, body2 in
-                        lock.lock()
-                        if let names2 = names2, !names2.isEmpty {
-                            report.tagOK += 1
-                            if result[index].tags.isEmpty { result[index].tags = names2 }
-                        } else {
-                            report.lastCode = code2 != 0 ? code2 : code
-                            report.lastMessage = message2.isEmpty ? message : message2
-                            report.lastStatus = status2 != 0 ? status2 : status
-                            report.lastBody = body2.isEmpty ? body : body2
-                        }
-                        lock.unlock()
-                        group.leave()
-                    }
+                    group.leave()
                 }
             }
         }
@@ -538,42 +540,57 @@ final class BiliAPI {
         group.notify(queue: .global()) { finishOnce() }
     }
 
-    /// 取视频公开详情（tid / tname / desc / duration）。
-    private func fetchViewMetadata(bvid: String, anonymous: Bool, completion: @escaping ([String: Any]?, Int, String, Int, String) -> Void) {
-        request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid], ignoreCookies: anonymous) { [weak self] data, response, _ in
+    /// 一次性取详情 + tag。
+    /// 用 `/x/web-interface/view/detail`（网页视频页同款接口），一次返回 `View`（tid/desc/duration）
+    /// 与 `Tags`（tag_name 列表），比 `/x/tag/archive/tags` 少一半请求，且后者在 iOS 上会被
+    /// WAF 直接回 412 风控页（实测「补tag 0/20 · HTTP412」）。
+    private func fetchMeta(bvid: String, completion: @escaping ([String: Any]?, [String], Int, String, Int, String) -> Void) {
+        request("https://api.bilibili.com/x/web-interface/view/detail", params: ["bvid": bvid]) { [weak self] data, response, _ in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let body = Self.snippet(data)
             guard let self = self, let json = self.parseJSON(data) else {
-                completion(nil, -1, "无响应", status, body)
+                completion(nil, [], -1, "无响应", status, body)
                 return
             }
             let code = json["code"] as? Int ?? -1
             guard code == 0, let d = json["data"] as? [String: Any] else {
-                completion(nil, code, json["message"] as? String ?? "", status, body)
+                completion(nil, [], code, json["message"] as? String ?? "", status, body)
                 return
             }
-            completion(d, 0, "", status, "")
+            let view = d["View"] as? [String: Any]
+            let tags = (d["Tags"] as? [[String: Any]] ?? [])
+                .compactMap { $0["tag_name"] as? String }
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            completion(view, tags, 0, "", status, tags.isEmpty ? body : "")
         }
     }
 
-    /// 取视频 tag 列表。
-    private func fetchTags(bvid: String, anonymous: Bool, completion: @escaping ([String]?, Int, String, Int, String) -> Void) {
-        request("https://api.bilibili.com/x/tag/archive/tags", params: ["bvid": bvid], ignoreCookies: anonymous) { [weak self] data, response, _ in
+    /// 兜底：按 bvid 走搜索接口拿 typeid + tag（逗号分隔）。
+    /// 搜索接口在 App 内实测可用（搜索页过滤一直正常），WAF 比 tag 接口宽松。
+    private func fetchMetaBySearch(bvid: String, completion: @escaping (Int, [String], Int, String, Int, String) -> Void) {
+        request("https://api.bilibili.com/x/web-interface/search/type",
+                params: ["search_type": "video", "keyword": bvid]) { [weak self] data, response, _ in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let body = Self.snippet(data)
             guard let self = self, let json = self.parseJSON(data) else {
-                completion(nil, -1, "无响应", status, body)
+                completion(0, [], -1, "无响应", status, body)
                 return
             }
             let code = json["code"] as? Int ?? -1
-            guard code == 0, let list = json["data"] as? [[String: Any]] else {
-                completion(nil, code, json["message"] as? String ?? "", status, body)
+            guard code == 0,
+                  let d = json["data"] as? [String: Any],
+                  let list = d["result"] as? [[String: Any]],
+                  let first = list.first else {
+                completion(0, [], code, json["message"] as? String ?? "", status, body)
                 return
             }
-            let names = list.compactMap { $0["tag_name"] as? String }
+            let tid = self.parseTid(first["typeid"])
+            let tags = (first["tag"] as? String ?? "")
+                .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
-            completion(names, names.isEmpty ? -2 : 0, names.isEmpty ? "tag为空" : "", status, names.isEmpty ? body : "")
+            completion(tid, tags, 0, "", status, tags.isEmpty ? body : "")
         }
     }
 

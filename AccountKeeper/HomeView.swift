@@ -142,7 +142,7 @@ struct HomeView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "waveform.path.ecg")
                         .foregroundColor(.secondary)
-                    Text("数据诊断v4 共\(store.feedDiagnostics.total)条 · 带tag \(store.feedDiagnostics.withTags) · 带分区 \(store.feedDiagnostics.withTid) · Tag拦截 \(store.lastTagBlockedCount)")
+                    Text("数据诊断v5 共\(store.feedDiagnostics.total)条 · 带tag \(store.feedDiagnostics.withTags) · 带分区 \(store.feedDiagnostics.withTid) · Tag拦截 \(store.lastTagBlockedCount)")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Spacer()

@@ -92,9 +92,13 @@ struct FilterSettings: Codable, Hashable {
     var blockedCategories: Set<String> = []
 
     // Partition filtering（按 B 站一级/二级分区 tid 屏蔽，作用于首页推荐、热门、搜索流）
-    var enablePartitionFilter: Bool = false
-    var blockedTopZoneTids: Set<Int> = []
+    // 默认开启并预置高频低质一级分区：动画/番剧/国创/游戏/美食/影视/娱乐/鬼畜。
+    // 热门流本身就带 tid，因此这条规则是唯一不依赖补拉、开箱即生效的强过滤维度。
+    var enablePartitionFilter: Bool = true
+    var blockedTopZoneTids: Set<Int> = FilterSettings.defaultTopZones
     var blockedSubZoneTids: Set<Int> = []
+
+    static let defaultTopZones: Set<Int> = [1, 13, 167, 4, 211, 181, 5, 119]
 
     // UP主 blacklist（按 mid）
     var enableUPBlockFilter: Bool = false
@@ -140,8 +144,8 @@ struct FilterSettings: Codable, Hashable {
         searchMinDurationSeconds = try c.decodeIfPresent(Int.self, forKey: .searchMinDurationSeconds)
         enableCategoryFilter = try c.decodeIfPresent(Bool.self, forKey: .enableCategoryFilter) ?? false
         blockedCategories = try c.decodeIfPresent(Set<String>.self, forKey: .blockedCategories) ?? []
-        enablePartitionFilter = try c.decodeIfPresent(Bool.self, forKey: .enablePartitionFilter) ?? false
-        blockedTopZoneTids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedTopZoneTids) ?? []
+        enablePartitionFilter = try c.decodeIfPresent(Bool.self, forKey: .enablePartitionFilter) ?? true
+        blockedTopZoneTids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedTopZoneTids) ?? FilterSettings.defaultTopZones
         blockedSubZoneTids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedSubZoneTids) ?? []
         enableUPBlockFilter = try c.decodeIfPresent(Bool.self, forKey: .enableUPBlockFilter) ?? false
         blockedUPMids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedUPMids) ?? []
@@ -158,7 +162,7 @@ struct FilterSettings: Codable, Hashable {
     }
 
     /// Current filter-settings schema version.
-    static let currentSchemaVersion = 5
+    static let currentSchemaVersion = 6
 }
 
 // MARK: - Built-in word lists
