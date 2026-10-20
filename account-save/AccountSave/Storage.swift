@@ -27,7 +27,7 @@ enum SMSSaver {
         recipient: String = "",
         receivedAt: Date = Date()
     ) throws -> Account {
-        let account = try findOrCreate(name: normalized(accountName), in: context)
+        let account = try findOrCreate(name: normalized(accountName, content: content), in: context)
         // 账号的注册手机号优先使用收件人参数；否则尝试从短信内容里识别。
         if account.phoneNumber.isEmpty {
             let recipientTrimmed = recipient.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -43,10 +43,24 @@ enum SMSSaver {
         return account
     }
 
-    /// 账号名去空白，留空时归入「未命名账号」。
-    private static func normalized(_ accountName: String) -> String {
+    /// 账号名去空白，留空时尝试从短信内容【】中提取，仍无则归入「未命名账号」。
+    private static func normalized(_ accountName: String, content: String = "") -> String {
         let trimmed = accountName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "未命名账号" : trimmed
+        if !trimmed.isEmpty { return trimmed }
+        if let extracted = extractBracketName(from: content) {
+            return extracted
+        }
+        return "未命名账号"
+    }
+
+    /// 从短信内容中提取第一个【...】里的文本作为账号名。
+    private static func extractBracketName(from content: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: "【([^】]+)】") else { return nil }
+        let range = NSRange(content.startIndex..., in: content)
+        guard let match = regex.firstMatch(in: content, range: range),
+              let r = Range(match.range(at: 1), in: content) else { return nil }
+        let name = String(content[r]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
     }
 
     private static func findOrCreate(name: String, in context: ModelContext) throws -> Account {

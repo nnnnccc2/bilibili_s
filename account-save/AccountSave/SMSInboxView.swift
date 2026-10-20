@@ -268,9 +268,14 @@ struct AccountGroupDetailView: View {
                     NavigationLink {
                         AccountDetailView(account: account)
                     } label: {
-                        Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                            .font(.system(size: 17))
-                            .padding(.vertical, 14)
+                        HStack(spacing: 10) {
+                            Image(systemName: "phone.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                            Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
+                                .font(.system(size: 17))
+                        }
+                        .padding(.vertical, 14)
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
@@ -283,6 +288,7 @@ struct AccountGroupDetailView: View {
             }
             .listStyle(.insetGrouped)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
         .alert(
@@ -313,6 +319,11 @@ struct AccountGroupDetailView: View {
 
             Spacer(minLength: 0)
         }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
     }
 
     private var isConfirmingAccountDelete: Binding<Bool> {
