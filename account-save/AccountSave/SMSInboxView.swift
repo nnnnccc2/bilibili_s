@@ -254,29 +254,22 @@ struct AccountGroupDetailView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var accountToDelete: Account?
-    @State private var shareItem: ShareItem?
-    @State private var exportError: String?
 
     var body: some View {
         List {
             Section {
                 headerCard
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
             }
 
             ForEach(group.accounts) { account in
                 NavigationLink {
                     AccountDetailView(account: account)
                 } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "phone.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.blue)
-                            .frame(width: 26)
-                        Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                            .font(.system(size: 17, weight: .medium))
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.vertical, 6)
+                    Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
+                        .font(.system(size: 17))
+                        .padding(.vertical, 14)
                 }
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
@@ -287,30 +280,9 @@ struct AccountGroupDetailView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        exportGroupMessages()
-                    } label: {
-                        Label("导出该账号全部短信（CSV）", systemImage: "doc.text")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-            }
-        }
-        .sheet(item: $shareItem) { item in
-            ShareSheet(items: [item.url])
-        }
-        .alert("导出失败", isPresented: exportErrorBinding) {
-            Button("好", role: .cancel) {}
-        } message: {
-            Text(exportError ?? "")
-        }
         .alert(
             "删除凭证?",
             isPresented: isConfirmingAccountDelete,
@@ -339,14 +311,6 @@ struct AccountGroupDetailView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(4)
-    }
-
-    private var exportErrorBinding: Binding<Bool> {
-        Binding(
-            get: { exportError != nil },
-            set: { if !$0 { exportError = nil } }
-        )
     }
 
     private var isConfirmingAccountDelete: Binding<Bool> {
@@ -354,15 +318,6 @@ struct AccountGroupDetailView: View {
             get: { accountToDelete != nil },
             set: { if !$0 { accountToDelete = nil } }
         )
-    }
-
-    private func exportGroupMessages() {
-        do {
-            let url = try ExportService.exportMessages(group.accounts)
-            shareItem = ShareItem(url: url)
-        } catch {
-            exportError = error.localizedDescription
-        }
     }
 
     private func delete(_ account: Account) {
