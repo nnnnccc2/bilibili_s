@@ -17,15 +17,6 @@ final class AppStore: ObservableObject {
     @Published var history: [HistoryItem] = []
     @Published var lastBlockedCount: Int = 0
 
-    /// Number of immersive full-screen overlays currently presented
-    /// (video player, UP空间, 设置, 搜索...). When > 0 the bottom tab bar hides
-    /// so the overlay covers the whole screen. Uses a counter because overlays
-    /// can be stacked (e.g. 视频 → UP空间).
-    @Published var immersiveDepth: Int = 0
-
-    func pushImmersive() { immersiveDepth += 1 }
-    func popImmersive() { immersiveDepth = max(0, immersiveDepth - 1) }
-
     // MARK: - Persistence keys
 
     private let settingsKey = "BiliBili.filterSettings"
@@ -49,13 +40,21 @@ final class AppStore: ObservableObject {
     func applyFilter(_ videos: [Video], countStats: Bool = true) -> [Video] {
         var passed: [Video] = []
         var blocked = 0
+        // Accumulate stats into a local copy and assign once at the end.
+        // Mutating `settings` inside the loop would trigger its `didSet`
+        // (full JSON encode + UserDefaults write) for every blocked video,
+        // stalling the main thread while the list loads.
+        var newStats = settings.stats
         for v in videos {
             if let reason = engine.shouldBlock(v) {
                 blocked += 1
-                if countStats { settings.stats.add(reason) }
+                if countStats { newStats.add(reason) }
             } else {
                 passed.append(v)
             }
+        }
+        if countStats && newStats != settings.stats {
+            settings.stats = newStats   // single publish + single persist
         }
         if blocked > 0 {
             lastBlockedCount = blocked
@@ -69,13 +68,19 @@ final class AppStore: ObservableObject {
     func applySearchFilter(_ videos: [Video], countStats: Bool = true, applyMinDuration: Bool = true) -> [Video] {
         var passed: [Video] = []
         var blocked = 0
+        // Same as `applyFilter`: batch the stats update so the store persists
+        // once instead of once per blocked video.
+        var newStats = settings.stats
         for v in videos {
             if let reason = engine.shouldBlockInSearch(v, applyMinDuration: applyMinDuration) {
                 blocked += 1
-                if countStats { settings.stats.add(reason) }
+                if countStats { newStats.add(reason) }
             } else {
                 passed.append(v)
             }
+        }
+        if countStats && newStats != settings.stats {
+            settings.stats = newStats
         }
         if blocked > 0 {
             lastBlockedCount = blocked
@@ -121,6 +126,42 @@ final class AppStore: ObservableObject {
 
     func removeCustomWord(_ word: String) {
         settings.customBlockedWords.removeAll { $0 == word }
+    }
+
+    // MARK: - UP主 blacklist
+
+    func blockUP(mid: Int, name: String? = nil) {
+        guard mid > 0 else { return }
+        settings.blockedUPMids.insert(mid)
+    }
+
+    func unblockUP(mid: Int) {
+        settings.blockedUPMids.remove(mid)
+    }
+
+    // MARK: - Category blacklist
+
+    func addBlockedCategory(_ category: String) {
+        let trimmed = category.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        settings.blockedCategories.insert(trimmed)
+    }
+
+    func removeBlockedCategory(_ category: String) {
+        settings.blockedCategories.remove(category)
+    }
+
+    // MARK: - General keyword blacklist
+
+    func addBlockedKeyword(_ keyword: String) {
+        let trimmed = keyword.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        guard !settings.blockedKeywords.contains(trimmed) else { return }
+        settings.blockedKeywords.append(trimmed)
+    }
+
+    func removeBlockedKeyword(_ keyword: String) {
+        settings.blockedKeywords.removeAll { $0 == keyword }
     }
 
     // MARK: - User / login

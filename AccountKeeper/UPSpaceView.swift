@@ -24,50 +24,32 @@ struct UPSpaceView: View {
     @State private var isFollowing = false
     @State private var isFollowBusy = false
     @State private var selectedVideo: Video?
+    @State private var loadError: String? = nil
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    headerSection
-                    statsSection
-                    videoGridSection
-                }
-            }
-            .background(biliBackgroundGradient.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        if let onDismiss = onDismiss { onDismiss() }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .foregroundColor(.biliBlue)
-                    }
-                }
-                ToolbarItem(placement: .principal) {
-                    Text(info?.name ?? initialName)
-                        .font(.headline)
-                        .lineLimit(1)
-                }
-            }
-            .onAppear {
-                if info == nil {
-                    loadInfo()
-                    loadVideos(reset: true)
-                }
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                headerSection
+                statsSection
+                videoGridSection
             }
         }
-        .overlay {
-            if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                    .environmentObject(store)
-                    .ignoresSafeArea()
-                    .immersive(backdrop: .black)
-                    .id(video.id)
-                    .zIndex(10)
+        .background(biliBackgroundGradient.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(info?.name ?? initialName)
+                    .font(.headline)
+                    .lineLimit(1)
             }
         }
+        .onAppear {
+            if info == nil {
+                loadInfo()
+                loadVideos(reset: true)
+            }
+        }
+        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。.playerOverlay(for: $selectedVideo, store: store)
     }
 
     // MARK: - Header
@@ -173,6 +155,26 @@ struct UPSpaceView: View {
             ProgressView()
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
+        } else if let errorMsg = loadError {
+            VStack(spacing: 10) {
+                Image(systemName: "wifi.slash")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.tertiary)
+                Text("加载失败")
+                    .font(.headline)
+                Text("网络异常或被风控拦截")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("点击重试") {
+                    self.loadError = nil
+                    loadVideos(reset: true)
+                }
+                .buttonStyle(.borderedProminent)
+                .font(.subheadline)
+                .tint(.biliBlue)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
         } else if videos.isEmpty {
             VStack(spacing: 8) {
                 Image(systemName: "video.slash")
@@ -180,12 +182,6 @@ struct UPSpaceView: View {
                     .foregroundStyle(.tertiary)
                 Text("暂无视频")
                     .foregroundStyle(.secondary)
-                Button("点击重试") {
-                    loadVideos(reset: true)
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(Color.biliBlue)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 40)
@@ -195,10 +191,16 @@ struct UPSpaceView: View {
                     Button {
                         selectedVideo = video
                     } label: {
-                        VideoCardView(video: video)
-                            .contentShape(Rectangle())
+                        VideoCardView(
+                            video: video,
+                            onBlockUP: { mid, _ in
+                                store.blockUP(mid: mid)
+                            }
+                        )
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(PressableCardStyle())
+                    .transition(.cardEnter)
                     .onAppear {
                         if video.id == videos.last?.id, hasMore, !isLoadingMore {
                             loadVideos(reset: false)
@@ -206,6 +208,7 @@ struct UPSpaceView: View {
                     }
                 }
             }
+            .animation(MiniBiliAnimation.cardEnter, value: videos.count)
             .padding(.horizontal, 8)
             .padding(.bottom, 20)
 
@@ -233,24 +236,37 @@ struct UPSpaceView: View {
             page = 1
             hasMore = true
             videos = []
+            loadError = nil
         }
         guard hasMore else { return }
         if reset { isLoading = true } else { isLoadingMore = true }
 
-        BiliAPI.shared.fetchUPVideos(mid: mid, page: page) { newVideos, total in
+        BiliAPI.shared.fetchUPVideos(mid: mid, page: page) { newVideos, total, error in
             DispatchQueue.main.async {
                 if reset {
                     videos = newVideos
                 } else {
                     videos.append(contentsOf: newVideos)
                 }
+                if let error = error {
+                    // Only treat as hard error when the grid would be empty AND
+                    // both endpoints failed. A subsequent "load more" hitting an
+                    // error should just stop pagination, not wipe the list.
+                    if reset && videos.isEmpty {
+                        loadError = error
+                    } else {
+                        hasMore = false
+                    }
+                } else {
+                    loadError = nil
+                    if newVideos.isEmpty || videos.count >= total {
+                        hasMore = false
+                    } else {
+                        page += 1
+                    }
+                }
                 isLoading = false
                 isLoadingMore = false
-                if newVideos.isEmpty || videos.count >= total {
-                    hasMore = false
-                } else {
-                    page += 1
-                }
             }
         }
     }

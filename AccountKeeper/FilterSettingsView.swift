@@ -15,6 +15,15 @@ struct FilterSettingsView: View {
     @State private var newWord: String = ""
     @State private var showWordError: String? = nil
 
+    @State private var newCategory: String = ""
+    @State private var showCategoryError: String? = nil
+
+    @State private var newUPMid: String = ""
+    @State private var showUPMidError: String? = nil
+
+    @State private var newKeyword: String = ""
+    @State private var showKeywordError: String? = nil
+
     private var selectedDurationCount: Int {
         store.settings.blockedDurationSeconds.count
     }
@@ -40,8 +49,17 @@ struct FilterSettingsView: View {
                         // Duration filter (multi-select)
                         durationCard
 
+                        // Category blacklist
+                        categoryCard
+
                         // Insult word list
                         insultWordCard
+
+                        // UP主 blacklist
+                        upBlockCard
+
+                        // General keyword filter
+                        keywordCard
 
                         // UI toggle
                         uiCard
@@ -135,12 +153,16 @@ struct FilterSettingsView: View {
             .background(Color.biliBlue.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 16))
 
-            // 4 stat cards grid
+            // Stat cards grid
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 miniStat(label: "标题党/引导词", value: store.settings.stats.byClickbait, color: .red)
                 miniStat(label: "时长过滤拦截", value: store.settings.stats.byDuration, color: .orange)
                 miniStat(label: "日文字符UP主", value: store.settings.stats.byJapaneseUP + store.settings.stats.byJapaneseTitle, color: .purple)
                 miniStat(label: "侮辱贬低词库", value: store.settings.stats.byInsultWord, color: .green)
+                miniStat(label: "分类黑名单", value: store.settings.stats.byCategory, color: .indigo)
+                miniStat(label: "UP主黑名单", value: store.settings.stats.byUPBlocked, color: .pink)
+                miniStat(label: "关键词拦截", value: store.settings.stats.byKeyword, color: .teal)
+                miniStat(label: "感叹号标题", value: store.settings.stats.byExclamationSpam, color: .cyan)
             }
         }
         .padding(16)
@@ -320,6 +342,75 @@ struct FilterSettingsView: View {
         .padding(.horizontal, 16)
     }
 
+    // MARK: - Category blacklist
+
+    private var categoryCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableCategoryFilter) {
+                Label("按分类黑名单屏蔽", systemImage: "folder.badge.minus")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("精确匹配视频分区/分类名称（如：动画、游戏、美食），不区分大小写。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                TextField("输入要屏蔽的分类...", text: $newCategory)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { addCategory() }
+                Button(action: addCategory) {
+                    Text("+ 添加")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.biliBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .disabled(!store.settings.enableCategoryFilter)
+
+            if !store.settings.blockedCategories.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(Array(store.settings.blockedCategories).sorted(), id: \.self) { category in
+                        HStack(spacing: 4) {
+                            Text(category)
+                                .font(.caption)
+                            Button {
+                                store.removeBlockedCategory(category)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.indigo.opacity(0.12))
+                        .foregroundStyle(.indigo)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+
+            if let err = showCategoryError {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - Insult words
 
     private var insultWordCard: some View {
@@ -417,6 +508,174 @@ struct FilterSettingsView: View {
         .padding(.horizontal, 16)
     }
 
+    // MARK: - UP主 blacklist
+
+    private var upBlockCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableUPBlockFilter) {
+                Label("屏蔽指定 UP 主", systemImage: "person.fill.xmark")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("输入 UP 主的 mid（用户 ID），将其所有视频加入黑名单。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                TextField("输入 UP 主 mid...", text: $newUPMid)
+                    .keyboardType(.numberPad)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { addUPMid() }
+                Button(action: addUPMid) {
+                    Text("+ 添加")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.biliBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .disabled(!store.settings.enableUPBlockFilter)
+
+            if !store.settings.blockedUPMids.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(Array(store.settings.blockedUPMids).sorted(), id: \.self) { mid in
+                        HStack(spacing: 4) {
+                            Text("\(mid)")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Button {
+                                store.unblockUP(mid: mid)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.pink.opacity(0.12))
+                        .foregroundStyle(.pink)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+
+            if let err = showUPMidError {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - General keyword filter
+
+    private var keywordCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableKeywordFilter) {
+                Label("通用关键词过滤", systemImage: "text.magnifyingglass")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("在标题、UP主昵称、简介、分类和标签中模糊匹配关键词，命中即屏蔽。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle("启用内置关键词建议", isOn: $store.settings.builtInKeywordsEnabled)
+                .disabled(!store.settings.enableKeywordFilter)
+                .tint(.biliBlue)
+
+            if store.settings.builtInKeywordsEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("内置关键词 (\(FilterSettings.builtInKeywords.count)个)：")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 8) {
+                        ForEach(FilterSettings.builtInKeywords, id: \.self) { word in
+                            Text(word)
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.teal.opacity(0.12))
+                                .foregroundStyle(.teal)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+
+            HStack {
+                TextField("输入自定义关键词...", text: $newKeyword)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { addKeyword() }
+                Button(action: addKeyword) {
+                    Text("+ 添加")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.biliBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .disabled(!store.settings.enableKeywordFilter)
+
+            if !store.settings.blockedKeywords.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("自定义关键词 (\(store.settings.blockedKeywords.count)个)：")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 8) {
+                        ForEach(store.settings.blockedKeywords, id: \.self) { word in
+                            HStack(spacing: 4) {
+                                Text(word)
+                                    .font(.caption)
+                                Button {
+                                    store.removeBlockedKeyword(word)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color(.systemGray5))
+                            .foregroundStyle(.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+
+            if let err = showKeywordError {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - UI
 
     private var uiCard: some View {
@@ -453,6 +712,55 @@ struct FilterSettingsView: View {
         showWordError = nil
         store.addCustomWord(trimmed)
         newWord = ""
+    }
+
+    private func addCategory() {
+        let trimmed = newCategory.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
+            showCategoryError = "请输入有效分类"
+            return
+        }
+        if store.settings.blockedCategories.contains(trimmed) {
+            showCategoryError = "该分类已在黑名单中"
+            return
+        }
+        showCategoryError = nil
+        store.addBlockedCategory(trimmed)
+        newCategory = ""
+    }
+
+    private func addUPMid() {
+        let trimmed = newUPMid.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
+            showUPMidError = "请输入有效 mid"
+            return
+        }
+        guard let mid = Int(trimmed), mid > 0 else {
+            showUPMidError = "mid 必须是正整数"
+            return
+        }
+        if store.settings.blockedUPMids.contains(mid) {
+            showUPMidError = "该 UP 主已在黑名单中"
+            return
+        }
+        showUPMidError = nil
+        store.blockUP(mid: mid)
+        newUPMid = ""
+    }
+
+    private func addKeyword() {
+        let trimmed = newKeyword.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
+            showKeywordError = "请输入有效关键词"
+            return
+        }
+        if store.settings.blockedKeywords.contains(trimmed) {
+            showKeywordError = "关键词已存在"
+            return
+        }
+        showKeywordError = nil
+        store.addBlockedKeyword(trimmed)
+        newKeyword = ""
     }
 }
 

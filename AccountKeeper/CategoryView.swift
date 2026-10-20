@@ -17,9 +17,7 @@ struct CategoryView: View {
     @State private var page = 1
     @State private var hasMore = true
     @State private var selectedVideo: Video?
-    @State private var selectedUPMid: Int = 0
-    @State private var selectedUPName: String = ""
-    @State private var showingUPSpace = false
+    @State private var selectedUP: UPTarget?
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
@@ -99,15 +97,18 @@ struct CategoryView: View {
                         } else {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(partitionVideos) { video in
-                                    VideoCardView(video: video) {
-                                        if video.upMid > 0 {
-                                            selectedUPMid = video.upMid
-                                            selectedUPName = video.upName
-                                            showingUPSpace = true
+                                    VideoCardView(
+                                        video: video,
+                                        onTap: { selectedVideo = video },
+                                        onTapUP主: {
+                                            if video.upMid > 0 {
+                                                selectedUP = UPTarget(mid: video.upMid, name: video.upName)
+                                            }
+                                        },
+                                        onBlockUP: { mid, _ in
+                                            store.blockUP(mid: mid)
                                         }
-                                    }
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { selectedVideo = video }
+                                    )
                                         .onAppear {
                                             if video.id == partitionVideos.last?.id, hasMore, !isLoadingMore {
                                                 loadPartition(selectedPartition, reset: false)
@@ -157,20 +158,11 @@ struct CategoryView: View {
                     }
                 }
             }
-            .overlay {
-                if let video = selectedVideo {
-                    VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                        .environmentObject(store)
-                        .ignoresSafeArea()
-                        .immersive(backdrop: .black)
-                        .zIndex(10)
-                }
-            }
-            .sheet(isPresented: $showingUPSpace) {
-                if selectedUPMid > 0 {
-                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName)
-                        .environmentObject(store)
-                }
+            // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。.playerOverlay(for: $selectedVideo, store: store)
+            // UP 空间：NavigationStack push，避免嵌套模态空白。
+            .navigationDestination(item: $selectedUP) { up in
+                UPSpaceView(mid: up.mid, initialName: up.name)
+                    .environmentObject(store)
             }
         }
     }

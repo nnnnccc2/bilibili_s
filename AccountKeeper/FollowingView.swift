@@ -15,9 +15,7 @@ struct FollowingView: View {
     @State private var rawVideos: [Video] = []
     @State private var isLoading = false
     @State private var selectedVideo: Video?
-    @State private var selectedUPMid: Int = 0
-    @State private var selectedUPName: String = ""
-    @State private var showingUPSpace = false
+    @State private var selectedUP: UPTarget?
 
     enum FollowTab: String, CaseIterable, Identifiable {
         case all = "综合"
@@ -76,17 +74,22 @@ struct FollowingView: View {
                         ScrollView {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(videos) { video in
-                                    VideoCardView(video: video) {
-                                        if video.upMid > 0 {
-                                            selectedUPMid = video.upMid
-                                            selectedUPName = video.upName
-                                            showingUPSpace = true
+                                    VideoCardView(
+                                        video: video,
+                                        onTap: { selectedVideo = video },
+                                        onTapUP主: {
+                                            if video.upMid > 0 {
+                                                selectedUP = UPTarget(mid: video.upMid, name: video.upName)
+                                            }
+                                        },
+                                        onBlockUP: { mid, _ in
+                                            store.blockUP(mid: mid)
                                         }
-                                    }
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { selectedVideo = video }
+                                    )
+                                    .transition(.cardEnter)
                                 }
                             }
+                            .animation(MiniBiliAnimation.cardEnter, value: videos.count)
                             .padding(.horizontal, 8)
                             .padding(.top, 8)
                             .padding(.bottom, 20)
@@ -116,23 +119,11 @@ struct FollowingView: View {
                 }
             }
         }
-        .overlay {
-            if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                    .environmentObject(store)
-                    .ignoresSafeArea()
-                    .immersive(backdrop: .black)
-                    .id(video.id)
-                    .zIndex(10)
-            }
-        }
-        .overlay {
-            if showingUPSpace, selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }) })
-                    .environmentObject(store)
-                    .immersive()
-                    .zIndex(20)
-            }
+        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。.playerOverlay(for: $selectedVideo, store: store)
+        // UP 空间：NavigationStack push，避免嵌套模态空白。
+        .navigationDestination(item: $selectedUP) { up in
+            UPSpaceView(mid: up.mid, initialName: up.name)
+                .environmentObject(store)
         }
         .onAppear { if videos.isEmpty { load() } }
         .onChange(of: store.settings) { _, _ in

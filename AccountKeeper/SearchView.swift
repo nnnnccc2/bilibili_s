@@ -20,9 +20,7 @@ struct SearchView: View {
     @State private var hasSearched = false
     @State private var selectedDurationIndex: Int = 0
     @State private var selectedVideo: Video?
-    @State private var selectedUPMid: Int = 0
-    @State private var selectedUPName: String = ""
-    @State private var showingUPSpace = false
+    @State private var selectedUP: UPTarget?
     @State private var hotKeywords: [String] = []
     @State private var isLoadingKeywords = false
 
@@ -155,26 +153,13 @@ struct SearchView: View {
                     }
                 }
             }
+            .navigationDestination(item: $selectedUP) { up in
+                UPSpaceView(mid: up.mid, initialName: up.name)
+                    .environmentObject(store)
+            }
             .onAppear { loadHotKeywords() }
         }
-        .overlay {
-            if let video = selectedVideo {
-                VideoPlayerView(video: video, onDismiss: { dismissImmersive({ selectedVideo = nil }) })
-                    .environmentObject(store)
-                    .ignoresSafeArea()
-                    .immersive()
-                    .id(video.id)
-                    .zIndex(10)
-            }
-        }
-        .overlay {
-            if showingUPSpace {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { dismissImmersive({ showingUPSpace = false }) })
-                    .environmentObject(store)
-                    .immersive()
-                    .zIndex(20)
-            }
-        }
+        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。.playerOverlay(for: $selectedVideo, store: store)
     }
 
     // MARK: - Hot keywords (哔哩哔哩热搜, gray and readable, never blue)
@@ -246,30 +231,32 @@ struct SearchView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(results) { video in
-                        VideoCardView(video: video) {
-                            if video.upMid > 0 {
-                                selectedUPMid = video.upMid
-                                selectedUPName = video.upName
-                                showingUPSpace = true
+                        VideoCardView(
+                            video: video,
+                            onTap: { selectedVideo = video },
+                            onTapUP主: {
+                                if video.upMid > 0 {
+                                    selectedUP = UPTarget(mid: video.upMid, name: video.upName)
+                                }
+                            },
+                            onBlockUP: { mid, _ in
+                                store.blockUP(mid: mid)
+                            }
+                        )
+                        .transition(.cardEnter)
+                        .onAppear {
+                            guard hasMore, !isLoadingMore else { return }
+                            if let idx = results.firstIndex(where: { $0.id == video.id }),
+                               idx >= results.count - 4 {
+                                loadMore()
                             }
                         }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedVideo = video
-                            }
-                            .onAppear {
-                                guard hasMore, !isLoadingMore else { return }
-                                if let idx = results.firstIndex(where: { $0.id == video.id }),
-                                   idx >= results.count - 4 {
-                                    loadMore()
-                                }
-                            }
                     }
                 }
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
-                .animation(.easeOut(duration: 0.2), value: results.count)
+                .animation(MiniBiliAnimation.cardEnter, value: results.count)
             }
 
             if isLoadingMore {
@@ -284,6 +271,7 @@ struct SearchView: View {
         LazyVStack(spacing: 8) {
             ForEach(results) { user in
                 userRow(user)
+                    .transition(.cardEnter)
                     .onAppear {
                         guard hasMore, !isLoadingMore else { return }
                         if let idx = results.firstIndex(where: { $0.id == user.id }),
@@ -293,6 +281,7 @@ struct SearchView: View {
                     }
             }
         }
+        .animation(MiniBiliAnimation.cardEnter, value: results.count)
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, 20)
@@ -301,9 +290,8 @@ struct SearchView: View {
     private func userRow(_ user: Video) -> some View {
         Button {
             if user.upMid > 0 {
-                selectedUPMid = user.upMid
-                selectedUPName = user.upName
-                showingUPSpace = true
+                
+                selectedUP = UPTarget(mid: user.upMid, name: user.upName)
             }
         } label: {
             HStack(spacing: 10) {
