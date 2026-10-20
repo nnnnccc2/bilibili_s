@@ -20,6 +20,7 @@ struct FilterStats: Codable, Hashable {
     var byCategory: Int = 0
     var byUPBlocked: Int = 0
     var byKeyword: Int = 0
+    var byTag: Int = 0
     var byPartition: Int = 0
 
     init() {}
@@ -39,6 +40,7 @@ struct FilterStats: Codable, Hashable {
         byCategory = try c.decodeIfPresent(Int.self, forKey: .byCategory) ?? 0
         byUPBlocked = try c.decodeIfPresent(Int.self, forKey: .byUPBlocked) ?? 0
         byKeyword = try c.decodeIfPresent(Int.self, forKey: .byKeyword) ?? 0
+        byTag = try c.decodeIfPresent(Int.self, forKey: .byTag) ?? 0
         byPartition = try c.decodeIfPresent(Int.self, forKey: .byPartition) ?? 0
     }
 
@@ -55,6 +57,7 @@ struct FilterStats: Codable, Hashable {
         case .categoryBlocked: byCategory += 1
         case .upBlocked: byUPBlocked += 1
         case .keywordBlocked: byKeyword += 1
+        case .tagBlocked: byTag += 1
         case .partitionBlocked: byPartition += 1
         }
     }
@@ -102,6 +105,12 @@ struct FilterSettings: Codable, Hashable {
     var builtInKeywordsEnabled: Bool = false
     var customBlockedKeywords: [String] = []
 
+    // Tag filtering（只匹配视频 tag 字段，比关键词更精准）
+    // 默认开启：tag 是最可靠的内容类型信号，内置标签库只收录强指示 tag。
+    var enableTagFilter: Bool = true
+    var builtInTagsEnabled: Bool = true
+    var customBlockedTags: [String] = []
+
     // UI
     var showFilteredBanner: Bool = true
 
@@ -138,13 +147,17 @@ struct FilterSettings: Codable, Hashable {
         enableKeywordFilter = try c.decodeIfPresent(Bool.self, forKey: .enableKeywordFilter) ?? false
         builtInKeywordsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInKeywordsEnabled) ?? false
         customBlockedKeywords = try c.decodeIfPresent([String].self, forKey: .customBlockedKeywords) ?? []
+        // 老版本没有这两个键：升级后默认开启 Tag 过滤，否则用户会以为"过滤又没效果"。
+        enableTagFilter = try c.decodeIfPresent(Bool.self, forKey: .enableTagFilter) ?? true
+        builtInTagsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInTagsEnabled) ?? true
+        customBlockedTags = try c.decodeIfPresent([String].self, forKey: .customBlockedTags) ?? []
         showFilteredBanner = try c.decodeIfPresent(Bool.self, forKey: .showFilteredBanner) ?? true
         schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion)
         stats = try c.decodeIfPresent(FilterStats.self, forKey: .stats) ?? FilterStats()
     }
 
     /// Current filter-settings schema version.
-    static let currentSchemaVersion = 4
+    static let currentSchemaVersion = 5
 }
 
 // MARK: - Built-in word lists
@@ -203,6 +216,40 @@ extension FilterSettings {
             words.append(contentsOf: FilterSettings.builtInKeywords)
         }
         words.append(contentsOf: customBlockedKeywords)
+        return words.map { $0.lowercased() }.filter { !$0.isEmpty }
+    }
+
+    /// 内置标签库：只收录「内容类型强指示」的 tag，命中即说明该视频属于用户要屏蔽的
+    /// 日本动画 / 无厘头动画 / 影视信息 / 游戏信息 / 美食 / 游戏录播 等类别。
+    /// 刻意排除「挑战」「测评」「日常」这类过于泛化、会误伤的 tag。
+    static let builtInTags: [String] = [
+        // 游戏（游戏信息 / 游戏录播）
+        "游戏实况", "游戏解说", "实况解说", "单机游戏", "手机游戏", "网络游戏",
+        "端游", "手游", "游戏攻略", "通关攻略", "游戏录播", "直播回放", "录播",
+        "游戏杂谈", "电竞", "电子竞技", "主机游戏", "独立游戏", "游戏集锦",
+        "游戏二创", "游戏直播", "手游实况", "游戏吐槽", "GMV",
+        // 动画（日本动画 / 无厘头动画）
+        "日本动画", "国产动画", "动画短片", "新番", "番剧", "追番", "动漫",
+        "二次元", "MAD", "AMV", "MMD", "手书", "同人", "动漫杂谈", "动画解说",
+        "泡面番", "番剧推荐", "动画杂谈", "特摄", "手办", "声优",
+        // 影视 / 综艺
+        "影视解说", "电影解说", "影视剪辑", "影视杂谈", "预告片", "电影混剪",
+        "电视剧", "综艺", "追剧", "影评", "影视盘点", "影sir",
+        // 美食
+        "美食", "美食探店", "探店", "吃播", "美食制作", "美食测评", "家常菜",
+        "料理", "做饭", "试吃", "下饭", "田园美食", "美食记录",
+        // 鬼畜 / 整活
+        "鬼畜", "鬼畜调教", "音MAD", "整活", "沙雕", "恶搞", "反应视频",
+        "reaction", "整蛊"
+    ]
+
+    /// 当前生效的屏蔽标签（内置 + 自定义），小写后返回便于不区分大小写匹配。
+    var activeTags: [String] {
+        var words: [String] = []
+        if builtInTagsEnabled {
+            words.append(contentsOf: FilterSettings.builtInTags)
+        }
+        words.append(contentsOf: customBlockedTags)
         return words.map { $0.lowercased() }.filter { !$0.isEmpty }
     }
 }

@@ -18,7 +18,8 @@ final class FilterEngine {
     }
 
     /// Returns the block reason if the video should be filtered out, nil otherwise.
-    /// Priority order: badData → insult → clickbait → exclamation → keyword → category → upBlocked → duration → japanese
+    /// Priority order: badData → insult → clickbait → exclamation → keyword → tag
+    /// → category → partition → upBlocked → duration → japanese
     func shouldBlock(_ video: Video) -> BlockReason? {
         // 0. 空白视频硬拦截 — 没有封面/没有 bvid 的卡片肯定打不开，直接过滤
         if video.cover.trimmingCharacters(in: .whitespaces).isEmpty
@@ -76,7 +77,19 @@ final class FilterEngine {
             }
         }
 
-        // 4. Category / partition blacklist (exact match, case-insensitive)
+        // 4. Tag filtering（只匹配视频 tag，精准度高于关键词）
+        // 首页推荐/热门接口本身不返回 tag，已由 BiliAPI.enrichMetadata 补齐；
+        // 搜索接口自带 tag 字段，因此三条流都能命中。
+        if settings.enableTagFilter, !video.tags.isEmpty {
+            let tags = video.tags.map { $0.lowercased() }
+            for blocked in settings.activeTags {
+                for tag in tags where tag.contains(blocked) {
+                    return .tagBlocked
+                }
+            }
+        }
+
+        // 5. Category / partition blacklist (exact match, case-insensitive)
         if settings.enableCategoryFilter {
             let category = video.category.lowercased()
             if !category.isEmpty {
@@ -88,31 +101,31 @@ final class FilterEngine {
             }
         }
 
-        // 5. Partition blacklist (一级 / 二级分区, by Bilibili tid)
+        // 6. Partition blacklist (一级 / 二级分区, by Bilibili tid)
         if settings.enablePartitionFilter {
             if let reason = partitionBlockReason(for: video) {
                 return reason
             }
         }
 
-        // 6. UP主 mid blacklist
+        // 7. UP主 mid blacklist
         if settings.enableUPBlockFilter, video.upMid != 0, settings.blockedUPMids.contains(video.upMid) {
             return .upBlocked
         }
 
-        // 7. Duration block (global): videos shorter than or equal to the max selected threshold
+        // 8. Duration block (global): videos shorter than or equal to the max selected threshold
         if let threshold = settings.effectiveDurationThreshold, video.duration > 0, video.duration <= threshold {
             return .duration
         }
 
-        // 8. Japanese characters in title
+        // 9. Japanese characters in title
         if settings.enableJapaneseTitleFilter {
             if containsJapanese(video.title) {
                 return .japaneseTitle
             }
         }
 
-        // 9. Japanese characters in UP主 name
+        // 10. Japanese characters in UP主 name
         if settings.enableJapaneseUPFilter {
             if containsJapanese(video.upName) {
                 return .japaneseUP

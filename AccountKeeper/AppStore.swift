@@ -226,6 +226,19 @@ final class AppStore: ObservableObject {
         settings.customBlockedKeywords.removeAll { $0 == word }
     }
 
+    // MARK: - Tag blacklist
+
+    func addBlockedTag(_ tag: String) {
+        let trimmed = tag.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        guard !settings.customBlockedTags.contains(trimmed) else { return }
+        settings.customBlockedTags.append(trimmed)
+    }
+
+    func removeBlockedTag(_ tag: String) {
+        settings.customBlockedTags.removeAll { $0 == tag }
+    }
+
     // MARK: - User / login
 
     private func loadUser() {

@@ -121,6 +121,7 @@ enum BlockReason: String, Codable, CaseIterable {
     case categoryBlocked = "分类黑名单"
     case upBlocked = "UP主黑名单"
     case keywordBlocked = "命中关键词"
+    case tagBlocked = "命中标签(Tag)"
     case partitionBlocked = "分区屏蔽"
 
     var icon: String {
@@ -135,6 +136,7 @@ enum BlockReason: String, Codable, CaseIterable {
         case .categoryBlocked: return "folder.badge.minus"
         case .upBlocked: return "person.badge.minus"
         case .keywordBlocked: return "text.magnifyingglass"
+        case .tagBlocked: return "tag.slash"
         case .partitionBlocked: return "square.grid.2x2"
         }
     }

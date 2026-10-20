@@ -17,6 +17,7 @@ struct FilterSettingsView: View {
     @State private var newCategory: String = ""
     @State private var newUPMid: String = ""
     @State private var newKeyword: String = ""
+    @State private var newTag: String = ""
     @State private var expandedTopZones: Set<Int> = []
 
     private var selectedDurationCount: Int {
@@ -55,6 +56,9 @@ struct FilterSettingsView: View {
 
                         // General keyword filter
                         keywordCard
+
+                        // 视频标签(Tag)屏蔽
+                        tagCard
 
                         // Insult word list
                         insultWordCard
@@ -160,6 +164,7 @@ struct FilterSettingsView: View {
                 miniStat(label: "分类黑名单", value: store.settings.stats.byCategory, color: .indigo)
                 miniStat(label: "分区屏蔽拦截", value: store.settings.stats.byPartition, color: .teal)
                 miniStat(label: "关键词拦截", value: store.settings.stats.byKeyword, color: .cyan)
+                miniStat(label: "标签(Tag)拦截", value: store.settings.stats.byTag, color: .indigo)
             }
         }
         .padding(16)
@@ -812,6 +817,97 @@ struct FilterSettingsView: View {
         .padding(.horizontal, 16)
     }
 
+    // MARK: - Tag filter
+
+    private var tagCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableTagFilter) {
+                Label("标签屏蔽 (Tag)", systemImage: "tag.slash")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("只匹配视频的真实 tag 字段，比关键词更精准。首页推荐 / 热门本身不返回 tag，App 会自动补拉后应用；搜索流自带 tag。适合精准屏蔽游戏录播、日本动画、影视解说、美食探店等内容。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle("启用内置标签库", isOn: $store.settings.builtInTagsEnabled)
+                .disabled(!store.settings.enableTagFilter)
+                .tint(.biliBlue)
+
+            HStack {
+                TextField("输入要屏蔽的标签...", text: $newTag)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { addTag() }
+                Button(action: addTag) {
+                    Text("+ 添加")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.biliBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .disabled(!store.settings.enableTagFilter)
+
+            if store.settings.builtInTagsEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("内置标签库 (\(FilterSettings.builtInTags.count)个):")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 8) {
+                        ForEach(FilterSettings.builtInTags, id: \.self) { tag in
+                            Text(tag)
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.indigo.opacity(0.12))
+                                .foregroundStyle(.indigo)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+
+            if !store.settings.customBlockedTags.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("自定义标签 (\(store.settings.customBlockedTags.count)个):")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 8) {
+                        ForEach(store.settings.customBlockedTags, id: \.self) { tag in
+                            HStack(spacing: 4) {
+                                Text(tag)
+                                    .font(.caption)
+                                Button {
+                                    store.removeBlockedTag(tag)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color(.systemGray5))
+                            .foregroundStyle(.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - UI
 
     private var uiCard: some View {
@@ -869,6 +965,13 @@ struct FilterSettingsView: View {
         guard !trimmed.isEmpty else { return }
         store.addBlockedKeyword(trimmed)
         newKeyword = ""
+    }
+
+    private func addTag() {
+        let trimmed = newTag.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        store.addBlockedTag(trimmed)
+        newTag = ""
     }
 }
 

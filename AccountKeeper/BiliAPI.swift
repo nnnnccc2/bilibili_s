@@ -402,16 +402,18 @@ final class BiliAPI {
         }
     }
 
-    /// 首页推荐流（rcmd 接口）只返回标题 / UP主 / 封面，缺少分区(tid)与简介，
-    /// 导致「通用关键词过滤」和「分区屏蔽」在这条流上无法命中（热门、搜索流则带
-    /// 完整元数据，所以只有首页推荐"过滤无效"）。
+    /// 首页推荐流（rcmd 接口）只返回标题 / UP主 / 封面，热门流虽然带 tid 但不带 tag，
+    /// 导致「通用关键词过滤」和「分区屏蔽」在这两条流上命中率极低（搜索流自带
+    /// tid/typename/tag，所以只有搜索"过滤有效"）。
     ///
-    /// 这里对缺少分区 ID 的视频并发补拉一次详情接口，回填 tid / 分区名 / 简介 /
-    /// 时长，让过滤引擎拿到与热门、搜索流一致的完整匹配维度。
-    /// 只补拉 bvid 形态（BV 开头）的视频；直播房间号、影视 season_id 等数字 ID 跳过。
+    /// 这里对缺少分区 ID 的视频补拉 `/x/web-interface/view`（tid / 分区名 / 简介 / 时长），
+    /// 对缺少 tag 的视频补拉 `/x/tag/archive/tags`（体积仅约 2KB/条）。
+    /// 直播房间号、影视 season_id 等非 BV 形态的 ID 直接跳过。
     /// 6 秒兜底超时，避免个别慢请求卡住首页。completion 始终在主线程回调。
     func enrichMetadata(_ videos: [Video], completion: @escaping ([Video]) -> Void) {
-        let targets = videos.indices.filter { videos[$0].tid == 0 && videos[$0].id.hasPrefix("BV") }
+        let targets = videos.indices.filter {
+            videos[$0].id.hasPrefix("BV") && (videos[$0].tid == 0 || videos[$0].tags.isEmpty)
+        }
         guard !targets.isEmpty else {
             DispatchQueue.main.async { completion(videos) }
             return
@@ -421,7 +423,7 @@ final class BiliAPI {
         let lock = NSLock()
         let group = DispatchGroup()
         let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = 5
+        queue.maxConcurrentOperationCount = 6
         var didFinish = false
 
         let finishOnce: () -> Void = {
@@ -441,33 +443,60 @@ final class BiliAPI {
 
         for index in targets {
             let bvid = videos[index].id
+            let needDetail = videos[index].tid == 0
+            let needTags = videos[index].tags.isEmpty
             group.enter()
             queue.addOperation { [weak self] in
                 guard let self = self else {
                     group.leave()
                     return
                 }
-                self.request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid]) { data, _, _ in
-                    defer { group.leave() }
-                    guard let json = self.parseJSON(data),
-                          let d = json["data"] as? [String: Any] else { return }
-                    let tid = self.parseTid(d["tid"])
-                    let tname = d["tname"] as? String ?? ""
-                    let desc = d["desc"] as? String ?? ""
-                    let duration = d["duration"] as? Int ?? 0
-                    let aid = d["aid"] as? Int ?? 0
-                    let cid = d["cid"] as? Int ?? 0
-                    lock.lock()
-                    if tid != 0 { result[index].tid = tid }
-                    if result[index].category.isEmpty {
-                        result[index].category = tname.isEmpty ? (BiliZone.leafName(tid) ?? "") : tname
+                // 同一条视频的两次补拉串行执行，OperationQueue 的并发度仍按视频数控制。
+                let inner = DispatchGroup()
+
+                if needDetail {
+                    inner.enter()
+                    self.request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid]) { data, _, _ in
+                        defer { inner.leave() }
+                        guard let json = self.parseJSON(data),
+                              let d = json["data"] as? [String: Any] else { return }
+                        let tid = self.parseTid(d["tid"])
+                        let tname = d["tname"] as? String ?? ""
+                        let desc = d["desc"] as? String ?? ""
+                        let duration = d["duration"] as? Int ?? 0
+                        let aid = d["aid"] as? Int ?? 0
+                        let cid = d["cid"] as? Int ?? 0
+                        lock.lock()
+                        if tid != 0 { result[index].tid = tid }
+                        if result[index].category.isEmpty {
+                            result[index].category = tname.isEmpty ? (BiliZone.leafName(tid) ?? "") : tname
+                        }
+                        if result[index].desc.isEmpty { result[index].desc = desc }
+                        if result[index].duration == 0 { result[index].duration = duration }
+                        if result[index].aid == 0 { result[index].aid = aid }
+                        if result[index].cid == 0 { result[index].cid = cid }
+                        lock.unlock()
                     }
-                    if result[index].desc.isEmpty { result[index].desc = desc }
-                    if result[index].duration == 0 { result[index].duration = duration }
-                    if result[index].aid == 0 { result[index].aid = aid }
-                    if result[index].cid == 0 { result[index].cid = cid }
-                    lock.unlock()
                 }
+
+                if needTags {
+                    inner.enter()
+                    self.request("https://api.bilibili.com/x/tag/archive/tags", params: ["bvid": bvid]) { data, _, _ in
+                        defer { inner.leave() }
+                        guard let json = self.parseJSON(data),
+                              let list = json["data"] as? [[String: Any]] else { return }
+                        let names = list.compactMap { $0["tag_name"] as? String }
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty }
+                        guard !names.isEmpty else { return }
+                        lock.lock()
+                        if result[index].tags.isEmpty { result[index].tags = names }
+                        lock.unlock()
+                    }
+                }
+
+                inner.wait()
+                group.leave()
             }
         }
 
