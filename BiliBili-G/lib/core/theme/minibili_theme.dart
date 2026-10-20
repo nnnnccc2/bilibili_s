@@ -196,6 +196,28 @@ abstract final class MiniBiliTheme {
         color: MiniBiliColors.biliBorder,
         thickness: 0.5,
       ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: MiniBiliColors.biliCard,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        clipBehavior: Clip.antiAlias,
+      ),
+      drawerTheme: DrawerThemeData(
+        backgroundColor: MiniBiliColors.biliCard,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.horizontal(right: Radius.circular(20)),
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: MiniBiliColors.biliBlue,
+        linearTrackColor: MiniBiliColors.biliMutedSurface,
+        circularTrackColor: MiniBiliColors.biliMutedSurface,
+      ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: MiniBiliColors.biliBlue,
         foregroundColor: Colors.white,
@@ -247,6 +269,7 @@ abstract final class MiniBiliTheme {
       popupMenuTheme: PopupMenuThemeData(
         color: MiniBiliColors.biliCard,
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -395,6 +418,28 @@ abstract final class MiniBiliTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: const Color(0xFF1E293B),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        clipBehavior: Clip.antiAlias,
+      ),
+      drawerTheme: DrawerThemeData(
+        backgroundColor: const Color(0xFF1E293B),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.horizontal(right: Radius.circular(20)),
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: MiniBiliColors.biliBlue,
+        linearTrackColor: Colors.white.withOpacity(0.1),
+        circularTrackColor: Colors.white.withOpacity(0.1),
+      ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: MiniBiliColors.biliBlue,
         foregroundColor: Colors.white,
@@ -446,6 +491,7 @@ abstract final class MiniBiliTheme {
       popupMenuTheme: PopupMenuThemeData(
         color: const Color(0xFF1E293B),
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),

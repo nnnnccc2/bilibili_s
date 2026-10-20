@@ -1,3 +1,4 @@
+import 'package:PiliPlus/core/theme/minibili_theme.dart';
 import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:flutter/material.dart';
@@ -74,7 +75,7 @@ class PBadge extends StatelessWidget {
         bgColor = Colors.transparent;
         borderColor = theme.secondary;
       case PBadgeType.free:
-        bgColor = Colors.blue;
+        bgColor = MiniBiliColors.biliBlue;
         color = Colors.white;
       case PBadgeType.shop:
         bgColor = theme.secondaryContainer.withValues(alpha: 0.5);

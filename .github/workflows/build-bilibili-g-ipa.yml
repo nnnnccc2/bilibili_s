@@ -100,19 +100,24 @@ jobs:
         run: |
           find $PUB_CACHE -path "*getx*get_navigation/src/extension_navigation.dart" 2>/dev/null | while read FILE; do
             echo "Patching getx: $FILE"
-            # Insert getters before the closing brace of the Nav extension (before "static GetMaterialController _getxController")
-            perl -i -pe '
-              if (/static GetMaterialController _getxController = GetMaterialController\(\);/) {
-                $_ = "\tThemeData get theme => context != null ? Theme.of(context!) : ThemeData.light();\n" .
-                     "\tSize get size => context != null ? MediaQuery.sizeOf(context!) : Size.zero;\n" .
-                     "\tMediaQueryData get mediaQuery => context != null ? MediaQuery.of(context!) : const MediaQueryData();\n" .
-                     "\tbool get isDarkMode => theme.brightness == Brightness.dark;\n" .
-                     "\tdouble get width => size.width;\n" .
-                     "\tdouble get height => size.height;\n" .
-                     $_;
-              }
-            ' "$FILE"
-            echo "--- Patched getters ---"
+            # Only add getters if they don't already exist (newer getx versions ship with them)
+            if grep -q "get theme" "$FILE"; then
+              echo "getters already present, skipping"
+            else
+              # Insert getters before the static _getxController declaration
+              perl -i -pe '
+                if (/static GetMaterialController _getxController = GetMaterialController\(\);/) {
+                  $_ = "\tThemeData get theme => context != null ? Theme.of(context!) : ThemeData.light();\n" .
+                       "\tSize get size => context != null ? MediaQuery.sizeOf(context!) : Size.zero;\n" .
+                       "\tMediaQueryData get mediaQuery => context != null ? MediaQuery.of(context!) : const MediaQueryData();\n" .
+                       "\tbool get isDarkMode => theme.brightness == Brightness.dark;\n" .
+                       "\tdouble get width => size.width;\n" .
+                       "\tdouble get height => size.height;\n" .
+                       $_;
+                }
+              ' "$FILE"
+              echo "--- Added getters ---"
+            fi
             grep -n "get theme\|get size\|get mediaQuery\|get isDarkMode\|get width" "$FILE" | head -10
           done
           echo "getx patch complete"
