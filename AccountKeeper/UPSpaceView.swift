@@ -155,7 +155,7 @@ struct UPSpaceView: View {
             ProgressView()
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
-        } else if let loadError = loadError {
+        } else if let errorMsg = loadError {
             VStack(spacing: 10) {
                 Image(systemName: "wifi.slash")
                     .font(.system(size: 32))
@@ -166,7 +166,7 @@ struct UPSpaceView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("点击重试") {
-                    loadError = nil
+                    self.loadError = nil
                     loadVideos(reset: true)
                 }
                 .buttonStyle(.borderedProminent)
