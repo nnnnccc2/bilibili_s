@@ -191,6 +191,14 @@ struct FilterSettingsView: View {
                 miniStat(label: "标签(Tag)拦截", value: store.settings.stats.byTag, color: .indigo)
             }
 
+            HStack(spacing: 6) {
+                Image(systemName: store.settings.enablePartitionFilter ? "shield.lefthalf.filled" : "shield.slash")
+                    .font(.system(size: 10))
+                Text("分区屏蔽 \(store.settings.enablePartitionFilter ? "已启用" : "未启用") · 一级 \(store.settings.blockedTopZoneTids.count) 个 · 二级 \(store.settings.blockedSubZoneTids.count) 个")
+                    .font(.system(size: 10))
+            }
+            .foregroundStyle(.secondary)
+
             Text("构建 \(Bundle.main.object(forInfoDictionaryKey: "BuildCompileTime") as? String ?? "未知") · 上次首页 带tag \(store.feedDiagnostics.withTags)/\(store.feedDiagnostics.total) 条")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)

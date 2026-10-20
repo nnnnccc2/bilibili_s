@@ -603,16 +603,37 @@ struct VideoPlayerView: View {
         return Group {
             if videoTid > 0, let topName {
                 HStack(spacing: 8) {
-                    partitionBadge(title: "一级分区", name: topName, tid: topTid)
+                    Button {
+                        toggleBlockedTopZone(topTid, name: topName)
+                    } label: {
+                        partitionBadge(
+                            title: "一级分区",
+                            name: topName,
+                            tid: topTid,
+                            blocked: store.settings.blockedTopZoneTids.contains(topTid)
+                        )
+                    }
+                    .buttonStyle(.plain)
+
                     if let leafName, leafName != topName {
-                        partitionBadge(title: "二级分区", name: leafName, tid: videoTid)
+                        Button {
+                            toggleBlockedSubZone(videoTid, name: leafName)
+                        } label: {
+                            partitionBadge(
+                                title: "二级分区",
+                                name: leafName,
+                                tid: videoTid,
+                                blocked: store.settings.blockedSubZoneTids.contains(videoTid)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                     Spacer()
                 }
                 .padding(.horizontal)
             } else if !video.category.isEmpty {
                 HStack(spacing: 8) {
-                    partitionBadge(title: "分区", name: video.category, tid: 0)
+                    partitionBadge(title: "分区", name: video.category, tid: 0, actionable: false)
                     Spacer()
                 }
                 .padding(.horizontal)
@@ -620,7 +641,37 @@ struct VideoPlayerView: View {
         }
     }
 
-    private func partitionBadge(title: String, name: String, tid: Int) -> some View {
+    /// 点一级分区：加入 / 移出分区黑名单（二级分区归属该一级分区时同样被拦）。
+    private func toggleBlockedTopZone(_ tid: Int, name: String) {
+        if store.settings.blockedTopZoneTids.contains(tid) {
+            store.settings.blockedTopZoneTids.remove(tid)
+            toast = "已取消屏蔽一级分区：\(name)"
+        } else {
+            store.settings.blockedTopZoneTids.insert(tid)
+            store.settings.enablePartitionFilter = true
+            toast = "已屏蔽一级分区：\(name)"
+        }
+    }
+
+    /// 点二级分区：只屏蔽这一个细分分区。
+    private func toggleBlockedSubZone(_ tid: Int, name: String) {
+        if store.settings.blockedSubZoneTids.contains(tid) {
+            store.settings.blockedSubZoneTids.remove(tid)
+            toast = "已取消屏蔽二级分区：\(name)"
+        } else {
+            store.settings.blockedSubZoneTids.insert(tid)
+            store.settings.enablePartitionFilter = true
+            toast = "已屏蔽二级分区：\(name)"
+        }
+    }
+
+    private func partitionBadge(
+        title: String,
+        name: String,
+        tid: Int,
+        blocked: Bool = false,
+        actionable: Bool = true
+    ) -> some View {
         HStack(spacing: 4) {
             Text(title)
                 .font(.caption2)
@@ -633,10 +684,16 @@ struct VideoPlayerView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            if actionable {
+                Text(blocked ? "已屏蔽" : "屏蔽")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundStyle(blocked ? Color.red : Color.biliBlue)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(Color.biliBlue.opacity(0.08))
+        .background((blocked ? Color.red : Color.biliBlue).opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
