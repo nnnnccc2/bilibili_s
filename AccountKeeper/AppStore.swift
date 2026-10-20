@@ -96,6 +96,38 @@ final class AppStore: ObservableObject {
         return passed
     }
 
+    // MARK: - 一键最强净化
+
+    /// 把当前生效的所有过滤维度一次性打开，并预置高频低质分区。
+    /// 用于「设置里看起来都开了、实际一条都没被拦」的场景：
+    /// 分区/分类开关和内置词库默认是关的，只开总开关不会命中任何内容。
+    func enableStrongPurification() {
+        settings.enableKeywordFilter = true
+        settings.builtInKeywordsEnabled = true
+        settings.enableTagFilter = true
+        settings.builtInTagsEnabled = true
+        settings.enablePartitionFilter = true
+        settings.enableClickbaitFilter = true
+        settings.enableInsultWordFilter = true
+        // 动画 / 番剧 / 国创 / 游戏 / 美食 / 影视 / 娱乐 / 鬼畜
+        settings.blockedTopZoneTids.formUnion([1, 13, 167, 4, 211, 181, 5, 119])
+    }
+
+    /// 当前真正生效的过滤维度摘要，显示在首页诊断行，便于确认开关状态。
+    var activeFilterSummary: String {
+        let s = settings
+        var on: [String] = []
+        if s.enableKeywordFilter { on.append(s.builtInKeywordsEnabled ? "关键词+词库" : "关键词") }
+        if s.enableTagFilter { on.append(s.builtInTagsEnabled ? "tag+词库" : "tag") }
+        if s.enablePartitionFilter { on.append("分区\(s.blockedTopZoneTids.count)") }
+        if s.enableCategoryFilter { on.append("分类") }
+        if s.enableClickbaitFilter { on.append("标题党") }
+        if s.enableInsultWordFilter { on.append("贬低词") }
+        if s.enableJapaneseTitleFilter { on.append("日文标题") }
+        if s.enableJapaneseUPFilter { on.append("日文UP") }
+        return on.isEmpty ? "未开启任何过滤" : "已开 " + on.joined(separator: "/")
+    }
+
     // MARK: - Settings persistence
 
     private func loadSettings() {

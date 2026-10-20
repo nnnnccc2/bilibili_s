@@ -126,6 +126,30 @@ struct FilterSettingsView: View {
                 }
             }
 
+            // 一键最强净化：只开总开关但没开内置词库/分区时，过滤不会命中任何内容。
+            Button {
+                store.enableStrongPurification()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "bolt.shield.fill")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("一键最强净化")
+                            .font(.subheadline).fontWeight(.bold)
+                        Text("开启关键词+内置词库、Tag、分区（动画/番剧/游戏/美食/影视/娱乐/鬼畜）")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer()
+                }
+                .foregroundStyle(Color.biliBlue)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.biliBlue.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+
             // Big number
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
