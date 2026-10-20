@@ -256,31 +256,34 @@ struct AccountGroupDetailView: View {
     @State private var accountToDelete: Account?
 
     var body: some View {
-        List {
-            Section {
-                headerCard
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
-            }
+        VStack(spacing: 0) {
+            headerCard
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
 
-            ForEach(group.accounts) { account in
-                NavigationLink {
-                    AccountDetailView(account: account)
-                } label: {
-                    Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                        .font(.system(size: 17))
-                        .padding(.vertical, 14)
-                }
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        accountToDelete = account
+            Divider()
+
+            List {
+                ForEach(group.accounts) { account in
+                    NavigationLink {
+                        AccountDetailView(account: account)
                     } label: {
-                        Label("删除", systemImage: "trash")
+                        Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
+                            .font(.system(size: 17))
+                            .padding(.vertical, 14)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            accountToDelete = account
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
                     }
                 }
             }
+            .listStyle(.plain)
         }
-        .listStyle(.plain)
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
         .alert(
