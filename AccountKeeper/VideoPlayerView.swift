@@ -37,6 +37,8 @@ struct VideoPlayerView: View {
     /// 视频 tag 列表（播放页「Tag」标签页展示，可直接加入 / 移出 Tag 屏蔽词库）
     @State private var videoTags: [String] = []
     @State private var isLoadingTags = false
+    /// 视频分区 tid（一级 / 二级分区在播放页简介里展示）
+    @State private var videoTid: Int = 0
 
     // Playback controls UI state
     @State private var isPlaying = false
@@ -590,7 +592,53 @@ struct VideoPlayerView: View {
         }
     }
 
-    // MARK: - Intro section
+    // MARK: - 分区展示
+
+    /// 播放页简介里的「一级分区 / 二级分区」行。
+    private var partitionRow: some View {
+        let topTid = BiliZone.topTid(forLeaf: videoTid) ?? 0
+        let topName = BiliZone.topName(topTid)
+        let leafName = BiliZone.leafName(videoTid)
+
+        return Group {
+            if videoTid > 0, let topName {
+                HStack(spacing: 8) {
+                    partitionBadge(title: "一级分区", name: topName, tid: topTid)
+                    if let leafName, leafName != topName {
+                        partitionBadge(title: "二级分区", name: leafName, tid: videoTid)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+            } else if !video.category.isEmpty {
+                HStack(spacing: 8) {
+                    partitionBadge(title: "分区", name: video.category, tid: 0)
+                    Spacer()
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    private func partitionBadge(title: String, name: String, tid: Int) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(name)
+                .font(.caption)
+                .fontWeight(.medium)
+            if tid > 0 {
+                Text("\(tid)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.biliBlue.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
 
     private var introSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -611,6 +659,8 @@ struct VideoPlayerView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .padding(.horizontal)
+
+            partitionRow
 
             Divider().padding(.horizontal)
 
@@ -784,11 +834,16 @@ struct VideoPlayerView: View {
     /// 播放页可能来自推荐 / 热门（接口本身不带 tag），此时补拉一次。
     private func loadVideoTags() {
         videoTags = video.tags
-        guard videoTags.isEmpty, video.id.hasPrefix("BV") else { return }
+        videoTid = video.tid
+        guard video.id.hasPrefix("BV") else { return }
+        guard videoTags.isEmpty || videoTid == 0 else { return }
         isLoadingTags = true
         BiliAPI.shared.enrichMetadata([video]) { enriched in
             DispatchQueue.main.async {
-                videoTags = enriched.first?.tags ?? []
+                if let full = enriched.first {
+                    if videoTags.isEmpty { videoTags = full.tags }
+                    if videoTid == 0 { videoTid = full.tid }
+                }
                 isLoadingTags = false
             }
         }
