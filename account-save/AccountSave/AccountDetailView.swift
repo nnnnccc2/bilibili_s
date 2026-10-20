@@ -76,7 +76,7 @@ struct AccountDetailView: View {
                 Text(account.name)
                     .font(.system(size: 22, weight: .semibold))
 
-                Text(account.phoneNumber.isEmpty ? "注册手机号未填写" : account.phoneNumber)
+                Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(account.phoneNumber.isEmpty ? .tertiary : .secondary)
             }
