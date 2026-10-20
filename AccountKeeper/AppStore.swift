@@ -60,6 +60,8 @@ final class AppStore: ObservableObject {
     /// - Parameter countStats: when false (re-filtering after settings change), the
     ///   per-reason counters are not incremented again.
     func applyFilter(_ videos: [Video], countStats: Bool = true) -> [Video] {
+        classifyAndCache(videos)
+        let engine = self.engine
         var passed: [Video] = []
         var blocked = 0
         for v in videos {
@@ -80,6 +82,8 @@ final class AppStore: ObservableObject {
     /// - Parameter applyMinDuration: false for user search — user results have no
     ///   duration and must not be filtered out by a min-duration threshold.
     func applySearchFilter(_ videos: [Video], countStats: Bool = true, applyMinDuration: Bool = true) -> [Video] {
+        classifyAndCache(videos)
+        let engine = self.engine
         var passed: [Video] = []
         var blocked = 0
         for v in videos {
@@ -96,6 +100,51 @@ final class AppStore: ObservableObject {
         return passed
     }
 
+    // MARK: - Creator classification cache
+
+    /// 对一批视频的 UP 主进行类型识别并写入 knownCreators 缓存。
+    /// 多次采样后类型稳定则置信度升高，类型漂移则降低并可能切换类型。
+    /// 缓存上限 800，超出按 lastSeen 淘汰最旧博主。
+    func classifyAndCache(_ videos: [Video]) {
+        let now = Date()
+        for v in videos {
+            guard v.upMid != 0 else { continue }
+            let detected = CreatorClassifier.classify(video: v)
+            if var existing = settings.knownCreators[v.upMid] {
+                existing.sampleCount += 1
+                existing.lastSeen = now
+                if !v.upName.isEmpty { existing.name = v.upName }
+                if !v.upAvatar.isEmpty { existing.avatar = v.upAvatar }
+                if existing.type == detected {
+                    existing.confidence = min(1.0, existing.confidence + 0.15)
+                } else {
+                    existing.confidence -= 0.25
+                    if existing.confidence <= 0 {
+                        existing.type = detected
+                        existing.confidence = detected == .other ? 0.1 : 0.4
+                    }
+                }
+                settings.knownCreators[v.upMid] = existing
+            } else {
+                let profile = CreatorProfile(
+                    mid: v.upMid,
+                    name: v.upName,
+                    avatar: v.upAvatar,
+                    type: detected,
+                    confidence: detected == .other ? 0.1 : 0.5
+                )
+                settings.knownCreators[v.upMid] = profile
+            }
+        }
+        // 缓存淘汰：超过 800 时按 lastSeen 降序保留前 800
+        if settings.knownCreators.count > 800 {
+            let keep = settings.knownCreators.values
+                .sorted { $0.lastSeen > $1.lastSeen }
+                .prefix(800)
+            settings.knownCreators = Dictionary(uniqueKeysWithValues: keep.map { ($0.mid, $0) })
+        }
+    }
+
     // MARK: - 一键最强净化
 
     /// 把当前生效的所有过滤维度一次性打开，并预置高频低质分区。
@@ -109,6 +158,8 @@ final class AppStore: ObservableObject {
         settings.enablePartitionFilter = true
         settings.enableClickbaitFilter = true
         settings.enableInsultWordFilter = true
+        settings.enableCreatorTypeFilter = true
+        settings.blockedCreatorTypes = FilterSettings.defaultBlockedCreatorTypes
         // 动画 / 番剧 / 国创 / 游戏 / 美食 / 影视 / 娱乐 / 鬼畜
         settings.blockedTopZoneTids.formUnion([1, 13, 167, 4, 211, 181, 5, 119])
     }
@@ -120,6 +171,7 @@ final class AppStore: ObservableObject {
         if s.enableKeywordFilter { on.append(s.builtInKeywordsEnabled ? "关键词+词库" : "关键词") }
         if s.enableTagFilter { on.append(s.builtInTagsEnabled ? "tag+词库" : "tag") }
         if s.enablePartitionFilter { on.append("分区\(s.blockedTopZoneTids.count)") }
+        if s.enableCreatorTypeFilter { on.append("博主类型\(s.blockedCreatorTypes.count)") }
         if s.enableCategoryFilter { on.append("分类") }
         if s.enableClickbaitFilter { on.append("标题党") }
         if s.enableInsultWordFilter { on.append("贬低词") }
@@ -155,6 +207,11 @@ final class AppStore: ObservableObject {
             settings.builtInTagsEnabled = true
             settings.enablePartitionFilter = true
             settings.blockedTopZoneTids.formUnion(FilterSettings.defaultTopZones)
+        }
+        // v7：新增「博主类型过滤」维度，老用户升级后默认开启并预置屏蔽类型。
+        if (settings.schemaVersion ?? 0) < 7 {
+            settings.enableCreatorTypeFilter = true
+            settings.blockedCreatorTypes = FilterSettings.defaultBlockedCreatorTypes
         }
         settings.schemaVersion = FilterSettings.currentSchemaVersion
     }
@@ -201,6 +258,39 @@ final class AppStore: ObservableObject {
 
     func unblockUP(mid: Int) {
         settings.blockedUPMids.remove(mid)
+    }
+
+    // MARK: - Creator type filter management
+
+    func blockCreatorType(_ type: CreatorType) {
+        settings.blockedCreatorTypes.insert(type)
+    }
+
+    func unblockCreatorType(_ type: CreatorType) {
+        settings.blockedCreatorTypes.remove(type)
+    }
+
+    func toggleCreatorType(_ type: CreatorType) {
+        if settings.blockedCreatorTypes.contains(type) {
+            unblockCreatorType(type)
+        } else {
+            blockCreatorType(type)
+        }
+    }
+
+    /// 恢复默认屏蔽的博主类型集合。
+    func resetBlockedCreatorTypes() {
+        settings.blockedCreatorTypes = FilterSettings.defaultBlockedCreatorTypes
+    }
+
+    /// 从缓存中移除某个博主（误判后可手动清除，下次出现会重新分类）。
+    func removeCreator(mid: Int) {
+        settings.knownCreators.removeValue(forKey: mid)
+    }
+
+    /// 清空已识别博主缓存。
+    func clearKnownCreators() {
+        settings.knownCreators.removeAll()
     }
 
     // MARK: - Category blacklist

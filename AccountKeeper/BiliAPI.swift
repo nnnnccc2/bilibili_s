@@ -500,6 +500,10 @@ final class BiliAPI {
                     if result[index].duration == 0 { result[index].duration = view["duration"] as? Int ?? 0 }
                     if result[index].aid == 0 { result[index].aid = view["aid"] as? Int ?? 0 }
                     if result[index].cid == 0 { result[index].cid = view["cid"] as? Int ?? 0 }
+                    // copyright: 1=原创 2=转载 —— 识别搬运号/营销号的核心信号
+                    if result[index].copyright == 0 {
+                        result[index].copyright = view["copyright"] as? Int ?? 0
+                    }
                 }
                 if gotTid { report.viewOK += 1 }
                 if gotTags { report.tagOK += 1; result[index].tags = tags }
@@ -1709,7 +1713,8 @@ private extension BiliAPI {
                 favorites: stat?["favorite"] as? Int ?? 0,
                 shares: stat?["share"] as? Int ?? 0,
                 cid: item["cid"] as? Int ?? 0,
-                tid: self.parseTid(item["tid"])
+                tid: self.parseTid(item["tid"]),
+                copyright: item["copyright"] as? Int ?? 0
             )
         }
     }
@@ -1820,7 +1825,8 @@ private extension BiliAPI {
                     desc: item["description"] as? String ?? "",
                     likes: 0, coins: 0, favorites: 0, shares: 0,
                     cid: item["cid"] as? Int ?? 0,
-                    tid: self.parseTid(item["typeid"])
+                    tid: self.parseTid(item["typeid"]),
+                    copyright: item["copyright"] as? Int ?? 0
                 )
             }
         }
@@ -1895,7 +1901,8 @@ private extension BiliAPI {
                 tags: self.parseTags(archive["tag"]),
                 desc: archive["desc"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
-                cid: archive["cid"] as? Int ?? 0
+                cid: archive["cid"] as? Int ?? 0,
+                copyright: archive["copyright"] as? Int ?? 0
             )
         }
     }
@@ -1922,7 +1929,8 @@ private extension BiliAPI {
             coins: stat?["coin"] as? Int ?? 0,
             favorites: stat?["favorite"] as? Int ?? 0,
             shares: stat?["share"] as? Int ?? 0,
-            cid: d["cid"] as? Int ?? 0
+            cid: d["cid"] as? Int ?? 0,
+            copyright: d["copyright"] as? Int ?? 0
         )
         video.aid = d["aid"] as? Int ?? 0
         return video
@@ -2224,11 +2232,12 @@ extension Video {
     init(id: String, title: String, cover: String, duration: Int, upName: String,
          upMid: Int, upAvatar: String, views: Int, danmaku: Int, publishTime: String,
          category: String, tags: [String] = [], desc: String, likes: Int, coins: Int,
-         favorites: Int, shares: Int, cid: Int, tid: Int = 0) {
+         favorites: Int, shares: Int, cid: Int, tid: Int = 0, copyright: Int = 0) {
         self.init(id: id, title: title, cover: cover, duration: duration,
                   upName: upName, upMid: upMid, upAvatar: upAvatar, views: views, danmaku: danmaku,
                   publishTime: publishTime, category: category, tags: tags, desc: desc,
-                  likes: likes, coins: coins, favorites: favorites, shares: shares, tid: tid)
+                  likes: likes, coins: coins, favorites: favorites, shares: shares, tid: tid,
+                  copyright: copyright)
         self.cid = cid
     }
 }

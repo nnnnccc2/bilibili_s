@@ -27,6 +27,7 @@ struct Video: Identifiable, Codable, Hashable {
     var favorites: Int
     var shares: Int
     var tid: Int                // Bilibili leaf partition id (0 if unknown)
+    var copyright: Int          // 1=原创, 2=转载, 0=未知（用于识别搬运号/营销号）
 
     init(id: String = UUID().uuidString,
          aid: Int = 0,
@@ -46,7 +47,8 @@ struct Video: Identifiable, Codable, Hashable {
          coins: Int = 0,
          favorites: Int = 0,
          shares: Int = 0,
-         tid: Int = 0) {
+         tid: Int = 0,
+         copyright: Int = 0) {
         self.id = id
         self.aid = aid
         self.title = title
@@ -66,6 +68,7 @@ struct Video: Identifiable, Codable, Hashable {
         self.favorites = favorites
         self.shares = shares
         self.tid = tid
+        self.copyright = copyright
     }
 
     /// Formatted duration string e.g. "06:28", "02:02:00"
@@ -123,6 +126,7 @@ enum BlockReason: String, Codable, CaseIterable {
     case keywordBlocked = "命中关键词"
     case tagBlocked = "命中标签(Tag)"
     case partitionBlocked = "分区屏蔽"
+    case creatorTypeBlocked = "博主类型屏蔽"
 
     var icon: String {
         switch self {
@@ -138,6 +142,7 @@ enum BlockReason: String, Codable, CaseIterable {
         case .keywordBlocked: return "text.magnifyingglass"
         case .tagBlocked: return "tag.slash"
         case .partitionBlocked: return "square.grid.2x2"
+        case .creatorTypeBlocked: return "person.2.slash"
         }
     }
 }

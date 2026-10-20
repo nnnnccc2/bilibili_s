@@ -113,6 +113,17 @@ final class FilterEngine {
             return .upBlocked
         }
 
+        // 7.5. 博主类型过滤：基于已缓存的 CreatorProfile.type 判断。
+        // 只在置信度 >= 0.4 时生效，避免单条视频误判把优质博主整个屏蔽。
+        // .other 类型不在默认屏蔽列表中，不会误伤。
+        if settings.enableCreatorTypeFilter, video.upMid != 0,
+           let profile = settings.knownCreators[video.upMid],
+           profile.type != .other,
+           profile.confidence >= 0.4,
+           settings.blockedCreatorTypes.contains(profile.type) {
+            return .creatorTypeBlocked
+        }
+
         // 8. Duration block (global): videos shorter than or equal to the max selected threshold
         if let threshold = settings.effectiveDurationThreshold, video.duration > 0, video.duration <= threshold {
             return .duration

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// Statistics for the purification engine
 struct FilterStats: Codable, Hashable {
@@ -22,6 +23,7 @@ struct FilterStats: Codable, Hashable {
     var byKeyword: Int = 0
     var byTag: Int = 0
     var byPartition: Int = 0
+    var byCreatorType: Int = 0
 
     init() {}
 
@@ -42,6 +44,7 @@ struct FilterStats: Codable, Hashable {
         byKeyword = try c.decodeIfPresent(Int.self, forKey: .byKeyword) ?? 0
         byTag = try c.decodeIfPresent(Int.self, forKey: .byTag) ?? 0
         byPartition = try c.decodeIfPresent(Int.self, forKey: .byPartition) ?? 0
+        byCreatorType = try c.decodeIfPresent(Int.self, forKey: .byCreatorType) ?? 0
     }
 
     mutating func add(_ reason: BlockReason) {
@@ -59,6 +62,7 @@ struct FilterStats: Codable, Hashable {
         case .keywordBlocked: byKeyword += 1
         case .tagBlocked: byTag += 1
         case .partitionBlocked: byPartition += 1
+        case .creatorTypeBlocked: byCreatorType += 1
         }
     }
 }
@@ -105,6 +109,22 @@ struct FilterSettings: Codable, Hashable {
     // UP主 blacklist（按 mid）
     var enableUPBlockFilter: Bool = false
     var blockedUPMids: Set<Int> = []
+
+    // Creator type filtering（按博主内容类型批量屏蔽）
+    // 基于视频分区 / tag / 标题 / copyright 自动识别 UP 主类型并缓存，
+    // 用户可在设置里查看已识别的各类型博主、跳转主页、取消屏蔽。
+    // 默认屏蔽数码评测、手机评测、游戏、美食、旅游、影视剪辑、二次元、
+    // 日本动画、穿搭时尚、营销号、搬运号。
+    var enableCreatorTypeFilter: Bool = true
+    var blockedCreatorTypes: Set<CreatorType> = FilterSettings.defaultBlockedCreatorTypes
+    /// 已识别博主画像缓存：mid -> profile。持久化，上限 800 个，超出按 lastSeen 淘汰。
+    var knownCreators: [Int: CreatorProfile] = [:]
+
+    static let defaultBlockedCreatorTypes: Set<CreatorType> = [
+        .techReview, .phoneReview, .gameStreamer, .foodBlogger,
+        .travelBlogger, .filmEditor, .animeBlogger, .japaneseAnime,
+        .fashionBlogger, .marketing, .repost
+    ]
 
     // General keyword filtering（标题 + UP名 + 描述 + 分类/tag 联合匹配）
     // 默认开启：这是用户最主要依赖的过滤维度，且对「无 tag 视频」同样有效。
@@ -156,6 +176,9 @@ struct FilterSettings: Codable, Hashable {
         blockedSubZoneTids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedSubZoneTids) ?? []
         enableUPBlockFilter = try c.decodeIfPresent(Bool.self, forKey: .enableUPBlockFilter) ?? false
         blockedUPMids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedUPMids) ?? []
+        enableCreatorTypeFilter = try c.decodeIfPresent(Bool.self, forKey: .enableCreatorTypeFilter) ?? true
+        blockedCreatorTypes = try c.decodeIfPresent(Set<CreatorType>.self, forKey: .blockedCreatorTypes) ?? FilterSettings.defaultBlockedCreatorTypes
+        knownCreators = try c.decodeIfPresent([Int: CreatorProfile].self, forKey: .knownCreators) ?? [:]
         enableKeywordFilter = try c.decodeIfPresent(Bool.self, forKey: .enableKeywordFilter) ?? true
         builtInKeywordsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInKeywordsEnabled) ?? true
         customBlockedKeywords = try c.decodeIfPresent([String].self, forKey: .customBlockedKeywords) ?? []
@@ -171,7 +194,7 @@ struct FilterSettings: Codable, Hashable {
     }
 
     /// Current filter-settings schema version.
-    static let currentSchemaVersion = 6
+    static let currentSchemaVersion = 7
 }
 
 // MARK: - Built-in word lists
@@ -591,5 +614,211 @@ enum BiliZone {
             if trimmed.contains(pair.name) { return pair.tid }
         }
         return nil
+    }
+}
+
+// MARK: - Creator type classification（博主类型识别）
+
+/// 博主内容类型。基于视频的分区 tid / tag / 标题 / copyright 等信号
+/// 对 UP 主进行归类，用于按「博主类型」批量屏蔽（如屏蔽所有数码评测博主）。
+enum CreatorType: String, Codable, CaseIterable, Identifiable, Hashable {
+    case techReview = "数码评测"
+    case phoneReview = "手机评测"
+    case gameStreamer = "游戏主播/UP"
+    case foodBlogger = "美食博主"
+    case travelBlogger = "旅游/出行博主"
+    case filmEditor = "影视/剪辑博主"
+    case animeBlogger = "二次元博主"
+    case japaneseAnime = "日本动画博主"
+    case fashionBlogger = "穿搭/时尚博主"
+    case marketing = "营销号"
+    case repost = "搬运号博主"
+    case official = "官方账号"
+    case enterprise = "企业号"
+    case other = "其他"
+
+    var id: String { rawValue }
+
+    /// SF Symbol 图标，用于设置页展示。
+    var icon: String {
+        switch self {
+        case .techReview: return "cpu"
+        case .phoneReview: return "iphone"
+        case .gameStreamer: return "gamecontroller"
+        case .foodBlogger: return "fork.knife"
+        case .travelBlogger: return "airplane"
+        case .filmEditor: return "film"
+        case .animeBlogger: return "sparkles"
+        case .japaneseAnime: return "character.book.closed"
+        case .fashionBlogger: return "tshirt"
+        case .marketing: return "megaphone"
+        case .repost: return "arrow.triangle.2.circlepath"
+        case .official: return "checkmark.seal.fill"
+        case .enterprise: return "building.2"
+        case .other: return "person"
+        }
+    }
+
+    /// 主题色，用于设置页 chip 着色。
+    var color: Color {
+        switch self {
+        case .techReview: return .blue
+        case .phoneReview: return .indigo
+        case .gameStreamer: return .purple
+        case .foodBlogger: return .orange
+        case .travelBlogger: return .teal
+        case .filmEditor: return .pink
+        case .animeBlogger: return .purple
+        case .japaneseAnime: return .red
+        case .fashionBlogger: return .pink
+        case .marketing: return .red
+        case .repost: return .red
+        case .official: return .green
+        case .enterprise: return .green
+        case .other: return .gray
+        }
+    }
+}
+
+/// 已识别博主的画像，按 mid 缓存。持久化在 FilterSettings 里。
+struct CreatorProfile: Codable, Hashable, Identifiable {
+    var id: Int { mid }
+    let mid: Int
+    var name: String
+    var avatar: String
+    var type: CreatorType
+    /// 识别置信度 0~1，多次采样后类型稳定则升高。
+    var confidence: Double
+    var firstSeen: Date
+    var lastSeen: Date
+    /// 已参与分类的视频样本数。
+    var sampleCount: Int
+
+    init(mid: Int, name: String, avatar: String = "", type: CreatorType, confidence: Double = 0) {
+        self.mid = mid
+        self.name = name
+        self.avatar = avatar
+        self.type = type
+        self.confidence = confidence
+        self.firstSeen = Date()
+        self.lastSeen = Date()
+        self.sampleCount = 1
+    }
+}
+
+// MARK: - CreatorClassifier
+
+/// 基于单条视频的可见信号（tid / tags / title / copyright / 互动数据）
+/// 推断 UP 主的内容类型。不依赖额外网络请求，过滤前即可运行。
+///
+/// 分类优先级：官方/企业号（用户名模式） > 分区 tid > 标签 tag > 标题关键词 > copyright。
+/// 首页推荐流只有 title+upName，分类会落到 .other 或靠标题关键词命中；
+/// 热门/搜索流带 tid+tag，分类较准确；补拉 copyright 后可识别搬运号。
+enum CreatorClassifier {
+
+    /// 用户名里出现这些词，基本可以判定为官方/企业账号。
+    private static let officialNameHints = [
+        "官方", "Official", "旗舰店", "公众号", "频道", "工作室", "传媒",
+        "文化", "科技", "公司", "集团", "品牌", "认证", "bilibili", "哔哩哔哩"
+    ]
+    /// 企业号名称后缀（更偏机构）。
+    private static let enterpriseNameHints = [
+        "公司", "集团", "传媒", "文化", "科技", "品牌", "官方账号"
+    ]
+
+    /// 手机相关关键词，命中数码分区时进一步细分为「手机评测」。
+    private static let phoneKeywords = [
+        "iphone", "小米", "华为", "oppo", "vivo", "荣耀", "三星", "一加",
+        "手机", "续航", "拍照", "骁龙", "天玑", "芯片", "处理器", "旗舰机",
+        "redmi", "realme", "iqoo", "魅族", "努比亚", "折叠屏"
+    ]
+
+    /// 推断单条视频所属的博主类型。
+    static func classify(video: Video) -> CreatorType {
+        let name = video.upName
+        let haystack = (video.title + " " + video.tags.joined(separator: " ")).lowercased()
+
+        // 1. 官方/企业号（用户名模式，优先级最高）
+        let lowerName = name.lowercased()
+        for hint in enterpriseNameHints where lowerName.contains(hint.lowercased()) {
+            return .enterprise
+        }
+        for hint in officialNameHints where lowerName.contains(hint.lowercased()) {
+            return .official
+        }
+
+        // 2. 搬运号：copyright=2（转载）且无明显原创加工信号
+        if video.copyright == 2 {
+            // 有解说/混剪等原创加工信号时不判为搬运号
+            let originalSignals = ["解说", "吐槽", "盘点", "混剪", "reaction", "反应", "配音", "鬼畜"]
+            let hasOriginal = originalSignals.contains { haystack.contains($0.lowercased()) }
+            if !hasOriginal {
+                return .repost
+            }
+        }
+
+        // 3. 营销号：低投币比 + 低收藏比 + （标题党或转载）
+        //    单条视频难以稳定判断，这里用「转载 + 极低互动」作为弱信号，
+        //    多次采样后 AppStore 会把它固化为 marketing 类型。
+        if video.copyright == 2, video.views > 1000 {
+            let coinRate = video.views > 0 ? Double(video.coins) / Double(video.views) : 0
+            let favRate = video.views > 0 ? Double(video.favorites) / Double(video.views) : 0
+            if coinRate < 0.001 && favRate < 0.002 {
+                return .marketing
+            }
+        }
+
+        // 4. 按一级/二级分区 tid 判断
+        let leafTid = video.tid
+        if let topTid = BiliZone.topTid(forLeaf: leafTid) {
+            switch topTid {
+            case 4:  // 游戏
+                return .gameStreamer
+            case 211: // 美食
+                return .foodBlogger
+            case 181: // 影视
+                return .filmEditor
+            case 1, 13, 167: // 动画 / 番剧 / 国创
+                return .animeBlogger
+            case 155: // 时尚
+                return .fashionBlogger
+            case 160: // 生活
+                if leafTid == 250 { return .travelBlogger } // 出行
+            case 188: // 科技
+                if leafTid == 95 { // 数码
+                    // 手机评测 vs 数码评测
+                    if phoneKeywords.contains(where: { haystack.contains($0) }) {
+                        return .phoneReview
+                    }
+                    return .techReview
+                }
+            default: break
+            }
+        }
+
+        // 5. 无 tid 时回退到 tag + 标题关键词
+        let tagSet = Set(video.tags.map { $0.lowercased() })
+        if !tagSet.isEmpty {
+            if tagSet.contains("游戏") || tagSet.contains("手游") || tagSet.contains("单机") { return .gameStreamer }
+            if tagSet.contains("美食") || tagSet.contains("探店") || tagSet.contains("吃播") { return .foodBlogger }
+            if tagSet.contains("影视") || tagSet.contains("影视解说") || tagSet.contains("影视剪辑") { return .filmEditor }
+            if tagSet.contains("动画") || tagSet.contains("动漫") || tagSet.contains("番剧") { return .animeBlogger }
+            if tagSet.contains("穿搭") || tagSet.contains("美妆") || tagSet.contains("时尚") { return .fashionBlogger }
+            if tagSet.contains("旅游") || tagSet.contains("vlog") || tagSet.contains("出行") { return .travelBlogger }
+            if tagSet.contains("手机") || phoneKeywords.contains(where: { tagSet.contains($0) }) { return .phoneReview }
+            if tagSet.contains("数码") || tagSet.contains("评测") || tagSet.contains("开箱") { return .techReview }
+        }
+
+        // 6. 纯标题关键词兜底（首页推荐流无 tid/tag 时唯一可用信号）
+        if haystack.contains("游戏") { return .gameStreamer }
+        if haystack.contains("美食") || haystack.contains("吃") { return .foodBlogger }
+        if haystack.contains("影视") || haystack.contains("电影") || haystack.contains("解说") { return .filmEditor }
+        if haystack.contains("动画") || haystack.contains("动漫") || haystack.contains("番剧") { return .animeBlogger }
+        if haystack.contains("穿搭") || haystack.contains("美妆") { return .fashionBlogger }
+        if haystack.contains("旅游") || haystack.contains("vlog") { return .travelBlogger }
+        if phoneKeywords.contains(where: { haystack.contains($0) }) { return .phoneReview }
+        if haystack.contains("数码") || haystack.contains("评测") || haystack.contains("开箱") { return .techReview }
+
+        return .other
     }
 }

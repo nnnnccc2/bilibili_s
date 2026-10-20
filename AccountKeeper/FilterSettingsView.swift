@@ -19,6 +19,10 @@ struct FilterSettingsView: View {
     @State private var newKeyword: String = ""
     @State private var newTag: String = ""
     @State private var expandedTopZones: Set<Int> = []
+    @State private var expandedCreatorTypes: Set<CreatorType> = []
+    @State private var selectedCreatorMid: Int = 0
+    @State private var selectedCreatorName: String = ""
+    @State private var showCreatorSheet: Bool = false
 
     private var selectedDurationCount: Int {
         store.settings.blockedDurationSeconds.count
@@ -53,6 +57,9 @@ struct FilterSettingsView: View {
 
                         // UP主 blacklist
                         upBlockCard
+
+                        // 博主类型过滤看板
+                        creatorTypeCard
 
                         // General keyword filter
                         keywordCard
@@ -96,6 +103,12 @@ struct FilterSettingsView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { if let onDismiss = onDismiss { onDismiss() } else { dismiss() } }
                         .foregroundColor(.biliBlue)
+                }
+            }
+            .sheet(isPresented: $showCreatorSheet) {
+                if selectedCreatorMid != 0 {
+                    UPSpaceView(mid: selectedCreatorMid, initialName: selectedCreatorName)
+                        .environmentObject(store)
                 }
             }
         }
@@ -189,6 +202,7 @@ struct FilterSettingsView: View {
                 miniStat(label: "分区屏蔽拦截", value: store.settings.stats.byPartition, color: .teal)
                 miniStat(label: "关键词拦截", value: store.settings.stats.byKeyword, color: .cyan)
                 miniStat(label: "标签(Tag)拦截", value: store.settings.stats.byTag, color: .indigo)
+                miniStat(label: "博主类型拦截", value: store.settings.stats.byCreatorType, color: .mint)
             }
 
             HStack(spacing: 6) {
@@ -752,6 +766,194 @@ struct FilterSettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
         .padding(.horizontal, 16)
+    }
+
+    // MARK: - Creator type filter
+
+    private var creatorTypeCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableCreatorTypeFilter) {
+                Label("博主类型过滤", systemImage: "person.2.slash")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("自动识别 UP 主的内容类型（数码评测 / 美食 / 游戏 / 影视剪辑等），按类型批量屏蔽。点击类型标签可展开查看该类型下已识别的博主，点博主头像可跳转主页。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if store.settings.enableCreatorTypeFilter {
+                HStack(spacing: 10) {
+                    Button {
+                        store.resetBlockedCreatorTypes()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("恢复默认屏蔽")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.biliBlue)
+                        .clipShape(Capsule())
+                    }
+                    Button {
+                        store.clearKnownCreators()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "trash")
+                            Text("清空识别缓存")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                    Spacer()
+                    Text("已识别 \(store.settings.knownCreators.count) 位博主")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // 类型 chip 网格：点击切换屏蔽，长按或点右侧展开箭头查看博主列表
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    ForEach(CreatorType.allCases.filter { $0 != .other }) { type in
+                        creatorTypeChip(type)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    private func creatorTypeChip(_ type: CreatorType) -> some View {
+        let blocked = store.settings.blockedCreatorTypes.contains(type)
+        let count = store.settings.knownCreators.values.filter { $0.type == type }.count
+        let expanded = expandedCreatorTypes.contains(type)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: type.icon)
+                    .font(.system(size: 13))
+                    .foregroundStyle(type.color)
+                Text(type.rawValue)
+                    .font(.caption)
+                    .fontWeight(blocked ? .semibold : .regular)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text("\(count)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        if expanded { expandedCreatorTypes.remove(type) }
+                        else { expandedCreatorTypes.insert(type) }
+                    }
+                } label: {
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                store.toggleCreatorType(type)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: blocked ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 12))
+                    Text(blocked ? "已屏蔽" : "未屏蔽")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(blocked ? Color.red : Color.secondary)
+            }
+            .buttonStyle(.plain)
+
+            if expanded {
+                creatorList(for: type)
+            }
+        }
+        .padding(10)
+        .background(blocked ? type.color.opacity(0.1) : Color(.systemGray5))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(blocked ? type.color.opacity(0.5) : Color.clear, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private func creatorList(for type: CreatorType) -> some View {
+        let creators = store.settings.knownCreators.values
+            .filter { $0.type == type }
+            .sorted { $0.confidence > $1.confidence }
+        if creators.isEmpty {
+            Text("暂无已识别博主")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.vertical, 4)
+        } else {
+            VStack(spacing: 6) {
+                ForEach(creators.prefix(30)) { profile in
+                    HStack(spacing: 8) {
+                        Button {
+                            selectedCreatorMid = profile.mid
+                            selectedCreatorName = profile.name
+                            showCreatorSheet = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                CachedAsyncImage(
+                                    url: URL(string: profile.avatar.isEmpty ? "" : profile.avatar),
+                                    targetSize: CGSize(width: 48, height: 48)
+                                ) { img in
+                                    img.resizable().scaledToFill()
+                                } placeholder: {
+                                    Circle().fill(Color.gray.opacity(0.3))
+                                }
+                                .frame(width: 32, height: 32)
+                                .clipShape(Circle())
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(profile.name)
+                                        .font(.caption)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    Text("置信度 \(Int(profile.confidence * 100))% · \(profile.sampleCount)条")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                        Button {
+                            store.removeCreator(mid: profile.mid)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("移除该博主")
+                    }
+                }
+                if creators.count > 30 {
+                    Text("还有 \(creators.count - 30) 位…")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .padding(.top, 4)
+        }
     }
 
     // MARK: - General keyword filter
