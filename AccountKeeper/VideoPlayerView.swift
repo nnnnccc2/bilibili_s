@@ -34,6 +34,9 @@ struct VideoPlayerView: View {
     @State private var aid: Int = 0
     @State private var isSendingComment = false
     @State private var upFans: Int = 0
+    /// 视频 tag 列表（播放页「Tag」标签页展示，可直接加入 / 移出 Tag 屏蔽词库）
+    @State private var videoTags: [String] = []
+    @State private var isLoadingTags = false
 
     // Playback controls UI state
     @State private var isPlaying = false
@@ -113,10 +116,11 @@ struct VideoPlayerView: View {
                             .aspectRatio(16.0/9.0, contentMode: .fit)
                             .frame(maxWidth: .infinity)
 
-                        // Tabs: 简介 / 评论
+                        // Tabs: 简介 / 评论 / Tag
                         HStack(spacing: 24) {
                             tabButton(title: "简介", index: 0)
                             tabButton(title: "评论 \(comments.count)", index: 1)
+                            tabButton(title: "Tag \(videoTags.count)", index: 2)
                             Spacer()
                         }
                         .padding(.horizontal)
@@ -124,8 +128,10 @@ struct VideoPlayerView: View {
 
                         if selectedTab == 0 {
                             introSection
-                        } else {
+                        } else if selectedTab == 1 {
                             commentsSection
+                        } else {
+                            tagsSection
                         }
                     }
                 }
@@ -147,6 +153,7 @@ struct VideoPlayerView: View {
         .onAppear {
             setupPlayer()
             loadComments()
+            loadVideoTags()
             if video.upMid > 0 {
                 BiliAPI.shared.fetchUPSpaceInfo(mid: video.upMid) { info in
                     DispatchQueue.main.async {
@@ -579,7 +586,7 @@ struct VideoPlayerView: View {
                     .fill(selectedTab == index ? Color.biliBlue : Color.clear)
                     .frame(height: 3)
             }
-            .frame(width: 60)
+            .frame(width: 68)
         }
     }
 
@@ -748,6 +755,111 @@ struct VideoPlayerView: View {
             }
             .padding(.bottom, 16)
         }
+    }
+
+    // MARK: - Tag section
+
+    /// 该 tag 当前是否在 Tag 屏蔽词库中且处于启用状态。
+    private func isTagBlocked(_ tag: String) -> Bool {
+        store.settings.customBlockedTags.contains(tag)
+            && !store.settings.disabledTags.contains(tag)
+    }
+
+    private func toggleTagBlock(_ tag: String) {
+        if store.settings.customBlockedTags.contains(tag) {
+            if store.settings.disabledTags.contains(tag) {
+                store.toggleBlockedTag(tag)
+                toast = "已重新启用：\(tag)"
+            } else {
+                store.removeBlockedTag(tag)
+                toast = "已移出 Tag 屏蔽：\(tag)"
+            }
+        } else {
+            store.addBlockedTag(tag)
+            toast = "已加入 Tag 屏蔽：\(tag)"
+        }
+        store.settings.enableTagFilter = true
+    }
+
+    /// 播放页可能来自推荐 / 热门（接口本身不带 tag），此时补拉一次。
+    private func loadVideoTags() {
+        videoTags = video.tags
+        guard videoTags.isEmpty, video.id.hasPrefix("BV") else { return }
+        isLoadingTags = true
+        BiliAPI.shared.enrichMetadata([video]) { enriched in
+            DispatchQueue.main.async {
+                videoTags = enriched.first?.tags ?? []
+                isLoadingTags = false
+            }
+        }
+    }
+
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "tag")
+                    .foregroundStyle(.secondary)
+                Text("视频标签")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+                Text("\(videoTags.count) 个")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("点标签即可加入 Tag 屏蔽词库；再次点击移出。命中屏蔽词库的视频会在首页 / 热门 / 搜索中被过滤。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if isLoadingTags {
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.8)
+                    Text("正在获取标签...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
+            } else if videoTags.isEmpty {
+                Text(video.id.hasPrefix("BV") ? "该视频暂无可用标签" : "该内容（直播 / 影视）不提供标签")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+            } else {
+                FlowLayout(spacing: 8) {
+                    ForEach(videoTags, id: \.self) { tag in
+                        let blocked = isTagBlocked(tag)
+                        Button {
+                            toggleTagBlock(tag)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: blocked ? "checkmark.circle.fill" : "plus.circle")
+                                    .font(.caption2)
+                                Text(tag)
+                                    .font(.caption)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .foregroundStyle(blocked ? Color.white : Color.biliBlue)
+                            .background(blocked ? Color.biliBlue : Color.biliBlue.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if !store.settings.customBlockedTags.isEmpty {
+                Divider()
+                Text("已加入屏蔽词库 (\(store.settings.customBlockedTags.count)个)，可在设置中心关闭或删除")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 16)
     }
 
     // MARK: - Player setup

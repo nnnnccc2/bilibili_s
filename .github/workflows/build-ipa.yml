@@ -107,7 +107,7 @@ jobs:
           import os, sys
           path = os.path.join(os.environ["APP_PATH"], "BiliBili")
           data = open(path, "rb").read()
-          needed = ["通用关键词过滤", "B站分区屏蔽", "标签屏蔽 (Tag)", "一键屏蔽高频低质区", "数据诊断v5", "一键最强净化"]
+          needed = ["通用关键词过滤", "B站分区屏蔽", "标签屏蔽 (Tag)", "一键屏蔽高频低质区", "数据诊断v5", "一键最强净化", "视频标签"]
           missing = [s for s in needed if s.encode("utf-8") not in data]
           for s in needed:
               print(("OK   " if s.encode("utf-8") in data else "MISS ") + s)
