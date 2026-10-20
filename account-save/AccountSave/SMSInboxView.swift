@@ -169,7 +169,8 @@ struct SMSInboxView: View {
     }
 }
 
-/// 凭证列表行：图标 + 账号名 + 注册手机号（优先）/ 短信预览 + 时间。
+/// 凭证列表行：图标 + 账号名（主） + 注册手机号（次）。
+/// 同应用不同手机号注册的账号，手机号清晰可见以便区分。
 struct AccountRowView: View {
     let account: Account
 
@@ -177,51 +178,24 @@ struct AccountRowView: View {
         HStack(alignment: .center, spacing: 12) {
             MerchantIconView(name: account.name, size: 46)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(account.name)
                     .font(.system(size: 17, weight: .semibold))
                     .lineLimit(1)
 
-                if !account.phoneNumber.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                            .font(.system(size: 12))
-                        Text(account.phoneNumber)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                    }
-                    .lineLimit(1)
-                } else {
-                    Text(preview)
+                HStack(spacing: 4) {
+                    Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                        .font(.system(size: 12, weight: .medium))
+                    Text(account.phoneNumber.isEmpty ? "未填写" : account.phoneNumber)
                         .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .foregroundStyle(account.phoneNumber.isEmpty ? .tertiary : .secondary)
+                        .fontWeight(account.phoneNumber.isEmpty ? .regular : .medium)
                 }
+                .lineLimit(1)
             }
 
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(timestampText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                Text("\(account.messages.count) 条")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
+            Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
-    }
-
-    private var preview: String {
-        guard let message = account.latestMessage else { return "还没有短信记录" }
-        return message.content.replacingOccurrences(of: "\n", with: " ")
-    }
-
-    private var timestampText: String {
-        guard let message = account.latestMessage else {
-            return DateText.relative(account.createdAt)
-        }
-        return DateText.relative(message.receivedAt)
+        .padding(.vertical, 6)
     }
 }

@@ -72,21 +72,17 @@ struct AccountDetailView: View {
         HStack(spacing: 14) {
             MerchantIconView(name: account.name, size: 62)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(account.name)
                     .font(.system(size: 22, weight: .semibold))
 
                 HStack(spacing: 4) {
                     Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                        .font(.system(size: 13))
-                    Text("注册手机号：\(account.phoneNumberText)")
-                        .font(.system(size: 15))
+                        .font(.system(size: 14, weight: .medium))
+                    Text(account.phoneNumber.isEmpty ? "注册手机号未填写" : account.phoneNumber)
+                        .font(.system(size: 16, weight: .medium))
                 }
-                .foregroundStyle(.secondary)
-
-                Text("\(account.messages.count) 条验证短信 · \(account.senderCount) 个发送号码")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.tertiary)
+                .foregroundStyle(account.phoneNumber.isEmpty ? .tertiary : .secondary)
             }
 
             Spacer(minLength: 0)
