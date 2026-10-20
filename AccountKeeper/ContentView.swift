@@ -118,8 +118,8 @@ struct PressableCardStyle: ButtonStyle {
 
 // MARK: - MiniBili animation system
 
-/// MiniBili 全局动画体系：干净、通透、干脆。
-/// 所有页面过渡与交互反馈都统一走这套手感，保证全应用动画语言一致。
+/// 全局动画体系：统一使用苹果原生曲线（iOS 17+），顺滑、自然、克制。
+/// 所有页面过渡与交互反馈都走这套手感，保证全应用动画语言一致。
 enum MiniBiliAnimation {
 
     // MARK: 沉浸式浮层过渡（页面进出）
@@ -134,26 +134,26 @@ enum MiniBiliAnimation {
     static let shadowRadius: CGFloat = 12
     static let shadowOpacity: Double = 0.15
 
-    /// 进场弹簧：原始韧性 0.42 的 0.7 倍（0.294），阻尼 0.86 干脆落定。
-    static let enter: Animation = .spring(response: 0.294, dampingFraction: 0.86)
-    /// 退场：干净快速淡出。
-    static let exit: Animation = .easeOut(duration: 0.22)
+    /// 进场：苹果原生 .smooth 顺滑弹簧，无回弹、落定自然。
+    static let enter: Animation = .smooth
+    /// 退场：苹果原生 .smooth，顺滑淡出。
+    static let exit: Animation = .smooth
 
     // MARK: 标签栏与交互
 
-    /// 标签栏隐藏/显示。
-    static let tabBar: Animation = .easeOut(duration: 0.20)
-    /// 标签选中反馈。
-    static let tabSelect: Animation = .spring(response: 0.25, dampingFraction: 0.86)
-    /// 按压反馈：极快，响应即时。
-    static let press: Animation = .easeOut(duration: 0.08)
+    /// 标签栏隐藏/显示：苹果原生 .smooth。
+    static let tabBar: Animation = .smooth
+    /// 标签选中反馈：苹果原生 .snappy，干脆利落。
+    static let tabSelect: Animation = .snappy
+    /// 按压反馈：苹果原生 .snappy，响应即时。
+    static let press: Animation = .snappy
 
     // MARK: 内容与控件
 
-    /// 内容出现（搜索结果、列表）。
-    static let contentAppear: Animation = .easeOut(duration: 0.20)
-    /// 界面控件显示/隐藏（播放器控制条、就绪态等）。
-    static let uiReveal: Animation = .easeInOut(duration: 0.18)
+    /// 内容出现（搜索结果、列表）：苹果原生 .smooth。
+    static let contentAppear: Animation = .smooth
+    /// 界面控件显示/隐藏（播放器控制条、就绪态等）：苹果原生 .smooth。
+    static let uiReveal: Animation = .smooth
 }
 
 // MARK: - Immersive overlay helper
@@ -161,12 +161,12 @@ enum MiniBiliAnimation {
 /// Marks a full-screen overlay (video player / UP空间 / 设置 / 搜索).
 /// While it is presented the bottom tab bar is hidden.
 ///
-/// 进场：内容从 0.97 放大铺满，干脆落定。
+/// 进场：内容从 0.97 放大铺满，苹果原生 .smooth 顺滑落定。
 ///   - 缩放锚点 .top：顶部边缘始终贴住屏幕顶端，视频不会先沉后升，刘海区无位移。
 ///   - 不模糊：内容略带通透（0.9→1）如清水，配极淡柔影自然托出厚度。
 ///   - 视频页（backdrop != nil）：黑色底即时铺满（不参与动画），刘海区全程黑色、绝不跳色。
 ///   - 其他页：极淡暗底随进场淡入，轻量连接前后两页。
-/// 退场：统一干净的快速淡出。
+/// 退场：统一顺滑淡出。
 ///
 /// The entrance is driven by internal state, so it works even when the call-site
 /// doesn't wrap its state change in `withAnimation`.
