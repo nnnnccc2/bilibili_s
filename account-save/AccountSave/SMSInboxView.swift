@@ -267,8 +267,16 @@ struct AccountGroupDetailView: View {
                 NavigationLink {
                     AccountDetailView(account: account)
                 } label: {
-                    Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                        .font(.system(size: 16))
+                    HStack(spacing: 12) {
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.blue)
+                            .frame(width: 26)
+                        Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
+                            .font(.system(size: 17, weight: .medium))
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 6)
                 }
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
