@@ -20,11 +20,13 @@ struct Video: Identifiable, Codable, Hashable {
     var danmaku: Int
     var publishTime: String
     var category: String
+    var tags: [String]
     var desc: String
     var likes: Int
     var coins: Int
     var favorites: Int
     var shares: Int
+    var tid: Int                // Bilibili leaf partition id (0 if unknown)
 
     init(id: String = UUID().uuidString,
          aid: Int = 0,
@@ -38,11 +40,13 @@ struct Video: Identifiable, Codable, Hashable {
          danmaku: Int = 0,
          publishTime: String = "",
          category: String = "",
+         tags: [String] = [],
          desc: String = "",
          likes: Int = 0,
          coins: Int = 0,
          favorites: Int = 0,
-         shares: Int = 0) {
+         shares: Int = 0,
+         tid: Int = 0) {
         self.id = id
         self.aid = aid
         self.title = title
@@ -55,11 +59,13 @@ struct Video: Identifiable, Codable, Hashable {
         self.danmaku = danmaku
         self.publishTime = publishTime
         self.category = category
+        self.tags = tags
         self.desc = desc
         self.likes = likes
         self.coins = coins
         self.favorites = favorites
         self.shares = shares
+        self.tid = tid
     }
 
     /// Formatted duration string e.g. "06:28", "02:02:00"
@@ -112,6 +118,10 @@ enum BlockReason: String, Codable, CaseIterable {
     case insultWord = "命中侮辱贬低词"
     case exclamationSpam = "标题感叹号过多"
     case badData = "无封面/无视频"
+    case categoryBlocked = "分类黑名单"
+    case upBlocked = "UP主黑名单"
+    case keywordBlocked = "命中关键词"
+    case partitionBlocked = "分区屏蔽"
 
     var icon: String {
         switch self {
@@ -122,6 +132,10 @@ enum BlockReason: String, Codable, CaseIterable {
         case .insultWord: return "hand.raised"
         case .exclamationSpam: return "text.badge.exclamationmark"
         case .badData: return "photo.badge.exclamationmark"
+        case .categoryBlocked: return "folder.badge.minus"
+        case .upBlocked: return "person.badge.minus"
+        case .keywordBlocked: return "text.magnifyingglass"
+        case .partitionBlocked: return "square.grid.2x2"
         }
     }
 }

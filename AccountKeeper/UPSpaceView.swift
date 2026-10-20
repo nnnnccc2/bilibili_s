@@ -195,7 +195,9 @@ struct UPSpaceView: View {
                     Button {
                         selectedVideo = video
                     } label: {
-                        VideoCardView(video: video)
+                        VideoCardView(video: video, onBlockUP: { mid, _ in
+                            store.blockUP(mid: mid)
+                        })
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(PressableCardStyle())

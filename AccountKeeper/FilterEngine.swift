@@ -18,7 +18,7 @@ final class FilterEngine {
     }
 
     /// Returns the block reason if the video should be filtered out, nil otherwise.
-    /// Priority order: badData (必拦) → insult → clickbait → !!连续 → japanese → duration
+    /// Priority order: badData → insult → clickbait → exclamation → keyword → category → upBlocked → duration → japanese
     func shouldBlock(_ video: Video) -> BlockReason? {
         // 0. 空白视频硬拦截 — 没有封面/没有 bvid 的卡片肯定打不开，直接过滤
         if video.cover.trimmingCharacters(in: .whitespaces).isEmpty
@@ -63,26 +63,90 @@ final class FilterEngine {
             }
         }
 
-        // 3. Japanese characters in title
+        // 3. General keyword filtering (title + upName + desc + category + tags)
+        if settings.enableKeywordFilter {
+            let keywords = settings.activeKeywords
+            if !keywords.isEmpty {
+                let haystack = keywordHaystack(for: video)
+                for word in keywords {
+                    if haystack.contains(word) {
+                        return .keywordBlocked
+                    }
+                }
+            }
+        }
+
+        // 4. Category / partition blacklist (exact match, case-insensitive)
+        if settings.enableCategoryFilter {
+            let category = video.category.lowercased()
+            if !category.isEmpty {
+                for blocked in settings.blockedCategories {
+                    if blocked.lowercased() == category {
+                        return .categoryBlocked
+                    }
+                }
+            }
+        }
+
+        // 5. Partition blacklist (一级 / 二级分区, by Bilibili tid)
+        if settings.enablePartitionFilter {
+            if let reason = partitionBlockReason(for: video) {
+                return reason
+            }
+        }
+
+        // 6. UP主 mid blacklist
+        if settings.enableUPBlockFilter, video.upMid != 0, settings.blockedUPMids.contains(video.upMid) {
+            return .upBlocked
+        }
+
+        // 7. Duration block (global): videos shorter than or equal to the max selected threshold
+        if let threshold = settings.effectiveDurationThreshold, video.duration > 0, video.duration <= threshold {
+            return .duration
+        }
+
+        // 8. Japanese characters in title
         if settings.enableJapaneseTitleFilter {
             if containsJapanese(video.title) {
                 return .japaneseTitle
             }
         }
 
-        // 4. Japanese characters in UP主 name
+        // 9. Japanese characters in UP主 name
         if settings.enableJapaneseUPFilter {
             if containsJapanese(video.upName) {
                 return .japaneseUP
             }
         }
 
-        // 5. Duration block (global): videos shorter than or equal to the max selected threshold
-        if let threshold = settings.effectiveDurationThreshold, video.duration > 0, video.duration <= threshold {
-            return .duration
-        }
-
         return nil
+    }
+
+    /// Resolve a video's partition against the 一级/二级分区 blacklist.
+    /// Prefers the API-provided leaf `tid`; when it is missing (some feeds such
+    /// as 首页推荐 return no partition), falls back to the partition name.
+    private func partitionBlockReason(for video: Video) -> BlockReason? {
+        var leafTid = video.tid
+        if leafTid == 0, !video.category.isEmpty {
+            leafTid = BiliZone.leafTid(forName: video.category) ?? 0
+        }
+        guard leafTid != 0 else { return nil }
+
+        if let topTid = BiliZone.topTid(forLeaf: leafTid),
+           settings.blockedTopZoneTids.contains(topTid) {
+            return .partitionBlocked
+        }
+        if settings.blockedSubZoneTids.contains(leafTid) {
+            return .partitionBlocked
+        }
+        return nil
+    }
+
+    /// 把视频的文本信息拼成一份 haystack，供关键词过滤使用。
+    private func keywordHaystack(for video: Video) -> String {
+        var parts: [String] = [video.title, video.upName, video.desc, video.category]
+        parts.append(contentsOf: video.tags)
+        return parts.joined(separator: " ").lowercased()
     }
 
     // MARK: - Exclamation spam detection

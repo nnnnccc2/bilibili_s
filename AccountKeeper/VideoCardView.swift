@@ -10,6 +10,7 @@ import SwiftUI
 
 struct VideoCardView: View {
     let video: Video
+    var onBlockUP: ((Int, String) -> Void)? = nil
     var onTapUP主: (() -> Void)? = nil
 
     var body: some View {
@@ -109,6 +110,15 @@ struct VideoCardView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.5), lineWidth: 1)
         )
+        .contextMenu {
+            if video.upMid > 0 {
+                Button(role: .destructive) {
+                    onBlockUP?(video.upMid, video.upName)
+                } label: {
+                    Label("屏蔽该 UP 主", systemImage: "person.badge.minus")
+                }
+            }
+        }
         .onAppear {
             // Prefetch stream URL when card becomes visible so playback starts instantly on tap
             BiliAPI.shared.prefetchStreamURL(for: video)

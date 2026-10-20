@@ -357,6 +357,16 @@ final class BiliAPI {
     // MARK: - Home feed
 
     func fetchHome(category: HomeCategory, page: Int = 1, completion: @escaping ([Video]) -> Void) {
+        // Every feed is post-processed so that videos missing partition metadata
+        // (notably 首页推荐) get tid / 分区名 / 简介 回填，过滤引擎才有完整的匹配维度。
+        let finish: ([Video]) -> Void = { [weak self] videos in
+            guard let self = self else {
+                DispatchQueue.main.async { completion(videos) }
+                return
+            }
+            self.enrichMetadata(videos, completion: completion)
+        }
+
         switch category {
         case .recommend:
             // Recommendation feed (WBI signed) — fresh_idx increments for pagination
@@ -367,14 +377,12 @@ final class BiliAPI {
                 "fresh_idx": String(page)
             ]
             request("https://api.bilibili.com/x/web-interface/wbi/index/top/feed/rcmd", params: params, useWBI: false) { [weak self] data, _, _ in
-                let videos = self?.parseRecommend(data) ?? []
-                DispatchQueue.main.async { completion(videos) }
+                finish(self?.parseRecommend(data) ?? [])
             }
         case .hot:
             let params: [String: String] = ["ps": "20", "pn": String(page)]
             request("https://api.bilibili.com/x/web-interface/popular", params: params) { [weak self] data, _, _ in
-                let videos = self?.parseVideoList(data) ?? []
-                DispatchQueue.main.async { completion(videos) }
+                finish(self?.parseVideoList(data) ?? [])
             }
         case .live:
             // Paginated live recommendations (page 1/2/3… return different rooms),
@@ -383,17 +391,87 @@ final class BiliAPI {
             // the same ~11 rooms, which is why refreshing appeared to do nothing.
             let params: [String: String] = ["page": String(page), "page_size": "20", "platform": "web"]
             request("https://api.live.bilibili.com/room/v1/room/get_user_recommend", params: params) { [weak self] data, _, _ in
-                let videos = self?.parseLive(data) ?? []
-                DispatchQueue.main.async { completion(videos) }
+                finish(self?.parseLive(data) ?? [])
             }
         case .cinema:
             // PGC cinema rank list (movies & TV)
             let params: [String: String] = ["season_type": "2", "day": "7"]
             request("https://api.bilibili.com/pgc/season/rank/web/list", params: params) { [weak self] data, _, _ in
-                let videos = self?.parseCinema(data) ?? []
-                DispatchQueue.main.async { completion(videos) }
+                finish(self?.parseCinema(data) ?? [])
             }
         }
+    }
+
+    /// 首页推荐流（rcmd 接口）只返回标题 / UP主 / 封面，缺少分区(tid)与简介，
+    /// 导致「通用关键词过滤」和「分区屏蔽」在这条流上无法命中（热门、搜索流则带
+    /// 完整元数据，所以只有首页推荐"过滤无效"）。
+    ///
+    /// 这里对缺少分区 ID 的视频并发补拉一次详情接口，回填 tid / 分区名 / 简介 /
+    /// 时长，让过滤引擎拿到与热门、搜索流一致的完整匹配维度。
+    /// 只补拉 bvid 形态（BV 开头）的视频；直播房间号、影视 season_id 等数字 ID 跳过。
+    /// 6 秒兜底超时，避免个别慢请求卡住首页。completion 始终在主线程回调。
+    func enrichMetadata(_ videos: [Video], completion: @escaping ([Video]) -> Void) {
+        let targets = videos.indices.filter { videos[$0].tid == 0 && videos[$0].id.hasPrefix("BV") }
+        guard !targets.isEmpty else {
+            DispatchQueue.main.async { completion(videos) }
+            return
+        }
+
+        var result = videos
+        let lock = NSLock()
+        let group = DispatchGroup()
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 5
+        var didFinish = false
+
+        let finishOnce: () -> Void = {
+            lock.lock()
+            if didFinish {
+                lock.unlock()
+                return
+            }
+            didFinish = true
+            let output = result
+            lock.unlock()
+            DispatchQueue.main.async { completion(output) }
+        }
+
+        // 兜底：6 秒内未全部返回也先交付已有数据，绝不卡住首页。
+        DispatchQueue.global().asyncAfter(deadline: .now() + 6) { finishOnce() }
+
+        for index in targets {
+            let bvid = videos[index].id
+            group.enter()
+            queue.addOperation { [weak self] in
+                guard let self = self else {
+                    group.leave()
+                    return
+                }
+                self.request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid]) { data, _, _ in
+                    defer { group.leave() }
+                    guard let json = self.parseJSON(data),
+                          let d = json["data"] as? [String: Any] else { return }
+                    let tid = self.parseTid(d["tid"])
+                    let tname = d["tname"] as? String ?? ""
+                    let desc = d["desc"] as? String ?? ""
+                    let duration = d["duration"] as? Int ?? 0
+                    let aid = d["aid"] as? Int ?? 0
+                    let cid = d["cid"] as? Int ?? 0
+                    lock.lock()
+                    if tid != 0 { result[index].tid = tid }
+                    if result[index].category.isEmpty {
+                        result[index].category = tname.isEmpty ? (BiliZone.leafName(tid) ?? "") : tname
+                    }
+                    if result[index].desc.isEmpty { result[index].desc = desc }
+                    if result[index].duration == 0 { result[index].duration = duration }
+                    if result[index].aid == 0 { result[index].aid = aid }
+                    if result[index].cid == 0 { result[index].cid = cid }
+                    lock.unlock()
+                }
+            }
+        }
+
+        group.notify(queue: .global()) { finishOnce() }
     }
 
     // MARK: - Search
@@ -1357,10 +1435,12 @@ final class BiliAPI {
                     views: cnt?["play"] as? Int ?? 0,
                     danmaku: cnt?["danmaku"] as? Int ?? 0,
                     publishTime: self.formatTime(item["pubtime"] as? Int ?? 0),
-                    category: "",
+                    category: item["tname"] as? String ?? "",
+                    tags: self.parseTags(item["tag"]),
                     desc: item["intro"] as? String ?? "",
                     likes: 0, coins: 0, favorites: 0, shares: 0,
-                    cid: 0
+                    cid: 0,
+                    tid: self.parseTid(item["tid"])
                 )
             }
             DispatchQueue.main.async { completion(videos, total) }
@@ -1463,10 +1543,12 @@ private extension BiliAPI {
                 views: item["play"] as? Int ?? 0,
                 danmaku: item["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["pubdate"] as? Int ?? 0),
-                category: "",
+                category: item["tname"] as? String ?? "",
+                tags: self.parseTags(item["tag"]),
                 desc: "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
-                cid: item["cid"] as? Int ?? 0
+                cid: item["cid"] as? Int ?? 0,
+                tid: self.parseTid(item["tid"] ?? item["typeid"])
             )
         }
     }
@@ -1490,13 +1572,15 @@ private extension BiliAPI {
                 views: stat?["view"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["pubdate"] as? Int ?? 0),
-                category: "",
+                category: item["tname"] as? String ?? "",
+                tags: self.parseTags(item["tag"]),
                 desc: item["desc"] as? String ?? "",
                 likes: stat?["like"] as? Int ?? 0,
                 coins: stat?["coin"] as? Int ?? 0,
                 favorites: stat?["favorite"] as? Int ?? 0,
                 shares: stat?["share"] as? Int ?? 0,
-                cid: item["cid"] as? Int ?? 0
+                cid: item["cid"] as? Int ?? 0,
+                tid: self.parseTid(item["tid"])
             )
         }
     }
@@ -1526,10 +1610,12 @@ private extension BiliAPI {
                     views: item["play"] as? Int ?? 0,
                     danmaku: 0,
                     publishTime: formatTime(item["ptime"] as? Int ?? 0),
-                    category: "",
+                    category: item["tname"] as? String ?? "",
+                    tags: self.parseTags(item["tag"]),
                     desc: "",
                     likes: 0, coins: 0, favorites: 0, shares: 0,
-                    cid: shareVideo["cid"] as? Int ?? 0
+                    cid: shareVideo["cid"] as? Int ?? 0,
+                    tid: self.parseTid(item["tid"] ?? item["typeid"])
                 )
             }
         case .user:
@@ -1600,10 +1686,12 @@ private extension BiliAPI {
                     views: item["play"] as? Int ?? 0,
                     danmaku: item["video_review"] as? Int ?? 0,
                     publishTime: formatTime(item["pubdate"] as? Int ?? 0),
-                    category: "",
+                    category: item["typename"] as? String ?? "",
+                    tags: self.parseTags(item["tag"]),
                     desc: item["description"] as? String ?? "",
                     likes: 0, coins: 0, favorites: 0, shares: 0,
-                    cid: item["cid"] as? Int ?? 0
+                    cid: item["cid"] as? Int ?? 0,
+                    tid: self.parseTid(item["typeid"])
                 )
             }
         }
@@ -1638,7 +1726,8 @@ private extension BiliAPI {
                 views: stat?["view"] as? Int ?? (item["play"] as? Int ?? 0),
                 danmaku: stat?["danmaku"] as? Int ?? (item["video_review"] as? Int ?? 0),
                 publishTime: formatTime(item["pubdate"] as? Int ?? (item["created"] as? Int ?? 0)),
-                category: "",
+                category: item["tname"] as? String ?? "",
+                tags: self.parseTags(item["tag"]),
                 desc: item["desc"] as? String ?? (item["description"] as? String ?? ""),
                 likes: stat?["like"] as? Int ?? 0,
                 coins: stat?["coin"] as? Int ?? 0,
@@ -1673,7 +1762,8 @@ private extension BiliAPI {
                 views: stat?["play"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
                 publishTime: "",
-                category: "",
+                category: archive["tname"] as? String ?? "",
+                tags: self.parseTags(archive["tag"]),
                 desc: archive["desc"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
                 cid: archive["cid"] as? Int ?? 0
@@ -1696,7 +1786,8 @@ private extension BiliAPI {
             views: stat?["view"] as? Int ?? 0,
             danmaku: stat?["danmaku"] as? Int ?? 0,
             publishTime: formatTime(d["pubdate"] as? Int ?? 0),
-            category: "",
+            category: d["tname"] as? String ?? "",
+            tags: self.parseTags(d["tag"]),
             desc: d["desc"] as? String ?? "",
             likes: stat?["like"] as? Int ?? 0,
             coins: stat?["coin"] as? Int ?? 0,
@@ -1750,7 +1841,8 @@ private extension BiliAPI {
                 views: item["play"] as? Int ?? 0,
                 danmaku: item["video_review"] as? Int ?? 0,
                 publishTime: formatTime(item["created"] as? Int ?? 0),
-                category: "",
+                category: item["tname"] as? String ?? "",
+                tags: self.parseTags(item["tag"]),
                 desc: item["description"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
                 cid: item["cid"] as? Int ?? 0
@@ -1787,6 +1879,7 @@ private extension BiliAPI {
                 danmaku: item["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["ctime"] as? Int ?? 0),
                 category: item["tname"] as? String ?? "",
+                tags: self.parseTags(item["tag"]),
                 desc: "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
                 cid: item["first_cid"] as? Int ?? 0
@@ -1814,6 +1907,22 @@ private extension BiliAPI {
         guard let json = parseJSON(data),
               let d = json["data"] as? [String: Any] else { return 0 }
         return d["aid"] as? Int ?? 0
+    }
+
+    /// 把 B 站 tag 字符串（逗号/空格/竖线分隔）拆成数组，便于过滤。
+    func parseTags(_ value: Any?) -> [String] {
+        guard let text = value as? String, !text.isEmpty else { return [] }
+        let separators = CharacterSet(charactersIn: ",，/| ")
+        return text.components(separatedBy: separators).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// Bilibili returns the partition id sometimes as an Int (`tid`) and
+    /// sometimes as a numeric String (`typeid`). Normalise both to Int.
+    func parseTid(_ value: Any?) -> Int {
+        if let n = value as? Int { return n }
+        if let s = value as? String { return Int(s) ?? 0 }
+        if let n = value as? NSNumber { return n.intValue }
+        return 0
     }
 
     func parseComments(_ data: Data?) -> [Comment] {
@@ -1985,12 +2094,12 @@ extension Video {
     }
     init(id: String, title: String, cover: String, duration: Int, upName: String,
          upMid: Int, upAvatar: String, views: Int, danmaku: Int, publishTime: String,
-         category: String, desc: String, likes: Int, coins: Int,
-         favorites: Int, shares: Int, cid: Int) {
+         category: String, tags: [String] = [], desc: String, likes: Int, coins: Int,
+         favorites: Int, shares: Int, cid: Int, tid: Int = 0) {
         self.init(id: id, title: title, cover: cover, duration: duration,
                   upName: upName, upMid: upMid, upAvatar: upAvatar, views: views, danmaku: danmaku,
-                  publishTime: publishTime, category: category, desc: desc,
-                  likes: likes, coins: coins, favorites: favorites, shares: shares)
+                  publishTime: publishTime, category: category, tags: tags, desc: desc,
+                  likes: likes, coins: coins, favorites: favorites, shares: shares, tid: tid)
         self.cid = cid
     }
 }

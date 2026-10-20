@@ -153,7 +153,9 @@ struct HomeView: View {
                         spacing: 12
                     ) {
                         ForEach(videos) { video in
-                            VideoCardView(video: video) {
+                            VideoCardView(video: video, onBlockUP: { mid, _ in
+                                store.blockUP(mid: mid)
+                            }) {
                                 if video.upMid > 0 {
                                     selectedUPMid = video.upMid
                                     selectedUPName = video.upName

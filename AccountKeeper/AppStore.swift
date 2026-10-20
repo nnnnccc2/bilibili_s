@@ -123,6 +123,109 @@ final class AppStore: ObservableObject {
         settings.customBlockedWords.removeAll { $0 == word }
     }
 
+    // MARK: - UP主 blacklist
+
+    func blockUP(mid: Int, name: String = "") {
+        guard mid != 0 else { return }
+        settings.blockedUPMids.insert(mid)
+    }
+
+    func unblockUP(mid: Int) {
+        settings.blockedUPMids.remove(mid)
+    }
+
+    // MARK: - Category blacklist
+
+    func blockCategory(_ category: String) {
+        let trimmed = category.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        settings.blockedCategories.insert(trimmed)
+    }
+
+    func unblockCategory(_ category: String) {
+        settings.blockedCategories.remove(category)
+    }
+
+    // MARK: - Partition blacklist（一级 / 二级分区 tid）
+
+    func blockTopZone(tid: Int) {
+        guard tid != 0 else { return }
+        settings.blockedTopZoneTids.insert(tid)
+        // 勾选一级分区时同步勾选其下所有已知二级分区，保证仅在二级层面返回的
+        // 视频（如搜索流只给叶子 tid）也能被拦截。
+        if let zone = BiliZone.topZone(tid: tid) {
+            for sub in zone.subs { settings.blockedSubZoneTids.insert(sub.tid) }
+        }
+    }
+
+    func unblockTopZone(tid: Int) {
+        settings.blockedTopZoneTids.remove(tid)
+        if let zone = BiliZone.topZone(tid: tid) {
+            for sub in zone.subs { settings.blockedSubZoneTids.remove(sub.tid) }
+        }
+    }
+
+    func toggleTopZone(tid: Int) {
+        if settings.blockedTopZoneTids.contains(tid) {
+            unblockTopZone(tid: tid)
+        } else {
+            blockTopZone(tid: tid)
+        }
+    }
+
+    func blockSubZone(tid: Int) {
+        guard tid != 0 else { return }
+        settings.blockedSubZoneTids.insert(tid)
+        // 若该二级分区的所有兄弟分区都被勾选，则自动勾选其一级分区。
+        if let topTid = BiliZone.topTid(forLeaf: tid),
+           topTid != tid,
+           let zone = BiliZone.topZone(tid: topTid),
+           !zone.subs.isEmpty,
+           zone.subs.allSatisfy({ settings.blockedSubZoneTids.contains($0.tid) }) {
+            settings.blockedTopZoneTids.insert(topTid)
+        }
+    }
+
+    func unblockSubZone(tid: Int) {
+        settings.blockedSubZoneTids.remove(tid)
+        if let topTid = BiliZone.topTid(forLeaf: tid), topTid != tid {
+            settings.blockedTopZoneTids.remove(topTid)
+        }
+    }
+
+    func toggleSubZone(tid: Int) {
+        if settings.blockedSubZoneTids.contains(tid) {
+            unblockSubZone(tid: tid)
+        } else {
+            blockSubZone(tid: tid)
+        }
+    }
+
+    func clearPartitionBlocklist() {
+        settings.blockedTopZoneTids.removeAll()
+        settings.blockedSubZoneTids.removeAll()
+    }
+
+    /// 一键屏蔽高频低质分区（动画 / 番剧 / 国创 / 游戏 / 美食 / 影视 / 娱乐）。
+    func blockRecommendedZones() {
+        for tid in BiliZone.recommendedBlockTids {
+            blockTopZone(tid: tid)
+        }
+    }
+
+    // MARK: - General keyword blacklist
+
+    func addBlockedKeyword(_ word: String) {
+        let trimmed = word.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        guard !settings.customBlockedKeywords.contains(trimmed) else { return }
+        settings.customBlockedKeywords.append(trimmed)
+    }
+
+    func removeBlockedKeyword(_ word: String) {
+        settings.customBlockedKeywords.removeAll { $0 == word }
+    }
+
     // MARK: - User / login
 
     private func loadUser() {

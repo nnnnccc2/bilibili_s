@@ -14,6 +14,10 @@ struct FilterSettingsView: View {
     var onDismiss: (() -> Void)? = nil
     @State private var newWord: String = ""
     @State private var showWordError: String? = nil
+    @State private var newCategory: String = ""
+    @State private var newUPMid: String = ""
+    @State private var newKeyword: String = ""
+    @State private var expandedTopZones: Set<Int> = []
 
     private var selectedDurationCount: Int {
         store.settings.blockedDurationSeconds.count
@@ -39,6 +43,18 @@ struct FilterSettingsView: View {
 
                         // Duration filter (multi-select)
                         durationCard
+
+                        // Category / partition blacklist
+                        categoryCard
+
+                        // 一级 / 二级分区屏蔽
+                        partitionCard
+
+                        // UP主 blacklist
+                        upBlockCard
+
+                        // General keyword filter
+                        keywordCard
 
                         // Insult word list
                         insultWordCard
@@ -135,12 +151,15 @@ struct FilterSettingsView: View {
             .background(Color.biliBlue.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 16))
 
-            // 4 stat cards grid
+            // 6 stat cards grid
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 miniStat(label: "标题党/引导词", value: store.settings.stats.byClickbait, color: .red)
                 miniStat(label: "时长过滤拦截", value: store.settings.stats.byDuration, color: .orange)
                 miniStat(label: "日文字符UP主", value: store.settings.stats.byJapaneseUP + store.settings.stats.byJapaneseTitle, color: .purple)
                 miniStat(label: "侮辱贬低词库", value: store.settings.stats.byInsultWord, color: .green)
+                miniStat(label: "分类黑名单", value: store.settings.stats.byCategory, color: .indigo)
+                miniStat(label: "分区屏蔽拦截", value: store.settings.stats.byPartition, color: .teal)
+                miniStat(label: "关键词拦截", value: store.settings.stats.byKeyword, color: .cyan)
             }
         }
         .padding(16)
@@ -417,6 +436,382 @@ struct FilterSettingsView: View {
         .padding(.horizontal, 16)
     }
 
+    // MARK: - Category blacklist
+
+    private var categoryCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableCategoryFilter) {
+                Label("分类黑名单屏蔽", systemImage: "folder.badge.minus")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("按 B 站分区（如“动画”“游戏”“美食”“影视”）整体屏蔽。从视频卡片详情或搜索结果中识别的分类会被应用。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            // Add category
+            HStack {
+                TextField("输入要屏蔽的分类名...", text: $newCategory)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { addCategory() }
+                Button(action: addCategory) {
+                    Text("+ 添加")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.biliBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .disabled(!store.settings.enableCategoryFilter)
+
+            if !store.settings.blockedCategories.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(Array(store.settings.blockedCategories).sorted(), id: \.self) { category in
+                        HStack(spacing: 4) {
+                            Text(category)
+                                .font(.caption)
+                            Button {
+                                store.unblockCategory(category)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.indigo.opacity(0.12))
+                        .foregroundStyle(.indigo)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Partition blacklist (一级 / 二级分区)
+
+    private var partitionCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enablePartitionFilter) {
+                Label("B站分区屏蔽（一级 / 二级）", systemImage: "square.grid.2x2.fill")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("按 B 站官方分区目录屏蔽：可整体屏蔽一级分区，或展开后精细屏蔽二级分区。作用于首页推荐、热门、搜索视频流。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if store.settings.enablePartitionFilter {
+                HStack(spacing: 10) {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            store.blockRecommendedZones()
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "bolt.fill")
+                            Text("一键屏蔽高频低质区")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.biliBlue)
+                        .clipShape(Capsule())
+                    }
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            store.clearPartitionBlocklist()
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "trash")
+                            Text("清空")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                    Spacer()
+                    Text("一级 \(store.settings.blockedTopZoneTids.count) · 二级 \(store.settings.blockedSubZoneTids.count)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(BiliZone.all) { zone in
+                        topZoneRow(zone)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    private func topZoneRow(_ zone: BiliTopZone) -> some View {
+        let topBlocked = store.settings.blockedTopZoneTids.contains(zone.tid)
+        let expanded = expandedTopZones.contains(zone.tid)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        store.toggleTopZone(tid: zone.tid)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: topBlocked ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(topBlocked ? Color.biliBlue : .gray)
+                        Text(zone.name)
+                            .font(.subheadline)
+                            .fontWeight(topBlocked ? .semibold : .regular)
+                            .foregroundStyle(.primary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                if !zone.subs.isEmpty {
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            if expanded { expandedTopZones.remove(zone.tid) }
+                            else { expandedTopZones.insert(zone.tid) }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("二级 \(zone.subs.count)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if expanded && !zone.subs.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(zone.subs) { sub in
+                        subZoneChip(sub)
+                    }
+                }
+                .padding(.bottom, 2)
+            }
+        }
+        .padding(.vertical, 8)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.biliBorder)
+                .frame(height: 0.5)
+        }
+    }
+
+    private func subZoneChip(_ sub: BiliSubZone) -> some View {
+        let selected = store.settings.blockedSubZoneTids.contains(sub.tid)
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                store.toggleSubZone(tid: sub.tid)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.caption2)
+                Text(sub.name)
+                    .font(.caption)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(selected ? Color.biliBlue.opacity(0.15) : Color(.systemGray5))
+            .foregroundStyle(selected ? Color.biliBlue : .primary)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - UP主 blacklist
+
+    private var upBlockCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableUPBlockFilter) {
+                Label("UP主黑名单", systemImage: "person.badge.minus")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("长按任意视频卡片选择“屏蔽该 UP 主”，或在此输入 mid 屏蔽指定 UP 主。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                TextField("输入 UP 主 mid...", text: $newUPMid)
+                    .keyboardType(.numberPad)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { addUPMid() }
+                Button(action: addUPMid) {
+                    Text("+ 添加")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.biliBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .disabled(!store.settings.enableUPBlockFilter)
+
+            if !store.settings.blockedUPMids.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(Array(store.settings.blockedUPMids).sorted(), id: \.self) { mid in
+                        HStack(spacing: 4) {
+                            Text("\(mid)")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Button {
+                                store.unblockUP(mid: mid)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(.systemGray5))
+                        .foregroundStyle(.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - General keyword filter
+
+    private var keywordCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: $store.settings.enableKeywordFilter) {
+                Label("通用关键词过滤", systemImage: "text.magnifyingglass")
+                    .font(.headline)
+            }
+            .tint(.biliBlue)
+
+            Text("命中标题、UP 主名、简介、分类或 tag 中的关键词即拦截。适合过滤“动画”“游戏录播”“美食”“影视”“Vlog”等内容。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle("启用内置关键词库", isOn: $store.settings.builtInKeywordsEnabled)
+                .disabled(!store.settings.enableKeywordFilter)
+                .tint(.biliBlue)
+
+            // Add custom keyword
+            HStack {
+                TextField("输入要屏蔽的关键词...", text: $newKeyword)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { addKeyword() }
+                Button(action: addKeyword) {
+                    Text("+ 添加")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.biliBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .disabled(!store.settings.enableKeywordFilter)
+
+            if store.settings.builtInKeywordsEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("内置关键词库 (\(FilterSettings.builtInKeywords.count)个):")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 8) {
+                        ForEach(FilterSettings.builtInKeywords, id: \.self) { word in
+                            Text(word)
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.cyan.opacity(0.12))
+                                .foregroundStyle(.cyan)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+
+            if !store.settings.customBlockedKeywords.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("自定义关键词 (\(store.settings.customBlockedKeywords.count)个):")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 8) {
+                        ForEach(store.settings.customBlockedKeywords, id: \.self) { word in
+                            HStack(spacing: 4) {
+                                Text(word)
+                                    .font(.caption)
+                                Button {
+                                    store.removeBlockedKeyword(word)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color(.systemGray5))
+                            .foregroundStyle(.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - UI
 
     private var uiCard: some View {
@@ -453,6 +848,27 @@ struct FilterSettingsView: View {
         showWordError = nil
         store.addCustomWord(trimmed)
         newWord = ""
+    }
+
+    private func addCategory() {
+        let trimmed = newCategory.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        store.blockCategory(trimmed)
+        newCategory = ""
+    }
+
+    private func addUPMid() {
+        let trimmed = newUPMid.trimmingCharacters(in: .whitespaces)
+        guard let mid = Int(trimmed), mid > 0 else { return }
+        store.blockUP(mid: mid)
+        newUPMid = ""
+    }
+
+    private func addKeyword() {
+        let trimmed = newKeyword.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        store.addBlockedKeyword(trimmed)
+        newKeyword = ""
     }
 }
 
