@@ -170,12 +170,26 @@ final class AppStore: ObservableObject {
     func addCustomWord(_ word: String) {
         let trimmed = word.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        guard !settings.customBlockedWords.contains(trimmed) else { return }
+        guard !settings.customBlockedWords.contains(trimmed) else {
+            // 已存在但处于停用状态时，添加即视为重新启用
+            settings.disabledWords.remove(trimmed)
+            return
+        }
         settings.customBlockedWords.append(trimmed)
     }
 
     func removeCustomWord(_ word: String) {
         settings.customBlockedWords.removeAll { $0 == word }
+        settings.disabledWords.remove(word)
+    }
+
+    /// 关闭/恢复某条自定义屏蔽词。关闭后条目保留并变灰，但不参与过滤。
+    func toggleCustomWord(_ word: String) {
+        if settings.disabledWords.contains(word) {
+            settings.disabledWords.remove(word)
+        } else {
+            settings.disabledWords.insert(word)
+        }
     }
 
     // MARK: - UP主 blacklist
@@ -273,12 +287,25 @@ final class AppStore: ObservableObject {
     func addBlockedKeyword(_ word: String) {
         let trimmed = word.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        guard !settings.customBlockedKeywords.contains(trimmed) else { return }
+        guard !settings.customBlockedKeywords.contains(trimmed) else {
+            settings.disabledKeywords.remove(trimmed)
+            return
+        }
         settings.customBlockedKeywords.append(trimmed)
     }
 
     func removeBlockedKeyword(_ word: String) {
         settings.customBlockedKeywords.removeAll { $0 == word }
+        settings.disabledKeywords.remove(word)
+    }
+
+    /// 关闭/恢复某条自定义关键词。关闭后条目保留并变灰，但不参与过滤。
+    func toggleBlockedKeyword(_ word: String) {
+        if settings.disabledKeywords.contains(word) {
+            settings.disabledKeywords.remove(word)
+        } else {
+            settings.disabledKeywords.insert(word)
+        }
     }
 
     // MARK: - Tag blacklist
@@ -286,12 +313,25 @@ final class AppStore: ObservableObject {
     func addBlockedTag(_ tag: String) {
         let trimmed = tag.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        guard !settings.customBlockedTags.contains(trimmed) else { return }
+        guard !settings.customBlockedTags.contains(trimmed) else {
+            settings.disabledTags.remove(trimmed)
+            return
+        }
         settings.customBlockedTags.append(trimmed)
     }
 
     func removeBlockedTag(_ tag: String) {
         settings.customBlockedTags.removeAll { $0 == tag }
+        settings.disabledTags.remove(tag)
+    }
+
+    /// 关闭/恢复某条自定义标签。关闭后条目保留并变灰，但不参与过滤。
+    func toggleBlockedTag(_ tag: String) {
+        if settings.disabledTags.contains(tag) {
+            settings.disabledTags.remove(tag)
+        } else {
+            settings.disabledTags.insert(tag)
+        }
     }
 
     // MARK: - User / login

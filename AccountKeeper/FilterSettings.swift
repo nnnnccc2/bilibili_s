@@ -77,6 +77,8 @@ struct FilterSettings: Codable, Hashable {
     var enableInsultWordFilter: Bool = true
     var builtInWordsEnabled: Bool = true
     var customBlockedWords: [String] = []
+    /// 被「关闭使用」的自定义屏蔽词：保留在列表中（变灰），但不参与过滤。
+    var disabledWords: Set<String> = []
 
     // Duration filtering (global, applies to home/feed/category/dynamic)
     // Multi-select: videos whose duration is <= ANY selected threshold are blocked.
@@ -109,12 +111,16 @@ struct FilterSettings: Codable, Hashable {
     var enableKeywordFilter: Bool = true
     var builtInKeywordsEnabled: Bool = true
     var customBlockedKeywords: [String] = []
+    /// 被「关闭使用」的自定义关键词：保留在列表中（变灰），但不参与过滤。
+    var disabledKeywords: Set<String> = []
 
     // Tag filtering（只匹配视频 tag 字段，比关键词更精准）
     // 默认开启：tag 是最可靠的内容类型信号，内置标签库只收录强指示 tag。
     var enableTagFilter: Bool = true
     var builtInTagsEnabled: Bool = true
     var customBlockedTags: [String] = []
+    /// 被「关闭使用」的自定义标签：保留在列表中（变灰），但不参与过滤。
+    var disabledTags: Set<String> = []
 
     // UI
     var showFilteredBanner: Bool = true
@@ -140,6 +146,7 @@ struct FilterSettings: Codable, Hashable {
         enableInsultWordFilter = try c.decodeIfPresent(Bool.self, forKey: .enableInsultWordFilter) ?? true
         builtInWordsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInWordsEnabled) ?? true
         customBlockedWords = try c.decodeIfPresent([String].self, forKey: .customBlockedWords) ?? []
+        disabledWords = try c.decodeIfPresent(Set<String>.self, forKey: .disabledWords) ?? []
         blockedDurationSeconds = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedDurationSeconds) ?? [10]
         searchMinDurationSeconds = try c.decodeIfPresent(Int.self, forKey: .searchMinDurationSeconds)
         enableCategoryFilter = try c.decodeIfPresent(Bool.self, forKey: .enableCategoryFilter) ?? false
@@ -152,10 +159,12 @@ struct FilterSettings: Codable, Hashable {
         enableKeywordFilter = try c.decodeIfPresent(Bool.self, forKey: .enableKeywordFilter) ?? true
         builtInKeywordsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInKeywordsEnabled) ?? true
         customBlockedKeywords = try c.decodeIfPresent([String].self, forKey: .customBlockedKeywords) ?? []
+        disabledKeywords = try c.decodeIfPresent(Set<String>.self, forKey: .disabledKeywords) ?? []
         // 老版本没有这两个键：升级后默认开启 Tag 过滤，否则用户会以为"过滤又没效果"。
         enableTagFilter = try c.decodeIfPresent(Bool.self, forKey: .enableTagFilter) ?? true
         builtInTagsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInTagsEnabled) ?? true
         customBlockedTags = try c.decodeIfPresent([String].self, forKey: .customBlockedTags) ?? []
+        disabledTags = try c.decodeIfPresent(Set<String>.self, forKey: .disabledTags) ?? []
         showFilteredBanner = try c.decodeIfPresent(Bool.self, forKey: .showFilteredBanner) ?? true
         schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion)
         stats = try c.decodeIfPresent(FilterStats.self, forKey: .stats) ?? FilterStats()
@@ -199,7 +208,7 @@ extension FilterSettings {
         if builtInWordsEnabled {
             words.append(contentsOf: FilterSettings.builtInInsultWords)
         }
-        words.append(contentsOf: customBlockedWords)
+        words.append(contentsOf: customBlockedWords.filter { !disabledWords.contains($0) })
         return words
     }
 
@@ -220,7 +229,7 @@ extension FilterSettings {
         if builtInKeywordsEnabled {
             words.append(contentsOf: FilterSettings.builtInKeywords)
         }
-        words.append(contentsOf: customBlockedKeywords)
+        words.append(contentsOf: customBlockedKeywords.filter { !disabledKeywords.contains($0) })
         return words.map { $0.lowercased() }.filter { !$0.isEmpty }
     }
 
@@ -257,7 +266,7 @@ extension FilterSettings {
         if builtInTagsEnabled {
             words.append(contentsOf: FilterSettings.builtInTags)
         }
-        words.append(contentsOf: customBlockedTags)
+        words.append(contentsOf: customBlockedTags.filter { !disabledTags.contains($0) })
         return words.map { $0.lowercased() }.filter { !$0.isEmpty }
     }
 }

@@ -433,24 +433,17 @@ struct FilterSettingsView: View {
                     Text("自定义屏蔽词 (\(store.settings.customBlockedWords.count)个):")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text("点左侧电源图标可暂时停用（变灰），点右侧 × 删除。")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                     FlowLayout(spacing: 8) {
                         ForEach(store.settings.customBlockedWords, id: \.self) { word in
-                            HStack(spacing: 4) {
-                                Text(word)
-                                    .font(.caption)
-                                Button {
-                                    store.removeCustomWord(word)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.caption2)
-                                        .foregroundStyle(.red)
-                                }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color(.systemGray5))
-                            .foregroundStyle(.primary)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            BlockedEntryChip(
+                                text: word,
+                                isDisabled: store.settings.disabledWords.contains(word),
+                                onToggle: { store.toggleCustomWord(word) },
+                                onDelete: { store.removeCustomWord(word) }
+                            )
                         }
                     }
                 }
@@ -815,24 +808,17 @@ struct FilterSettingsView: View {
                     Text("自定义关键词 (\(store.settings.customBlockedKeywords.count)个):")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text("点左侧电源图标可暂时停用（变灰），点右侧 × 删除。")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                     FlowLayout(spacing: 8) {
                         ForEach(store.settings.customBlockedKeywords, id: \.self) { word in
-                            HStack(spacing: 4) {
-                                Text(word)
-                                    .font(.caption)
-                                Button {
-                                    store.removeBlockedKeyword(word)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.caption2)
-                                        .foregroundStyle(.red)
-                                }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color(.systemGray5))
-                            .foregroundStyle(.primary)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            BlockedEntryChip(
+                                text: word,
+                                isDisabled: store.settings.disabledKeywords.contains(word),
+                                onToggle: { store.toggleBlockedKeyword(word) },
+                                onDelete: { store.removeBlockedKeyword(word) }
+                            )
                         }
                     }
                 }
@@ -906,24 +892,17 @@ struct FilterSettingsView: View {
                     Text("自定义标签 (\(store.settings.customBlockedTags.count)个):")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text("点左侧电源图标可暂时停用（变灰），点右侧 × 删除。")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                     FlowLayout(spacing: 8) {
                         ForEach(store.settings.customBlockedTags, id: \.self) { tag in
-                            HStack(spacing: 4) {
-                                Text(tag)
-                                    .font(.caption)
-                                Button {
-                                    store.removeBlockedTag(tag)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.caption2)
-                                        .foregroundStyle(.red)
-                                }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color(.systemGray5))
-                            .foregroundStyle(.primary)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            BlockedEntryChip(
+                                text: tag,
+                                isDisabled: store.settings.disabledTags.contains(tag),
+                                onToggle: { store.toggleBlockedTag(tag) },
+                                onDelete: { store.removeBlockedTag(tag) }
+                            )
                         }
                     }
                 }
@@ -1000,6 +979,45 @@ struct FilterSettingsView: View {
         guard !trimmed.isEmpty else { return }
         store.addBlockedTag(trimmed)
         newTag = ""
+    }
+}
+
+/// 自定义屏蔽条目 chip：左侧电源图标切换「使用 / 关闭使用」，右侧 × 删除。
+/// 关闭使用后条目仍保留在列表中但整体变灰，便于随时恢复。
+private struct BlockedEntryChip: View {
+    let text: String
+    let isDisabled: Bool
+    let onToggle: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Button(action: onToggle) {
+                Image(systemName: isDisabled ? "power.circle" : "power.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(isDisabled ? Color.secondary : Color.biliBlue)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isDisabled ? "恢复使用" : "关闭使用")
+
+            Text(text)
+                .font(.caption)
+                .strikethrough(isDisabled, color: .secondary)
+                .foregroundStyle(isDisabled ? Color.secondary : Color.primary)
+
+            Button(action: onDelete) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.red.opacity(isDisabled ? 0.45 : 0.85))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("删除")
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(isDisabled ? Color(.systemGray6) : Color(.systemGray5))
+        .opacity(isDisabled ? 0.55 : 1)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
