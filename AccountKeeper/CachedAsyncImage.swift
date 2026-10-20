@@ -146,15 +146,16 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         ZStack {
             placeholder()
                 .opacity(phase == .loaded ? 0 : 1)
-                .animation(.none, value: phase == .loaded)
 
             if let img = image {
                 content(Image(uiImage: img))
-                    .transition(.opacity)
-                    .id(img.hashValue)
+                    .opacity(phase == .loaded ? 1 : 0)
             }
         }
         .clipped()
+        // Single fade driven by phase — no `.id()` identity churn / per-load
+        // transition, which caused dropped frames while scrolling fast.
+        .animation(.easeOut(duration: 0.18), value: phase)
         .onAppear { load() }
         .onChange(of: url?.absoluteString) { _, _ in
             image = nil

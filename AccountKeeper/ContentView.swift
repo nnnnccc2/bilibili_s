@@ -69,9 +69,9 @@ struct ContentView: View {
         }
         .frame(height: 56)
         .padding(.horizontal, 12)
-        .background(Color.white.opacity(0.8))
+        .background(Color.white)
         .clipShape(Capsule())
-        .overlay(Capsule().stroke(Color.white.opacity(0.6), lineWidth: 1))
+        .overlay(Capsule().stroke(Color.biliBorder, lineWidth: 1))
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -130,9 +130,6 @@ enum MiniBiliAnimation {
     static let enterStartOpacity: Double = 0.9
     /// 非视频页空隙填充的暗度：极淡，清水感。
     static let enterDim: Double = 0.10
-    /// 极淡柔影：自然托出厚度，不厚重。
-    static let shadowRadius: CGFloat = 12
-    static let shadowOpacity: Double = 0.15
 
     /// 进场：苹果原生 .smooth 顺滑弹簧，无回弹、落定自然。
     static let enter: Animation = .smooth
@@ -163,7 +160,7 @@ enum MiniBiliAnimation {
 ///
 /// 进场：内容从 0.97 放大铺满，苹果原生 .smooth 顺滑落定。
 ///   - 缩放锚点 .top：顶部边缘始终贴住屏幕顶端，视频不会先沉后升，刘海区无位移。
-///   - 不模糊：内容略带通透（0.9→1）如清水，配极淡柔影自然托出厚度。
+///   - 不模糊、不加阴影：内容略带通透（0.9→1）如清水；阴影会让全屏缩放的每一帧都离屏重绘，拖慢过渡。
 ///   - 视频页（backdrop != nil）：黑色底即时铺满（不参与动画），刘海区全程黑色、绝不跳色。
 ///   - 其他页：极淡暗底随进场淡入，轻量连接前后两页。
 /// 退场：统一顺滑淡出。
@@ -189,6 +186,17 @@ struct ImmersiveOverlay: ViewModifier {
         backdrop != nil ? fillTarget : (appeared ? fillTarget : 0)
     }
 
+    /// 视频页（backdrop != nil）内容不做任何缩放/淡入：直接满尺寸、全不透明出现。
+    /// 视频内容承载 AVPlayerLayer，对它逐帧缩放会掉帧并产生播放区位移；
+    /// 仅靠即时铺满的黑色底完成过渡，最干脆也最流畅。
+    /// 其他页保留极近的缩放 + 轻微通透，做出轻量的进场连接感。
+    private var contentScale: CGFloat {
+        backdrop != nil ? 1 : (appeared ? 1 : MiniBiliAnimation.enterStartScale)
+    }
+    private var contentOpacity: Double {
+        backdrop != nil ? 1 : (appeared ? 1 : MiniBiliAnimation.enterStartOpacity)
+    }
+
     func body(content: Content) -> some View {
         ZStack {
             fillColor
@@ -196,12 +204,9 @@ struct ImmersiveOverlay: ViewModifier {
                 .opacity(fillOpacity)
             content
                 // 锚点在顶部：上沿全程贴顶，缩放只向下展开，杜绝位移。
-                .scaleEffect(appeared ? 1 : MiniBiliAnimation.enterStartScale, anchor: .top)
-                // 极淡柔影：自然厚度，不厚重。
-                .shadow(color: .black.opacity(MiniBiliAnimation.shadowOpacity),
-                        radius: MiniBiliAnimation.shadowRadius)
-                // 内容略带通透如清水（0.9→1），不模糊、不浓重淡入。
-                .opacity(appeared ? 1 : MiniBiliAnimation.enterStartOpacity)
+                .scaleEffect(contentScale, anchor: .top)
+                // 不加阴影：全屏内容缩放的阴影需逐帧离屏重绘，是过渡顿挫的主因。
+                .opacity(contentOpacity)
         }
         .transition(.asymmetric(
             insertion: .identity,

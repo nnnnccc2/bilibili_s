@@ -49,13 +49,21 @@ final class AppStore: ObservableObject {
     func applyFilter(_ videos: [Video], countStats: Bool = true) -> [Video] {
         var passed: [Video] = []
         var blocked = 0
+        // Accumulate stats into a local copy and assign once at the end.
+        // Mutating `settings` inside the loop would trigger its `didSet`
+        // (full JSON encode + UserDefaults write) for every blocked video,
+        // stalling the main thread while the list loads.
+        var newStats = settings.stats
         for v in videos {
             if let reason = engine.shouldBlock(v) {
                 blocked += 1
-                if countStats { settings.stats.add(reason) }
+                if countStats { newStats.add(reason) }
             } else {
                 passed.append(v)
             }
+        }
+        if countStats && newStats != settings.stats {
+            settings.stats = newStats   // single publish + single persist
         }
         if blocked > 0 {
             lastBlockedCount = blocked
@@ -69,13 +77,19 @@ final class AppStore: ObservableObject {
     func applySearchFilter(_ videos: [Video], countStats: Bool = true, applyMinDuration: Bool = true) -> [Video] {
         var passed: [Video] = []
         var blocked = 0
+        // Same as `applyFilter`: batch the stats update so the store persists
+        // once instead of once per blocked video.
+        var newStats = settings.stats
         for v in videos {
             if let reason = engine.shouldBlockInSearch(v, applyMinDuration: applyMinDuration) {
                 blocked += 1
-                if countStats { settings.stats.add(reason) }
+                if countStats { newStats.add(reason) }
             } else {
                 passed.append(v)
             }
+        }
+        if countStats && newStats != settings.stats {
+            settings.stats = newStats
         }
         if blocked > 0 {
             lastBlockedCount = blocked

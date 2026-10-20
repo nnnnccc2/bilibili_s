@@ -3,7 +3,7 @@
 //  BiliBili
 //
 //  Reusable video card matching the reference design
-//  (translucent card, 16:9 cover with duration badge, two-line meta)
+//  (solid white card, 16:9 cover with duration badge, two-line meta)
 //
 
 import SwiftUI
@@ -103,11 +103,11 @@ struct VideoCardView: View {
             }
             .padding(10)
         }
-        .background(Color.white.opacity(0.7))
+        .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                .stroke(Color.biliBorder, lineWidth: 1)
         )
         .onAppear {
             // Prefetch stream URL when card becomes visible so playback starts instantly on tap
