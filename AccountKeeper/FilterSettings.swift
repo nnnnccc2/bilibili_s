@@ -101,8 +101,9 @@ struct FilterSettings: Codable, Hashable {
     var blockedUPMids: Set<Int> = []
 
     // General keyword filtering（标题 + UP名 + 描述 + 分类/tag 联合匹配）
-    var enableKeywordFilter: Bool = false
-    var builtInKeywordsEnabled: Bool = false
+    // 默认开启：这是用户最主要依赖的过滤维度，且对「无 tag 视频」同样有效。
+    var enableKeywordFilter: Bool = true
+    var builtInKeywordsEnabled: Bool = true
     var customBlockedKeywords: [String] = []
 
     // Tag filtering（只匹配视频 tag 字段，比关键词更精准）
@@ -144,8 +145,8 @@ struct FilterSettings: Codable, Hashable {
         blockedSubZoneTids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedSubZoneTids) ?? []
         enableUPBlockFilter = try c.decodeIfPresent(Bool.self, forKey: .enableUPBlockFilter) ?? false
         blockedUPMids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedUPMids) ?? []
-        enableKeywordFilter = try c.decodeIfPresent(Bool.self, forKey: .enableKeywordFilter) ?? false
-        builtInKeywordsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInKeywordsEnabled) ?? false
+        enableKeywordFilter = try c.decodeIfPresent(Bool.self, forKey: .enableKeywordFilter) ?? true
+        builtInKeywordsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInKeywordsEnabled) ?? true
         customBlockedKeywords = try c.decodeIfPresent([String].self, forKey: .customBlockedKeywords) ?? []
         // 老版本没有这两个键：升级后默认开启 Tag 过滤，否则用户会以为"过滤又没效果"。
         enableTagFilter = try c.decodeIfPresent(Bool.self, forKey: .enableTagFilter) ?? true

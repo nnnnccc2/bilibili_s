@@ -23,6 +23,8 @@ final class AppStore: ObservableObject {
         var total: Int = 0
         var withTags: Int = 0
         var withTid: Int = 0
+        /// 补拉结果摘要（含失败错误码），用于定位为什么 tag 是 0
+        var note: String = ""
     }
     @Published var feedDiagnostics = FeedDiagnostics()
     /// 本次拉取中被 Tag 规则拦下的条数（用于确认 Tag 过滤是否命中）。

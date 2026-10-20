@@ -149,6 +149,14 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
+
+                if !store.feedDiagnostics.note.isEmpty {
+                    Text(store.feedDiagnostics.note)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                }
             }
 
             if isLoading || !hasLoadedOnce {
@@ -224,7 +232,8 @@ struct HomeView: View {
                 store.feedDiagnostics = AppStore.FeedDiagnostics(
                     total: raw.count,
                     withTags: raw.filter { !$0.tags.isEmpty }.count,
-                    withTid: raw.filter { $0.tid != 0 }.count
+                    withTid: raw.filter { $0.tid != 0 }.count,
+                    note: BiliAPI.shared.lastEnrichReport.note
                 )
                 let engine = store.engine
                 store.lastTagBlockedCount = raw.filter { engine.shouldBlock($0) == .tagBlocked }.count
