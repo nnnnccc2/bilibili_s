@@ -164,7 +164,7 @@ abstract final class MiniBiliTheme {
         hintStyle: TextStyle(color: MiniBiliColors.biliMuted),
       ),
       // TabBar 主题 — MiniBili 胶囊风格，全局生效
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: MiniBiliColors.biliBlue,
         unselectedLabelColor: MiniBiliColors.biliTabText,
         labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
@@ -314,7 +314,7 @@ abstract final class MiniBiliTheme {
               BorderSide(color: MiniBiliColors.biliBlue, width: 1.5),
         ),
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: MiniBiliColors.biliBlue,
         unselectedLabelColor: Colors.white.withOpacity(0.6),
         labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
