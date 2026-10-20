@@ -51,13 +51,7 @@ struct FavoritesListView: View {
             }
             .onAppear { loadFolders() }
         }
-        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
-        .fullScreenCover(item: $selectedVideo) { video in
-            VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
-                .environmentObject(store)
-                .ignoresSafeArea()
-                .presentationBackground(.black)
-        }
+        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。.playerOverlay(for: $selectedVideo, store: store)
     }
 
     private var folderList: some View {

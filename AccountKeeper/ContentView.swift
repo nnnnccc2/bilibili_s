@@ -14,29 +14,40 @@ struct ContentView: View {
     @State private var showingSearch = false
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            HomeView(showingSearch: $showingSearch)
-                .tag(0)
-                .toolbar(.hidden, for: .tabBar)
+        ZStack {
+            TabView(selection: $selectedTab) {
+                HomeView(showingSearch: $showingSearch)
+                    .tag(0)
+                    .toolbar(.hidden, for: .tabBar)
 
-            FollowingView(showingSearch: $showingSearch)
-                .tag(1)
-                .toolbar(.hidden, for: .tabBar)
+                FollowingView(showingSearch: $showingSearch)
+                    .tag(1)
+                    .toolbar(.hidden, for: .tabBar)
 
-            ProfileView(showingSearch: $showingSearch)
-                .tag(2)
-                .toolbar(.hidden, for: .tabBar)
+                ProfileView(showingSearch: $showingSearch)
+                    .tag(2)
+                    .toolbar(.hidden, for: .tabBar)
+            }
+            .tint(.biliBlue)
+            .background(Color.biliBackground.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                bottomBar
+            }
+
+            // 搜索：overlay + 自定义 transition（从右侧滑入，不用 fullScreenCover 的"从下往上"）。
+            if showingSearch {
+                SearchView(onDismiss: { showingSearch = false })
+                    .environmentObject(store)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.biliBackground.ignoresSafeArea())
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing),
+                        removal: .move(edge: .trailing)
+                    ))
+                    .zIndex(10)
+            }
         }
-        .tint(.biliBlue)
-        .background(Color.biliBackground.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            bottomBar
-        }
-        // 搜索：系统全屏模态（fullScreenCover 原生滑入/滑出）。
-        .fullScreenCover(isPresented: $showingSearch) {
-            SearchView(onDismiss: { showingSearch = false })
-                .environmentObject(store)
-        }
+        .animation(MiniBiliAnimation.contentAppear, value: showingSearch)
     }
 
     // MARK: - Floating pill navigation (首页 / 关注 / 我的 + 搜索)
@@ -148,3 +159,23 @@ extension AnyTransition {
 /// 全屏页面统一改用系统模态呈现（fullScreenCover），系统原生滑入/滑出。
 /// 旧的缩放/暗底浮层（ImmersiveOverlay）已移除，动画全部交给系统。
 
+
+// MARK: - Video player overlay (淡入淡出，不要从下往上)
+
+/// 全屏播放器 overlay：用 `.transition(.opacity)` 代替 fullScreenCover 的"从下往上"系统动画。
+/// 外层 View 会被包在 overlay 里，播放器淡入覆盖整个屏幕。
+extension View {
+    /// 给当前 View 加一个播放器 overlay，用淡入淡出过渡。
+    func playerOverlay(for video: Binding<Video?>, store: AppStore) -> some View {
+        overlay(alignment: .top) {
+            if let v = video.wrappedValue {
+                VideoPlayerView(video: v, onDismiss: { video.wrappedValue = nil })
+                    .environmentObject(store)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .animation(MiniBiliAnimation.uiReveal, value: video.wrappedValue?.id)
+                    .zIndex(99)
+            }
+        }
+    }
+}

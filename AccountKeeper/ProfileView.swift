@@ -10,15 +10,12 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject var store: AppStore
     @Binding var showingSearch: Bool
-    @State private var showingLogin = false
-    @State private var showingSettings = false
-    @State private var showingHistory = false
     @State private var selectedVideo: Video?
     @State private var showingLogoutAlert = false
     @State private var remoteHistory: [HistoryItem] = []
     @State private var isLoadingHistory = false
     @State private var favoriteCount: Int = 0
-    @State private var showingFavorites = false
+    @State private var destination: ProfileDestination?
 
     private var displayHistory: [HistoryItem] {
         store.currentUser != nil ? remoteHistory : store.history
@@ -76,15 +73,24 @@ struct ProfileView: View {
                 }
             }
         }
-        // 登录：系统全屏模态。
-        .fullScreenCover(isPresented: $showingLogin) {
-            LoginView(onDismiss: { showingLogin = false })
-                .environmentObject(store)
-        }
-        // 过滤设置：系统全屏模态。
-        .fullScreenCover(isPresented: $showingSettings) {
-            FilterSettingsView(onDismiss: { showingSettings = false })
-                .environmentObject(store)
+        // 4 个子页统一用 NavigationStack push（从左滑入，不要从下往上）。
+        .navigationDestination(item: $destination) { dest in
+            switch dest {
+            case .login:
+                LoginView()
+                    .environmentObject(store)
+                    .navigationTitle("登录")
+            case .settings:
+                FilterSettingsView()
+                    .environmentObject(store)
+                    .navigationTitle("过滤设置")
+            case .history:
+                historyPush
+            case .favorites:
+                FavoritesListView()
+                    .environmentObject(store)
+                    .navigationTitle("我的收藏")
+            }
         }
         .alert("退出登录", isPresented: $showingLogoutAlert) {
             Button("取消", role: .cancel) {}
@@ -94,15 +100,6 @@ struct ProfileView: View {
             }
         } message: {
             Text("确定要退出当前账号吗？")
-        }
-        // 观看历史：系统全屏模态（播放器在历史列表内部以 zoom 转场进入）。
-        .fullScreenCover(isPresented: $showingHistory) {
-            historySheet
-        }
-        // 收藏：系统全屏模态。
-        .fullScreenCover(isPresented: $showingFavorites) {
-            FavoritesListView(onDismiss: { showingFavorites = false })
-                .environmentObject(store)
         }
         .onAppear {
             refreshProfile()
@@ -215,7 +212,7 @@ struct ProfileView: View {
             )
         } else {
             Button {
-                showingLogin = true
+                destination = .login
             } label: {
                 HStack(spacing: 14) {
                     ZStack {
@@ -252,7 +249,7 @@ struct ProfileView: View {
 
     private var historyStat: some View {
         Button {
-            showingHistory = true
+            destination = .history
         } label: {
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
@@ -275,7 +272,7 @@ struct ProfileView: View {
 
     private var favoritesStat: some View {
         Button {
-            showingFavorites = true
+            destination = .favorites
         } label: {
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
@@ -308,7 +305,7 @@ struct ProfileView: View {
                     .fontWeight(.bold)
                 Spacer()
                 Button {
-                    showingSettings = true
+                    destination = .settings
                 } label: {
                     HStack(spacing: 2) {
                         Text("管理过滤规则")
@@ -396,67 +393,53 @@ struct ProfileView: View {
 
     // MARK: - History sheet
 
-    private var historySheet: some View {
-        NavigationStack {
-            ZStack {
-                biliBackgroundGradient.ignoresSafeArea()
-                Group {
-                    if isLoadingHistory {
-                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if displayHistory.isEmpty {
-                        ContentUnavailableView("暂无观看历史", systemImage: "clock")
-                    } else {
-                        List {
-                            ForEach(displayHistory) { item in
-                                Button {
-                                    playHistoryItem(item)
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        CachedAsyncImage(
-                                            url: URL(string: BiliAPI.coverThumb(item.cover, width: 160)),
-                                            targetSize: CGSize(width: 80, height: 50)
-                                        ) { img in
-                                            img.resizable().aspectRatio(contentMode: .fill)
-                                        } placeholder: {
-                                            Rectangle().fill(Color.gray.opacity(0.2))
-                                        }
-                                        .frame(width: 80, height: 50)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(item.title)
-                                                .font(.subheadline)
-                                                .lineLimit(2)
-                                                .foregroundStyle(.primary)
-                                            Text(item.upName)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
+    private var historyPush: some View {
+        ZStack {
+            biliBackgroundGradient.ignoresSafeArea()
+            Group {
+                if isLoadingHistory {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if displayHistory.isEmpty {
+                    ContentUnavailableView("暂无观看历史", systemImage: "clock")
+                } else {
+                    List {
+                        ForEach(displayHistory) { item in
+                            Button {
+                                playHistoryItem(item)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    CachedAsyncImage(
+                                        url: URL(string: BiliAPI.coverThumb(item.cover, width: 160)),
+                                        targetSize: CGSize(width: 80, height: 50)
+                                    ) { img in
+                                        img.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Rectangle().fill(Color.gray.opacity(0.2))
                                     }
+                                    .frame(width: 80, height: 50)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.title)
+                                            .font(.subheadline)
+                                            .lineLimit(2)
+                                            .foregroundStyle(.primary)
+                                        Text(item.upName)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .buttonStyle(.plain)
                         }
-                        .scrollContentBackground(.hidden)
                     }
-                }
-            }
-            .navigationTitle("观看历史")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { showingHistory = false }
-                        .foregroundColor(.biliBlue)
+                    .scrollContentBackground(.hidden)
                 }
             }
         }
-        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
-        .fullScreenCover(item: $selectedVideo) { video in
-            VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
-                .environmentObject(store)
-                .ignoresSafeArea()
-                .presentationBackground(.black)
-        }
+        .navigationTitle("观看历史")
+        .navigationBarTitleDisplayMode(.inline)
+        // 播放器：overlay + 淡入淡出（不要从下往上）。.playerOverlay(for: $selectedVideo, store: store)
     }
 
     private func playHistoryItem(_ item: HistoryItem) {
@@ -473,7 +456,7 @@ struct ProfileView: View {
 
     private var filterConfigEntry: some View {
         Button {
-            showingSettings = true
+            destination = .settings
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: "slider.horizontal.3")
@@ -502,4 +485,13 @@ struct ProfileView: View {
             )
         }
     }
+}
+
+// MARK: - Profile navigation destinations (push, 从左滑入)
+
+private enum ProfileDestination: Hashable {
+    case login
+    case settings
+    case history
+    case favorites
 }

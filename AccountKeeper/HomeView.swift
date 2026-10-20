@@ -36,13 +36,7 @@ struct HomeView: View {
             .navigationBarBackButtonHidden(true)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
-            // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
-            .fullScreenCover(item: $selectedVideo) { video in
-                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
-                    .environmentObject(store)
-                    .ignoresSafeArea()
-                    .presentationBackground(.black)
-            }
+            // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。.playerOverlay(for: $selectedVideo, store: store)
             // UP 空间：NavigationStack push（和搜索页保持一致，避免嵌套模态空白）。
             .navigationDestination(item: $selectedUP) { up in
                 UPSpaceView(mid: up.mid, initialName: up.name)
