@@ -411,9 +411,14 @@ final class BiliAPI {
         /// 最后一次失败的接口错误码（B站 code，如 -101 / -352 / -404）
         var lastCode = 0
         var lastMessage = ""
+        /// 最后一次失败的 HTTP 状态码与响应体片段，用于区分风控（412/HTML）/ 接口报错
+        var lastStatus = 0
+        var lastBody = ""
         var note: String {
             var s = "补tag \(tagOK)/\(tagTried) · 补分区 \(viewOK)/\(viewTried)"
-            if lastCode != 0 { s += " · 错误 \(lastCode) \(lastMessage)" }
+            if lastStatus != 0 { s += " · HTTP\(lastStatus)" }
+            if lastCode != 0 { s += " · code \(lastCode) \(lastMessage)" }
+            if !lastBody.isEmpty { s += " · \(lastBody)" }
             return s
         }
     }
@@ -472,7 +477,7 @@ final class BiliAPI {
             if videos[index].tid == 0 {
                 group.enter()
                 lock.lock(); report.viewTried += 1; lock.unlock()
-                fetchViewMetadata(bvid: bvid, anonymous: false) { [weak self] payload, code, message in
+                fetchViewMetadata(bvid: bvid, anonymous: false) { [weak self] payload, code, message, status, body in
                     defer { group.leave() }
                     guard let self = self else { return }
                     lock.lock()
@@ -491,6 +496,8 @@ final class BiliAPI {
                     } else {
                         report.lastCode = code
                         report.lastMessage = message
+                        report.lastStatus = status
+                        report.lastBody = body
                     }
                     lock.unlock()
                 }
@@ -499,7 +506,7 @@ final class BiliAPI {
             if videos[index].tags.isEmpty {
                 group.enter()
                 lock.lock(); report.tagTried += 1; lock.unlock()
-                fetchTags(bvid: bvid, anonymous: false) { [weak self] names, code, message in
+                fetchTags(bvid: bvid, anonymous: false) { [weak self] names, code, message, status, body in
                     guard let self = self else { group.leave(); return }
                     if let names = names, !names.isEmpty {
                         lock.lock()
@@ -510,7 +517,7 @@ final class BiliAPI {
                         return
                     }
                     // 失败 → 去掉 cookie（游客身份）再试一次
-                    self.fetchTags(bvid: bvid, anonymous: true) { names2, code2, message2 in
+                    self.fetchTags(bvid: bvid, anonymous: true) { names2, code2, message2, status2, body2 in
                         lock.lock()
                         if let names2 = names2, !names2.isEmpty {
                             report.tagOK += 1
@@ -518,6 +525,8 @@ final class BiliAPI {
                         } else {
                             report.lastCode = code2 != 0 ? code2 : code
                             report.lastMessage = message2.isEmpty ? message : message2
+                            report.lastStatus = status2 != 0 ? status2 : status
+                            report.lastBody = body2.isEmpty ? body : body2
                         }
                         lock.unlock()
                         group.leave()
@@ -530,38 +539,51 @@ final class BiliAPI {
     }
 
     /// 取视频公开详情（tid / tname / desc / duration）。
-    private func fetchViewMetadata(bvid: String, anonymous: Bool, completion: @escaping ([String: Any]?, Int, String) -> Void) {
-        request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid], ignoreCookies: anonymous) { [weak self] data, _, _ in
+    private func fetchViewMetadata(bvid: String, anonymous: Bool, completion: @escaping ([String: Any]?, Int, String, Int, String) -> Void) {
+        request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid], ignoreCookies: anonymous) { [weak self] data, response, _ in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let body = Self.snippet(data)
             guard let self = self, let json = self.parseJSON(data) else {
-                completion(nil, -1, "无响应")
+                completion(nil, -1, "无响应", status, body)
                 return
             }
             let code = json["code"] as? Int ?? -1
             guard code == 0, let d = json["data"] as? [String: Any] else {
-                completion(nil, code, json["message"] as? String ?? "")
+                completion(nil, code, json["message"] as? String ?? "", status, body)
                 return
             }
-            completion(d, 0, "")
+            completion(d, 0, "", status, "")
         }
     }
 
     /// 取视频 tag 列表。
-    private func fetchTags(bvid: String, anonymous: Bool, completion: @escaping ([String]?, Int, String) -> Void) {
-        request("https://api.bilibili.com/x/tag/archive/tags", params: ["bvid": bvid], ignoreCookies: anonymous) { [weak self] data, _, _ in
+    private func fetchTags(bvid: String, anonymous: Bool, completion: @escaping ([String]?, Int, String, Int, String) -> Void) {
+        request("https://api.bilibili.com/x/tag/archive/tags", params: ["bvid": bvid], ignoreCookies: anonymous) { [weak self] data, response, _ in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let body = Self.snippet(data)
             guard let self = self, let json = self.parseJSON(data) else {
-                completion(nil, -1, "无响应")
+                completion(nil, -1, "无响应", status, body)
                 return
             }
             let code = json["code"] as? Int ?? -1
             guard code == 0, let list = json["data"] as? [[String: Any]] else {
-                completion(nil, code, json["message"] as? String ?? "")
+                completion(nil, code, json["message"] as? String ?? "", status, body)
                 return
             }
             let names = list.compactMap { $0["tag_name"] as? String }
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
-            completion(names, names.isEmpty ? -2 : 0, names.isEmpty ? "tag为空" : "")
+            completion(names, names.isEmpty ? -2 : 0, names.isEmpty ? "tag为空" : "", status, names.isEmpty ? body : "")
         }
+    }
+
+    /// 响应体前 60 个字符，用于诊断（HTML 风控页 / JSON 错误码都能看出）。
+    private static func snippet(_ data: Data?) -> String {
+        guard let data = data, !data.isEmpty else { return "" }
+        let text = String(decoding: data.prefix(200), as: UTF8.self)
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return String(text.prefix(60))
     }
 
     // MARK: - Search
