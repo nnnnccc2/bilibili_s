@@ -260,9 +260,8 @@ struct AccountGroupDetailView: View {
             headerCard
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 16)
-
-            Divider()
+                .padding(.top, 16)
+                .padding(.bottom, 12)
 
             List {
                 ForEach(group.accounts) { account in
@@ -282,7 +281,7 @@ struct AccountGroupDetailView: View {
                     }
                 }
             }
-            .listStyle(.plain)
+            .listStyle(.insetGrouped)
         }
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
