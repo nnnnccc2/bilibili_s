@@ -2,17 +2,12 @@ name: Build BiliBili IPA
 
 on:
   push:
-    branches: [ main, master ]
-    # 只在本 App 的源码变化时构建。
-    # 否则 account-save 自动化推送 main 时会连带触发本工作流，用一份
-    # 不含过滤功能的源码重新构建并覆盖 latest Release —— 这正是"过滤老是失效"的原因。
+    # 只在本 App 的专用分支上构建。main 会被 account-save 自动化强制推送覆盖成
+    # 不含过滤功能的旧源码，若跟着 main 构建，latest Release 就会被"过滤失效"的包覆盖。
+    branches: [ bilibili-app ]
     paths:
       - 'AccountKeeper/**'
       - '.github/workflows/build-ipa.yml'
-  pull_request:
-    branches: [ main, master ]
-    paths:
-      - 'AccountKeeper/**'
   workflow_dispatch:
 
 jobs:
@@ -25,6 +20,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # 无论由哪个 ref 触发，始终构建 bilibili-app 分支的源码。
+          ref: bilibili-app
 
       - name: Select Xcode
         run: |
@@ -125,7 +123,7 @@ jobs:
           retention-days: 30
 
       - name: Publish IPA to GitHub Release (force refresh)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/bilibili-app' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMPILE_TIME: ${{ steps.compile_time.outputs.compile_time }}
