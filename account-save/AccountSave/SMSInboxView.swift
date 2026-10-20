@@ -3,12 +3,14 @@ import SwiftData
 
 /// 凭证存储：按账号名聚合，一眼看到某应用有哪些手机号注册过。
 struct SMSInboxView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Account.createdAt, order: .reverse) private var accounts: [Account]
 
     @State private var searchText = ""
     @State private var isShowingGuide = false
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
+    @State private var groupToDelete: AccountGroup?
 
     var body: some View {
         NavigationStack {
@@ -32,6 +34,16 @@ struct SMSInboxView: View {
         } message: {
             Text(exportError ?? "")
         }
+        .alert(
+            "删除凭证?",
+            isPresented: isConfirmingGroupDelete,
+            presenting: groupToDelete
+        ) { group in
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) { delete(group) }
+        } message: { group in
+            Text("将删除账号 \(group.name) 及其下所有记录。")
+        }
     }
 
     @ViewBuilder
@@ -53,6 +65,13 @@ struct SMSInboxView: View {
                         AccountGroupDetailView(group: group)
                     } label: {
                         AccountGroupRowView(group: group)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            groupToDelete = group
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
                     }
                 }
             }
@@ -131,6 +150,13 @@ struct SMSInboxView: View {
         )
     }
 
+    private var isConfirmingGroupDelete: Binding<Bool> {
+        Binding(
+            get: { groupToDelete != nil },
+            set: { if !$0 { groupToDelete = nil } }
+        )
+    }
+
     private enum ExportKind {
         case accounts
         case messages
@@ -153,6 +179,13 @@ struct SMSInboxView: View {
         } catch {
             exportError = error.localizedDescription
         }
+    }
+
+    private func delete(_ group: AccountGroup) {
+        for account in group.accounts {
+            modelContext.delete(account)
+        }
+        try? modelContext.save()
     }
 }
 
@@ -215,44 +248,34 @@ struct AccountGroupRowView: View {
 
 // MARK: - 按账号名聚合的详情页
 
-/// 同一账号名下多个手机号账号一起展示的详情页。
+/// 账号详情：顶部账号简介，下面按手机号列出，点击进入该手机号的短信列表。
 struct AccountGroupDetailView: View {
     let group: AccountGroup
     @Environment(\.modelContext) private var modelContext
 
-    @State private var selectedAccount: Account?
+    @State private var accountToDelete: Account?
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
 
     var body: some View {
         List {
+            Section {
+                headerCard
+            }
+
             ForEach(group.accounts) { account in
-                Section {
-                    if account.sortedMessages.isEmpty {
-                        Text("暂无短信")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(account.sortedMessages) { message in
-                            MessageRowView(message: message)
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        delete(message)
-                                    } label: {
-                                        Label("删除", systemImage: "trash")
-                                    }
-                                }
-                        }
-                    }
-                } header: {
-                    Button {
-                        selectedAccount = account
+                NavigationLink {
+                    AccountDetailView(account: account)
+                } label: {
+                    Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
+                        .font(.system(size: 16))
+                }
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        accountToDelete = account
                     } label: {
-                        Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.primary)
+                        Label("删除", systemImage: "trash")
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -267,14 +290,6 @@ struct AccountGroupDetailView: View {
                     } label: {
                         Label("导出该账号全部短信（CSV）", systemImage: "doc.text")
                     }
-                    Divider()
-                    ForEach(group.accounts) { account in
-                        Button {
-                            selectedAccount = account
-                        } label: {
-                            Label(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber, systemImage: "pencil")
-                        }
-                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -288,11 +303,35 @@ struct AccountGroupDetailView: View {
         } message: {
             Text(exportError ?? "")
         }
-        .navigationDestination(isPresented: detailBinding) {
-            if let selectedAccount {
-                AccountDetailView(account: selectedAccount)
-            }
+        .alert(
+            "删除凭证?",
+            isPresented: isConfirmingAccountDelete,
+            presenting: accountToDelete
+        ) { account in
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) { delete(account) }
+        } message: { account in
+            Text("将删除账号 \(account.name)（\(account.phoneNumberText)）及其下所有记录。")
         }
+    }
+
+    private var headerCard: some View {
+        HStack(spacing: 14) {
+            MerchantIconView(name: group.name, size: 62)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(group.name)
+                    .font(.system(size: 22, weight: .semibold))
+                if !group.phones.isEmpty {
+                    Text(group.phones.joined(separator: "、"))
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(4)
     }
 
     private var exportErrorBinding: Binding<Bool> {
@@ -302,10 +341,10 @@ struct AccountGroupDetailView: View {
         )
     }
 
-    private var detailBinding: Binding<Bool> {
+    private var isConfirmingAccountDelete: Binding<Bool> {
         Binding(
-            get: { selectedAccount != nil },
-            set: { if !$0 { selectedAccount = nil } }
+            get: { accountToDelete != nil },
+            set: { if !$0 { accountToDelete = nil } }
         )
     }
 
@@ -318,8 +357,8 @@ struct AccountGroupDetailView: View {
         }
     }
 
-    private func delete(_ message: SMSMessage) {
-        modelContext.delete(message)
+    private func delete(_ account: Account) {
+        modelContext.delete(account)
         try? modelContext.save()
     }
 }
