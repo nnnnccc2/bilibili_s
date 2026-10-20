@@ -107,8 +107,11 @@ final class AppStore: ObservableObject {
     /// 缓存上限 800，超出按 lastSeen 淘汰最旧博主。
     func classifyAndCache(_ videos: [Video]) {
         let now = Date()
+        let whitelist = settings.whitelistedCreators
         for v in videos {
             guard v.upMid != 0 else { continue }
+            // 白名单博主不再重新分类，避免用户移除后又被自动加回屏蔽列表。
+            guard whitelist[v.upMid] == nil else { continue }
             let detected = CreatorClassifier.classify(video: v)
             if var existing = settings.knownCreators[v.upMid] {
                 existing.sampleCount += 1
@@ -283,9 +286,25 @@ final class AppStore: ObservableObject {
         settings.blockedCreatorTypes = FilterSettings.defaultBlockedCreatorTypes
     }
 
-    /// 从缓存中移除某个博主（误判后可手动清除，下次出现会重新分类）。
+    /// 把博主移入白名单：从 knownCreators 移除并加入 whitelistedCreators。
+    /// 白名单内的博主不会被 classifyAndCache 重新分类，也不会被博主类型规则屏蔽。
+    /// 误判博主用此方法「移除」后即永久放行，直到用户在白名单里再次删除。
     func removeCreator(mid: Int) {
+        if let profile = settings.knownCreators[mid] {
+            settings.whitelistedCreators[mid] = profile
+        }
         settings.knownCreators.removeValue(forKey: mid)
+    }
+
+    /// 把博主从白名单彻底移除（删除）。
+    /// 移除后该博主下次出现在视频流中时会被重新分类，可能再次进入屏蔽列表。
+    func removeFromWhitelist(mid: Int) {
+        settings.whitelistedCreators.removeValue(forKey: mid)
+    }
+
+    /// 清空博主白名单。
+    func clearCreatorWhitelist() {
+        settings.whitelistedCreators.removeAll()
     }
 
     /// 清空已识别博主缓存。

@@ -116,7 +116,9 @@ final class FilterEngine {
         // 7.5. 博主类型过滤：基于已缓存的 CreatorProfile.type 判断。
         // 只在置信度 >= 0.4 时生效，避免单条视频误判把优质博主整个屏蔽。
         // .other 类型不在默认屏蔽列表中，不会误伤。
+        // 白名单内的博主跳过此规则。
         if settings.enableCreatorTypeFilter, video.upMid != 0,
+           settings.whitelistedCreators[video.upMid] == nil,
            let profile = settings.knownCreators[video.upMid],
            profile.type != .other,
            profile.confidence >= 0.4,

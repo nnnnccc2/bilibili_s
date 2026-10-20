@@ -119,6 +119,10 @@ struct FilterSettings: Codable, Hashable {
     var blockedCreatorTypes: Set<CreatorType> = FilterSettings.defaultBlockedCreatorTypes
     /// 已识别博主画像缓存：mid -> profile。持久化，上限 800 个，超出按 lastSeen 淘汰。
     var knownCreators: [Int: CreatorProfile] = [:]
+    /// 博主白名单：用户在看板里点「移除」的博主会进入白名单，
+    /// classifyAndCache 不再对其重新分类，FilterEngine 也不再按类型屏蔽。
+    /// 在白名单里再次点「删除」才会彻底移除。存储完整 profile 便于在设置页展示。
+    var whitelistedCreators: [Int: CreatorProfile] = [:]
 
     static let defaultBlockedCreatorTypes: Set<CreatorType> = [
         .techReview, .phoneReview, .gameStreamer, .foodBlogger,
@@ -179,6 +183,7 @@ struct FilterSettings: Codable, Hashable {
         enableCreatorTypeFilter = try c.decodeIfPresent(Bool.self, forKey: .enableCreatorTypeFilter) ?? true
         blockedCreatorTypes = try c.decodeIfPresent(Set<CreatorType>.self, forKey: .blockedCreatorTypes) ?? FilterSettings.defaultBlockedCreatorTypes
         knownCreators = try c.decodeIfPresent([Int: CreatorProfile].self, forKey: .knownCreators) ?? [:]
+        whitelistedCreators = try c.decodeIfPresent([Int: CreatorProfile].self, forKey: .whitelistedCreators) ?? [:]
         enableKeywordFilter = try c.decodeIfPresent(Bool.self, forKey: .enableKeywordFilter) ?? true
         builtInKeywordsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInKeywordsEnabled) ?? true
         customBlockedKeywords = try c.decodeIfPresent([String].self, forKey: .customBlockedKeywords) ?? []
