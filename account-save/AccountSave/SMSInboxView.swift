@@ -1,6 +1,13 @@
 import SwiftUI
 import SwiftData
 
+/// 账本纸张色：暖米白，模拟账本内页。
+extension Color {
+    static let ledgerPaper = Color(red: 0.97, green: 0.95, blue: 0.90)
+    static let ledgerCard = Color(red: 0.99, green: 0.98, blue: 0.95)
+    static let ledgerLine = Color(red: 0.82, green: 0.78, blue: 0.70)
+}
+
 /// 凭证存储：按账号名聚合，一眼看到某应用有哪些手机号注册过。
 struct SMSInboxView: View {
     @Environment(\.modelContext) private var modelContext
@@ -16,13 +23,16 @@ struct SMSInboxView: View {
         NavigationStack {
             content
                 .navigationTitle("凭证存储")
+                .toolbarColorScheme(.light, for: .navigationBar)
                 .searchable(
                     text: $searchText,
                     placement: .navigationBarDrawer(displayMode: .always),
                     prompt: "搜索账号、手机号或短信"
                 )
                 .toolbar { toolbarContent }
+                .background(Color.ledgerPaper.ignoresSafeArea())
         }
+        .tint(.brown)
         .sheet(isPresented: $isShowingGuide) {
             ConfigImportView()
         }
@@ -66,6 +76,7 @@ struct SMSInboxView: View {
                     } label: {
                         AccountGroupRowView(group: group)
                     }
+                    .listRowBackground(Color.ledgerPaper)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
                             groupToDelete = group
@@ -76,6 +87,8 @@ struct SMSInboxView: View {
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .listRowSeparatorTint(Color.ledgerLine)
         }
     }
 
@@ -287,10 +300,12 @@ struct AccountGroupDetailView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.ledgerPaper.ignoresSafeArea())
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
+        .tint(.brown)
         .alert(
             "删除凭证?",
             isPresented: isConfirmingAccountDelete,
@@ -322,7 +337,7 @@ struct AccountGroupDetailView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+                .fill(Color.ledgerCard)
         )
     }
 
