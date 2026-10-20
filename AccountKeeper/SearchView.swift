@@ -163,6 +163,7 @@ struct SearchView: View {
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                 .environmentObject(store)
+                .ignoresSafeArea()
                 .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
                 .presentationBackground(.black)
         }
@@ -244,18 +245,18 @@ struct SearchView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(results) { video in
-                        VideoCardView(video: video) {
-                            if video.upMid > 0 {
-                                selectedUPMid = video.upMid
-                                selectedUPName = video.upName
-                                showingUPSpace = true
+                        VideoCardView(
+                            video: video,
+                            onTap: { selectedVideo = video },
+                            onTapUP主: {
+                                if video.upMid > 0 {
+                                    selectedUPMid = video.upMid
+                                    selectedUPName = video.upName
+                                    showingUPSpace = true
+                                }
                             }
-                        }
+                        )
                             .matchedTransitionSource(id: video.id, in: playerZoom)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedVideo = video
-                            }
                             .onAppear {
                                 guard hasMore, !isLoadingMore else { return }
                                 if let idx = results.firstIndex(where: { $0.id == video.id }),

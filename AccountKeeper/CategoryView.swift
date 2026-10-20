@@ -100,16 +100,18 @@ struct CategoryView: View {
                         } else {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(partitionVideos) { video in
-                                    VideoCardView(video: video) {
-                                        if video.upMid > 0 {
-                                            selectedUPMid = video.upMid
-                                            selectedUPName = video.upName
-                                            showingUPSpace = true
+                                    VideoCardView(
+                                        video: video,
+                                        onTap: { selectedVideo = video },
+                                        onTapUP主: {
+                                            if video.upMid > 0 {
+                                                selectedUPMid = video.upMid
+                                                selectedUPName = video.upName
+                                                showingUPSpace = true
+                                            }
                                         }
-                                    }
+                                    )
                                         .matchedTransitionSource(id: video.id, in: playerZoom)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { selectedVideo = video }
                                         .onAppear {
                                             if video.id == partitionVideos.last?.id, hasMore, !isLoadingMore {
                                                 loadPartition(selectedPartition, reset: false)
@@ -163,6 +165,7 @@ struct CategoryView: View {
             .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                     .environmentObject(store)
+                    .ignoresSafeArea()
                     .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
                     .presentationBackground(.black)
             }

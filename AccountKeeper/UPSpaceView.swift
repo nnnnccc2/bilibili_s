@@ -63,6 +63,7 @@ struct UPSpaceView: View {
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                 .environmentObject(store)
+                .ignoresSafeArea()
                 .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
                 .presentationBackground(.black)
         }

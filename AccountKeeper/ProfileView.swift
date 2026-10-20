@@ -456,6 +456,7 @@ struct ProfileView: View {
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                 .environmentObject(store)
+                .ignoresSafeArea()
                 .navigationTransition(.zoom(sourceID: video.id, in: historyZoom))
                 .presentationBackground(.black)
         }

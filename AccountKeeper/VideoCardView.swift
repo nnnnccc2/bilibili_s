@@ -10,62 +10,70 @@ import SwiftUI
 
 struct VideoCardView: View {
     let video: Video
+    /// 点击卡片主体（封面 / 标题 / 数据行）→ 打开视频。
+    /// 为 nil 时自身不拦截点击，交给外层（如 Button）处理。
+    var onTap: (() -> Void)? = nil
+    /// 点击 UP主头像/昵称 → 打开 UP 空间。
     var onTapUP主: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Cover (16:9) with duration badge
-            ZStack(alignment: .bottomTrailing) {
-                CachedAsyncImage(
-                    url: URL(string: BiliAPI.coverThumb(video.cover, width: 360)),
-                    targetSize: CGSize(width: 180, height: 101)
-                ) { img in
-                    img.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.biliMutedSurface)
-                }
-                .aspectRatio(16.0/9.0, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .clipped()
+            mainTap(
+                ZStack(alignment: .bottomTrailing) {
+                    CachedAsyncImage(
+                        url: URL(string: BiliAPI.coverThumb(video.cover, width: 360)),
+                        targetSize: CGSize(width: 180, height: 101)
+                    ) { img in
+                        img.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.biliMutedSurface)
+                    }
+                    .aspectRatio(16.0/9.0, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
 
-                if video.duration > 0 {
-                    Text(video.durationText)
-                        .font(.system(size: 10, weight: .bold))
+                    if video.duration > 0 {
+                        Text(video.durationText)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.biliText.opacity(0.9))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .padding(8)
+                    } else if video.category == "直播" {
+                        HStack(spacing: 3) {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 5, height: 5)
+                            Text("直播中")
+                                .font(.system(size: 10, weight: .bold))
+                        }
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.biliText.opacity(0.9))
+                        .background(Color.black.opacity(0.6))
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .padding(8)
-                } else if video.category == "直播" {
-                    HStack(spacing: 3) {
-                        Circle()
-                            .fill(.red)
-                            .frame(width: 5, height: 5)
-                        Text("直播中")
-                            .font(.system(size: 10, weight: .bold))
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.black.opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .padding(8)
                 }
-            }
+            )
 
             VStack(alignment: .leading, spacing: 0) {
                 // Title (2 lines)
-                Text(video.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.biliText)
-                    .lineLimit(2)
-                    .lineSpacing(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                mainTap(
+                    Text(video.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.biliText)
+                        .lineLimit(2)
+                        .lineSpacing(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                )
 
-                // Row 1: avatar + uploader name
+                // Row 1: avatar + uploader name → UP 空间（独立点击区，绝不与卡片主体冲突）
                 HStack(spacing: 6) {
                     upAvatar
                     Text(video.upName)
@@ -80,26 +88,28 @@ struct VideoCardView: View {
                 }
 
                 // Row 2: views · danmaku · publish time
-                HStack(spacing: 8) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "play.fill")
-                        Text(video.viewsText)
-                    }
+                mainTap(
+                    HStack(spacing: 8) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "play.fill")
+                            Text(video.viewsText)
+                        }
 
-                    HStack(spacing: 3) {
-                        Image(systemName: "message.fill")
-                        Text(video.danmakuText)
-                    }
+                        HStack(spacing: 3) {
+                            Image(systemName: "message.fill")
+                            Text(video.danmakuText)
+                        }
 
-                    Spacer(minLength: 4)
+                        Spacer(minLength: 4)
 
-                    if !video.publishTime.isEmpty {
-                        Text(video.publishTime)
+                        if !video.publishTime.isEmpty {
+                            Text(video.publishTime)
+                        }
                     }
-                }
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color.biliSubtext)
-                .padding(.top, 6)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.biliSubtext)
+                    .padding(.top, 6)
+                )
             }
             .padding(10)
         }
@@ -112,6 +122,18 @@ struct VideoCardView: View {
         .onAppear {
             // Prefetch stream URL when card becomes visible so playback starts instantly on tap
             BiliAPI.shared.prefetchStreamURL(for: video)
+        }
+    }
+
+    /// 卡片主体点击区：仅当 `onTap` 存在时拦截点击，避免与外层 Button 冲突。
+    @ViewBuilder
+    private func mainTap<V: View>(_ content: V) -> some View {
+        if onTap == nil {
+            content
+        } else {
+            content
+                .contentShape(Rectangle())
+                .onTapGesture { onTap?() }
         }
     }
 

@@ -77,16 +77,18 @@ struct FollowingView: View {
                         ScrollView {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(videos) { video in
-                                    VideoCardView(video: video) {
-                                        if video.upMid > 0 {
-                                            selectedUPMid = video.upMid
-                                            selectedUPName = video.upName
-                                            showingUPSpace = true
+                                    VideoCardView(
+                                        video: video,
+                                        onTap: { selectedVideo = video },
+                                        onTapUP主: {
+                                            if video.upMid > 0 {
+                                                selectedUPMid = video.upMid
+                                                selectedUPName = video.upName
+                                                showingUPSpace = true
+                                            }
                                         }
-                                    }
+                                    )
                                         .matchedTransitionSource(id: video.id, in: playerZoom)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { selectedVideo = video }
                                 }
                             }
                             .padding(.horizontal, 8)
@@ -122,6 +124,7 @@ struct FollowingView: View {
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                 .environmentObject(store)
+                .ignoresSafeArea()
                 .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
                 .presentationBackground(.black)
         }
