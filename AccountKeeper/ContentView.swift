@@ -111,7 +111,7 @@ struct PressableCardStyle: ButtonStyle {
 // MARK: - Shared animation curves
 
 /// 全局动画曲线：统一使用苹果原生曲线，顺滑、自然、克制。
-/// 全屏页面进出改用系统模态动画（fullScreenCover / zoom 转场），不再手写缩放。
+/// 全屏页面进出统一交给系统模态动画（fullScreenCover），不再手写缩放。
 enum MiniBiliAnimation {
 
     /// 标签选中反馈：苹果原生 .snappy，干脆利落。
@@ -127,6 +127,6 @@ enum MiniBiliAnimation {
 
 // MARK: - Immersive overlay helper
 
-/// 全屏页面统一改用系统模态呈现（fullScreenCover），播放器带 iOS 18 zoom 转场。
+/// 全屏页面统一改用系统模态呈现（fullScreenCover），系统原生滑入/滑出。
 /// 旧的缩放/暗底浮层（ImmersiveOverlay）已移除，动画全部交给系统。
 

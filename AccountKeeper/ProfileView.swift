@@ -19,7 +19,6 @@ struct ProfileView: View {
     @State private var isLoadingHistory = false
     @State private var favoriteCount: Int = 0
     @State private var showingFavorites = false
-    @Namespace private var historyZoom
 
     private var displayHistory: [HistoryItem] {
         store.currentUser != nil ? remoteHistory : store.history
@@ -435,7 +434,6 @@ struct ProfileView: View {
                                         Spacer()
                                     }
                                 }
-                                .matchedTransitionSource(id: item.videoId, in: historyZoom)
                                 .buttonStyle(.plain)
                             }
                         }
@@ -452,12 +450,11 @@ struct ProfileView: View {
                 }
             }
         }
-        // 播放器：系统全屏模态 + iOS 18 zoom 转场（从历史条目放大进入）。
+        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                 .environmentObject(store)
                 .ignoresSafeArea()
-                .navigationTransition(.zoom(sourceID: video.id, in: historyZoom))
                 .presentationBackground(.black)
         }
     }

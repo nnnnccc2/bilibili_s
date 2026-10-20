@@ -29,8 +29,6 @@ struct SearchView: View {
     /// Callback when user taps the cancel button (overlay presentation).
     var onDismiss: (() -> Void)? = nil
 
-    @Namespace private var playerZoom
-
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
@@ -159,12 +157,11 @@ struct SearchView: View {
             }
             .onAppear { loadHotKeywords() }
         }
-        // 播放器：系统全屏模态 + iOS 18 zoom 转场。
+        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                 .environmentObject(store)
                 .ignoresSafeArea()
-                .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
                 .presentationBackground(.black)
         }
         // UP 空间：系统全屏模态。
@@ -256,7 +253,6 @@ struct SearchView: View {
                                 }
                             }
                         )
-                            .matchedTransitionSource(id: video.id, in: playerZoom)
                             .onAppear {
                                 guard hasMore, !isLoadingMore else { return }
                                 if let idx = results.firstIndex(where: { $0.id == video.id }),

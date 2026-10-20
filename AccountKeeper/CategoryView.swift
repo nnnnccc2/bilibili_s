@@ -20,7 +20,6 @@ struct CategoryView: View {
     @State private var selectedUPMid: Int = 0
     @State private var selectedUPName: String = ""
     @State private var showingUPSpace = false
-    @Namespace private var playerZoom
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
@@ -111,7 +110,6 @@ struct CategoryView: View {
                                             }
                                         }
                                     )
-                                        .matchedTransitionSource(id: video.id, in: playerZoom)
                                         .onAppear {
                                             if video.id == partitionVideos.last?.id, hasMore, !isLoadingMore {
                                                 loadPartition(selectedPartition, reset: false)
@@ -161,12 +159,11 @@ struct CategoryView: View {
                     }
                 }
             }
-            // 播放器：系统全屏模态 + iOS 18 zoom 转场。
+            // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
             .fullScreenCover(item: $selectedVideo) { video in
                 VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                     .environmentObject(store)
                     .ignoresSafeArea()
-                    .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
                     .presentationBackground(.black)
             }
             // UP 空间：系统全屏模态。

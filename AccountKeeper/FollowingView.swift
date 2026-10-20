@@ -18,7 +18,6 @@ struct FollowingView: View {
     @State private var selectedUPMid: Int = 0
     @State private var selectedUPName: String = ""
     @State private var showingUPSpace = false
-    @Namespace private var playerZoom
 
     enum FollowTab: String, CaseIterable, Identifiable {
         case all = "综合"
@@ -88,7 +87,6 @@ struct FollowingView: View {
                                             }
                                         }
                                     )
-                                        .matchedTransitionSource(id: video.id, in: playerZoom)
                                 }
                             }
                             .padding(.horizontal, 8)
@@ -120,12 +118,11 @@ struct FollowingView: View {
                 }
             }
         }
-        // 播放器：系统全屏模态 + iOS 18 zoom 转场。
+        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                 .environmentObject(store)
                 .ignoresSafeArea()
-                .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
                 .presentationBackground(.black)
         }
         // UP 空间：系统全屏模态。

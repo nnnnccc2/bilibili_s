@@ -24,7 +24,6 @@ struct HomeView: View {
     @State private var selectedUPMid: Int = 0
     @State private var selectedUPName: String = ""
     @State private var showingUPSpace = false
-    @Namespace private var playerZoom
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -35,12 +34,11 @@ struct HomeView: View {
                 contentBoard
             }
         }
-        // 播放器：系统全屏模态 + iOS 18 zoom 转场（从卡片缩略图放大进入）。
+        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
         .fullScreenCover(item: $selectedVideo) { video in
             VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
                 .environmentObject(store)
                 .ignoresSafeArea()
-                .navigationTransition(.zoom(sourceID: video.id, in: playerZoom))
                 .presentationBackground(.black)
         }
         // UP 空间：系统全屏模态。
@@ -162,7 +160,6 @@ struct HomeView: View {
                                     }
                                 }
                             )
-                            .matchedTransitionSource(id: video.id, in: playerZoom)
                             .onAppear {
                                 guard hasMore, !isLoadingMore else { return }
                                 // Pre-load when within the last 4 items so
