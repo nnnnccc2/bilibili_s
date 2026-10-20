@@ -8,10 +8,10 @@ import SwiftData
 /// 「收件人」即接收短信的手机号，用作该账号的注册手机号；留空时会自动尝试
 /// 从短信内容里识别出手机号。
 struct ImportMerchantSMSIntent: AppIntent {
-    static var title: LocalizedStringResource { "导入商家短信" }
+    static var title: LocalizedStringResource { "保存登录凭证短信" }
 
     static var description: IntentDescription? {
-        IntentDescription("把收到的短信保存到指定账号下，数据只保存在本机。")
+        IntentDescription("把收到的账号验证码短信保存到本机凭证库，方便按账号查询注册手机号和历史记录。")
     }
 
     /// 自动化运行时不需要把 App 切到前台。

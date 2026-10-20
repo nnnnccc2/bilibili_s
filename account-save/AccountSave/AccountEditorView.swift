@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// 编辑账号：账号名与注册手机号。
+/// 编辑凭证：账号名与注册手机号。
 struct AccountEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -22,12 +22,12 @@ struct AccountEditorView: View {
                 }
 
                 Section {
-                    Text("账号名用于快捷指令弹窗输入后归类短信；注册手机号用于导出的账号表格，留空时收到短信会自动从短信内容中识别填写。")
+                    Text("账号名用于快捷指令弹窗输入后归档凭证；注册手机号是账号用哪个手机号注册的，会自动写入并在主列表展示。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("编辑账号")
+            .navigationTitle("编辑凭证信息")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

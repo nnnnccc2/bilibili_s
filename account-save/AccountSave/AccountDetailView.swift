@@ -51,11 +51,11 @@ struct AccountDetailView: View {
         .sheet(item: $shareItem) { item in
             ShareSheet(items: [item.url])
         }
-        .alert("删除商家会话?", isPresented: $isConfirmingDelete) {
+        .alert("删除凭证?", isPresented: $isConfirmingDelete) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) { deleteAccount() }
         } message: {
-            Text("将删除 \(account.name) 的会话和所有短信。")
+            Text("将删除 \(account.name) 及其下所有记录。")
         }
         .alert("导出失败", isPresented: exportErrorBinding) {
             Button("好", role: .cancel) {}
@@ -70,17 +70,23 @@ struct AccountDetailView: View {
 
     private var headerCard: some View {
         HStack(spacing: 14) {
-            MerchantIconView(name: account.name, size: 60)
+            MerchantIconView(name: account.name, size: 62)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(account.name)
                     .font(.system(size: 22, weight: .semibold))
-                Text("\(account.senderCount) 个号码 / \(account.messages.count) 条短信")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                Text("注册手机号：\(account.phoneNumberText)")
+
+                HStack(spacing: 4) {
+                    Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                        .font(.system(size: 13))
+                    Text("注册手机号：\(account.phoneNumberText)")
+                        .font(.system(size: 15))
+                }
+                .foregroundStyle(.secondary)
+
+                Text("\(account.messages.count) 条验证短信 · \(account.senderCount) 个发送号码")
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
             }
 
             Spacer(minLength: 0)
@@ -96,7 +102,7 @@ struct AccountDetailView: View {
                 Button {
                     isEditing = true
                 } label: {
-                    Label("编辑账号与手机号", systemImage: "pencil")
+                    Label("编辑凭证信息", systemImage: "pencil")
                 }
                 Button {
                     exportMessages()
@@ -107,7 +113,7 @@ struct AccountDetailView: View {
                 Button(role: .destructive) {
                     isConfirmingDelete = true
                 } label: {
-                    Label("删除账号", systemImage: "trash")
+                    Label("删除凭证", systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")

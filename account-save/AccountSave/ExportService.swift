@@ -1,15 +1,15 @@
 import Foundation
 
-/// 导出账号列表与短信。
+/// 导出凭证清单与短信。
 enum ExportService {
-    /// 账号列表：`.xlsx`，Excel / Numbers 可直接打开查看。
+    /// 凭证清单：`.xlsx`，Excel / Numbers 可直接打开查看。
     static func exportAccounts(_ accounts: [Account]) throws -> URL {
         var rows: [[String]] = [["账号名", "注册手机号"]]
         for account in accounts.sorted(by: { $0.createdAt < $1.createdAt }) {
             rows.append([account.name, account.phoneNumber])
         }
-        let data = Spreadsheet.makeXLSX(sheetName: "账号列表", rows: rows)
-        return try write(data, named: "账号列表_\(DateText.stamp()).xlsx")
+        let data = Spreadsheet.makeXLSX(sheetName: "凭证清单", rows: rows)
+        return try write(data, named: "凭证清单_\(DateText.stamp()).xlsx")
     }
 
     /// 全部短信：CSV 文本，Excel / Numbers / WPS 均可直接打开。
@@ -30,7 +30,7 @@ enum ExportService {
         }
 
         let csv = "\u{FEFF}" + lines.joined(separator: "\r\n") + "\r\n"
-        return try write(Data(csv.utf8), named: "短信_\(DateText.stamp()).csv")
+        return try write(Data(csv.utf8), named: "验证短信_\(DateText.stamp()).csv")
     }
 
     private static func write(_ data: Data, named name: String) throws -> URL {

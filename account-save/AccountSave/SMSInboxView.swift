@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// 短信收纳盒：按账号分组的短信列表。
+/// 凭证存储：按账号分组，记录每个账号用哪个手机号注册。
 struct SMSInboxView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Account.createdAt, order: .reverse) private var accounts: [Account]
@@ -15,11 +15,11 @@ struct SMSInboxView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("短信收纳盒")
+                .navigationTitle("凭证存储")
                 .searchable(
                     text: $searchText,
                     placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "搜索短信或商家"
+                    prompt: "搜索账号、手机号或短信"
                 )
                 .toolbar { toolbarContent }
         }
@@ -35,14 +35,14 @@ struct SMSInboxView: View {
             Text(exportError ?? "")
         }
         .alert(
-            "删除商家会话?",
+            "删除凭证?",
             isPresented: isConfirmingAccountDelete,
             presenting: accountToDelete
         ) { account in
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) { delete(account) }
         } message: { account in
-            Text("将删除 \(account.name) 的会话和所有短信。")
+            Text("将删除 \(account.name) 及其下所有记录。")
         }
     }
 
@@ -50,9 +50,9 @@ struct SMSInboxView: View {
     private var content: some View {
         if accounts.isEmpty {
             ContentUnavailableView {
-                Label("还没有保存短信", systemImage: "tray")
+                Label("还没有保存凭证", systemImage: "lock.shield")
             } description: {
-                Text("在「快捷指令」中添加「导入商家短信」动作后，收到的短信会自动保存到这里。")
+                Text("在「快捷指令」中添加「保存登录凭证短信」动作，收到的账号验证码短信会自动归档到这里。")
             } actions: {
                 Button("查看配置步骤") { isShowingGuide = true }
             }
@@ -86,18 +86,18 @@ struct SMSInboxView: View {
                 Button {
                     isShowingGuide = true
                 } label: {
-                    Label("配置导入", systemImage: "questionmark.circle")
+                    Label("配置快捷指令", systemImage: "questionmark.circle")
                 }
                 Divider()
                 Button {
                     export(kind: .accounts)
                 } label: {
-                    Label("导出账号列表（Excel）", systemImage: "tablecells")
+                    Label("导出账号清单（Excel）", systemImage: "tablecells")
                 }
                 Button {
                     export(kind: .messages)
                 } label: {
-                    Label("导出短信（CSV）", systemImage: "doc.text")
+                    Label("导出全部短信（CSV）", systemImage: "doc.text")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -169,41 +169,59 @@ struct SMSInboxView: View {
     }
 }
 
-/// 列表行：图标 + 账号名 + 最近一条短信 + 时间。
+/// 凭证列表行：图标 + 账号名 + 注册手机号（优先）/ 短信预览 + 时间。
 struct AccountRowView: View {
     let account: Account
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             MerchantIconView(name: account.name, size: 46)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(account.name)
                     .font(.system(size: 17, weight: .semibold))
                     .lineLimit(1)
-                Text(preview)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
+
+                if !account.phoneNumber.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                            .font(.system(size: 12))
+                        Text(account.phoneNumber)
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
                     .lineLimit(1)
+                } else {
+                    Text(preview)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 8)
 
-            Text(timestampText)
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(timestampText)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                Text("\(account.messages.count) 条")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
     }
 
     private var preview: String {
-        guard let message = account.latestMessage else { return "暂无短信" }
+        guard let message = account.latestMessage else { return "还没有短信记录" }
         return message.content.replacingOccurrences(of: "\n", with: " ")
     }
 
     private var timestampText: String {
-        guard let message = account.latestMessage else { return "" }
+        guard let message = account.latestMessage else {
+            return DateText.relative(account.createdAt)
+        }
         return DateText.relative(message.receivedAt)
     }
 }
