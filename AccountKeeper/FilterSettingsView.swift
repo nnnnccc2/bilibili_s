@@ -166,6 +166,10 @@ struct FilterSettingsView: View {
                 miniStat(label: "关键词拦截", value: store.settings.stats.byKeyword, color: .cyan)
                 miniStat(label: "标签(Tag)拦截", value: store.settings.stats.byTag, color: .indigo)
             }
+
+            Text("构建 \(Bundle.main.object(forInfoDictionaryKey: "BuildCompileTime") as? String ?? "未知") · 上次首页 带tag \(store.feedDiagnostics.withTags)/\(store.feedDiagnostics.total) 条")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
         }
         .padding(16)
         .background(Color.white.opacity(0.7))

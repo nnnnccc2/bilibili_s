@@ -408,8 +408,9 @@ final class BiliAPI {
     ///
     /// 这里对缺少分区 ID 的视频补拉 `/x/web-interface/view`（tid / 分区名 / 简介 / 时长），
     /// 对缺少 tag 的视频补拉 `/x/tag/archive/tags`（体积仅约 2KB/条）。
+    /// 两者**并行**发起，避免"详情 → tag"串行把耗时翻倍导致兜底超时先触发、tag 丢失。
     /// 直播房间号、影视 season_id 等非 BV 形态的 ID 直接跳过。
-    /// 6 秒兜底超时，避免个别慢请求卡住首页。completion 始终在主线程回调。
+    /// 12 秒兜底超时，避免个别慢请求卡住首页。completion 始终在主线程回调。
     func enrichMetadata(_ videos: [Video], completion: @escaping ([Video]) -> Void) {
         let targets = videos.indices.filter {
             videos[$0].id.hasPrefix("BV") && (videos[$0].tid == 0 || videos[$0].tags.isEmpty)
@@ -422,8 +423,6 @@ final class BiliAPI {
         var result = videos
         let lock = NSLock()
         let group = DispatchGroup()
-        let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = 6
         var didFinish = false
 
         let finishOnce: () -> Void = {
@@ -438,65 +437,53 @@ final class BiliAPI {
             DispatchQueue.main.async { completion(output) }
         }
 
-        // 兜底：6 秒内未全部返回也先交付已有数据，绝不卡住首页。
-        DispatchQueue.global().asyncAfter(deadline: .now() + 6) { finishOnce() }
+        // 兜底：12 秒内未全部返回也先交付已有数据，绝不卡住首页。
+        DispatchQueue.global().asyncAfter(deadline: .now() + 12) { finishOnce() }
 
         for index in targets {
             let bvid = videos[index].id
-            let needDetail = videos[index].tid == 0
-            let needTags = videos[index].tags.isEmpty
-            group.enter()
-            queue.addOperation { [weak self] in
-                guard let self = self else {
-                    group.leave()
-                    return
-                }
-                // 同一条视频的两次补拉串行执行，OperationQueue 的并发度仍按视频数控制。
-                let inner = DispatchGroup()
 
-                if needDetail {
-                    inner.enter()
-                    self.request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid]) { data, _, _ in
-                        defer { inner.leave() }
-                        guard let json = self.parseJSON(data),
-                              let d = json["data"] as? [String: Any] else { return }
-                        let tid = self.parseTid(d["tid"])
-                        let tname = d["tname"] as? String ?? ""
-                        let desc = d["desc"] as? String ?? ""
-                        let duration = d["duration"] as? Int ?? 0
-                        let aid = d["aid"] as? Int ?? 0
-                        let cid = d["cid"] as? Int ?? 0
-                        lock.lock()
-                        if tid != 0 { result[index].tid = tid }
-                        if result[index].category.isEmpty {
-                            result[index].category = tname.isEmpty ? (BiliZone.leafName(tid) ?? "") : tname
-                        }
-                        if result[index].desc.isEmpty { result[index].desc = desc }
-                        if result[index].duration == 0 { result[index].duration = duration }
-                        if result[index].aid == 0 { result[index].aid = aid }
-                        if result[index].cid == 0 { result[index].cid = cid }
-                        lock.unlock()
+            if videos[index].tid == 0 {
+                group.enter()
+                request("https://api.bilibili.com/x/web-interface/view", params: ["bvid": bvid]) { [weak self] data, _, _ in
+                    defer { group.leave() }
+                    guard let self = self,
+                          let json = self.parseJSON(data),
+                          let d = json["data"] as? [String: Any] else { return }
+                    let tid = self.parseTid(d["tid"])
+                    let tname = d["tname"] as? String ?? ""
+                    let desc = d["desc"] as? String ?? ""
+                    let duration = d["duration"] as? Int ?? 0
+                    let aid = d["aid"] as? Int ?? 0
+                    let cid = d["cid"] as? Int ?? 0
+                    lock.lock()
+                    if tid != 0 { result[index].tid = tid }
+                    if result[index].category.isEmpty {
+                        result[index].category = tname.isEmpty ? (BiliZone.leafName(tid) ?? "") : tname
                     }
+                    if result[index].desc.isEmpty { result[index].desc = desc }
+                    if result[index].duration == 0 { result[index].duration = duration }
+                    if result[index].aid == 0 { result[index].aid = aid }
+                    if result[index].cid == 0 { result[index].cid = cid }
+                    lock.unlock()
                 }
+            }
 
-                if needTags {
-                    inner.enter()
-                    self.request("https://api.bilibili.com/x/tag/archive/tags", params: ["bvid": bvid]) { data, _, _ in
-                        defer { inner.leave() }
-                        guard let json = self.parseJSON(data),
-                              let list = json["data"] as? [[String: Any]] else { return }
-                        let names = list.compactMap { $0["tag_name"] as? String }
-                            .map { $0.trimmingCharacters(in: .whitespaces) }
-                            .filter { !$0.isEmpty }
-                        guard !names.isEmpty else { return }
-                        lock.lock()
-                        if result[index].tags.isEmpty { result[index].tags = names }
-                        lock.unlock()
-                    }
+            if videos[index].tags.isEmpty {
+                group.enter()
+                request("https://api.bilibili.com/x/tag/archive/tags", params: ["bvid": bvid]) { [weak self] data, _, _ in
+                    defer { group.leave() }
+                    guard let self = self,
+                          let json = self.parseJSON(data),
+                          let list = json["data"] as? [[String: Any]] else { return }
+                    let names = list.compactMap { $0["tag_name"] as? String }
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                    guard !names.isEmpty else { return }
+                    lock.lock()
+                    if result[index].tags.isEmpty { result[index].tags = names }
+                    lock.unlock()
                 }
-
-                inner.wait()
-                group.leave()
             }
         }
 

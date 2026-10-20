@@ -17,6 +17,17 @@ final class AppStore: ObservableObject {
     @Published var history: [HistoryItem] = []
     @Published var lastBlockedCount: Int = 0
 
+    /// 首页数据诊断：本次拉取到的视频总数 / 已带回 tag 的条数 / 已带回分区 tid 的条数。
+    /// 用来在设备上直接确认「元数据补拉」是否真的成功（tag 全 0 = 补拉失败）。
+    struct FeedDiagnostics {
+        var total: Int = 0
+        var withTags: Int = 0
+        var withTid: Int = 0
+    }
+    @Published var feedDiagnostics = FeedDiagnostics()
+    /// 本次拉取中被 Tag 规则拦下的条数（用于确认 Tag 过滤是否命中）。
+    @Published var lastTagBlockedCount: Int = 0
+
     /// Number of immersive full-screen overlays currently presented
     /// (video player, UP空间, 设置, 搜索...). When > 0 the bottom tab bar hides
     /// so the overlay covers the whole screen. Uses a counter because overlays

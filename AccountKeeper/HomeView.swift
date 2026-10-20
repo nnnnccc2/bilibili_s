@@ -119,7 +119,7 @@ struct HomeView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "shield.lefthalf.filled")
                         .foregroundColor(.biliBlue)
-                    Text("已为你净化 \(store.lastBlockedCount) 条低质内容")
+                    Text("已为你净化 \(store.lastBlockedCount) 条低质内容 · Tag 补全 \(store.feedDiagnostics.withTags)/\(store.feedDiagnostics.total)")
                         .font(.caption)
                         .foregroundStyle(Color.biliSubtext)
                     Spacer()
@@ -134,6 +134,21 @@ struct HomeView: View {
                 .padding(.vertical, 6)
                 .background(Color.biliBlue.opacity(0.08))
                 .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            // 数据诊断条：确认元数据补拉是否成功（带 tag / 带分区 的条数）。
+            // Tag 全为 0 说明补拉失败，此时任何 Tag 规则都不可能命中。
+            if store.feedDiagnostics.total > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform.path.ecg")
+                        .foregroundColor(.secondary)
+                    Text("数据诊断 共\(store.feedDiagnostics.total)条 · 带tag \(store.feedDiagnostics.withTags) · 带分区 \(store.feedDiagnostics.withTid) · Tag拦截 \(store.lastTagBlockedCount)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
             }
 
             if isLoading || !hasLoadedOnce {
@@ -206,6 +221,13 @@ struct HomeView: View {
         BiliAPI.shared.fetchHome(category: category, page: page) { raw in
             DispatchQueue.main.async {
                 rawVideos = raw
+                store.feedDiagnostics = AppStore.FeedDiagnostics(
+                    total: raw.count,
+                    withTags: raw.filter { !$0.tags.isEmpty }.count,
+                    withTid: raw.filter { $0.tid != 0 }.count
+                )
+                let engine = store.engine
+                store.lastTagBlockedCount = raw.filter { engine.shouldBlock($0) == .tagBlocked }.count
                 let filtered = store.applyFilter(raw)
                 videos = filtered
                 isLoading = false
