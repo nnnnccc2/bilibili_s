@@ -195,6 +195,46 @@ abstract final class MiniBiliTheme {
         color: MiniBiliColors.biliBorder,
         thickness: 0.5,
       ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: MiniBiliColors.biliBlue,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: MiniBiliColors.biliText,
+        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: MiniBiliColors.biliCard,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: MiniBiliColors.biliMutedSurface,
+        selectedColor: MiniBiliColors.biliBlue.withOpacity(0.12),
+        labelStyle: const TextStyle(
+          fontSize: 13,
+          color: MiniBiliColors.biliText,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          fontSize: 13,
+          color: MiniBiliColors.biliBlue,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
       textTheme: const TextTheme(
         titleLarge: TextStyle(
           fontSize: 20,
@@ -338,6 +378,46 @@ abstract final class MiniBiliTheme {
         unselectedItemColor: MiniBiliColors.biliMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: MiniBiliColors.biliBlue,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: const Color(0xFF1E293B),
+        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: const Color(0xFF1E293B),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: const Color(0xFF334155),
+        selectedColor: MiniBiliColors.biliBlue.withOpacity(0.2),
+        labelStyle: const TextStyle(
+          fontSize: 13,
+          color: Colors.white,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          fontSize: 13,
+          color: MiniBiliColors.biliBlue,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }
