@@ -104,7 +104,8 @@ jobs:
           APP_PATH="${{ steps.find_app.outputs.app_path }}"
           MISSING=0
           for s in "通用关键词过滤" "B站分区屏蔽" "标签屏蔽 (Tag)" "一键屏蔽高频低质区"; do
-            if strings "$APP_PATH/BiliBili" | grep -q "$s"; then
+            # 用 grep -a 而不是 strings：strings 默认不输出 UTF-8 中文，会误报缺失。
+            if grep -aq "$s" "$APP_PATH/BiliBili"; then
               echo "OK   $s"
             else
               echo "::error::missing feature string: $s"
