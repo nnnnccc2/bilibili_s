@@ -46,6 +46,7 @@ abstract final class MiniBiliColors {
 /// - 主色 biliBlue，背景 biliBackground
 /// - 卡片圆角 16，细边框
 /// - 全局去除 Material 水波纹，按钮/输入框/标签栏统一 MiniBili 风格
+/// - 覆盖 FAB/SnackBar/Dialog/Chip/ListTile/PopupMenu 主题
 abstract final class MiniBiliTheme {
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(
