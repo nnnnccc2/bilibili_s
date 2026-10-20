@@ -166,3 +166,13 @@ jobs:
             --notes-file RELEASE_NOTES.md
           echo "Release created successfully"
           gh release view latest --json assets --jq '.assets[].name'
+
+          # 同时发布到 bilibili-latest：main 分支上的旧工作流只会覆盖 latest，
+          # 不会碰这个 tag，因此它是唯一稳定的下载地址。
+          echo "Mirroring to stable tag 'bilibili-latest'..."
+          gh release delete bilibili-latest --yes --cleanup-tag 2>/dev/null || true
+          sleep 1
+          gh release create bilibili-latest BiliBili.ipa \
+            --title "BiliBili 稳定构建（含完整过滤）" \
+            --notes-file RELEASE_NOTES.md
+          gh release view bilibili-latest --json assets --jq '.assets[].name'
