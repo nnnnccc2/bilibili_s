@@ -71,6 +71,18 @@ jobs:
         run: git apply $GITHUB_WORKSPACE/BiliBili-G/lib/scripts/mouse_cursor_patch.diff || true
         continue-on-error: true
 
+      - name: Clean Flutter + Xcode + CocoaPods caches (force fresh rebuild)
+        run: |
+          set -e
+          echo "=== Flutter clean ==="
+          flutter clean || true
+          rm -rf build/ .dart_tool/ .flutter-plugins-dependencies ios/.symlinks ios/Flutter/Flutter.podspec ios/Flutter/Flutter.framework ios/Flutter/Flutter.podspec || true
+          echo "=== CocoaPods clean ==="
+          rm -rf ios/Pods ios/Podfile.lock || true
+          echo "=== Xcode DerivedData clean ==="
+          rm -rf ~/Library/Developer/Xcode/DerivedData/* || true
+          echo "=== All caches cleaned ==="
+
       - name: Flutter pub get
         run: flutter pub get
 
@@ -177,6 +189,12 @@ jobs:
           done
           echo "chat_bottom_container patch complete"
 
+      - name: Pre-build final DerivedData sweep
+        run: |
+          echo "=== Final Xcode DerivedData sweep before build ==="
+          rm -rf ~/Library/Developer/Xcode/DerivedData/* || true
+          echo "Done"
+
       - name: Build iOS (release, unsigned)
         run: |
           flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json
@@ -202,6 +220,11 @@ jobs:
           COMPILE_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           /usr/libexec/PlistBuddy -c "Add :BuildCompileTime string '$COMPILE_TIME'" "Payload/BiliBili-G.app/Info.plist" 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :BuildCompileTime '$COMPILE_TIME'" "Payload/BiliBili-G.app/Info.plist"
+          # Inject commit hash (unique build fingerprint)
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          /usr/libexec/PlistBuddy -c "Add :BuildCommit string '$COMMIT_HASH'" "Payload/BiliBili-G.app/Info.plist" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :BuildCommit '$COMMIT_HASH'" "Payload/BiliBili-G.app/Info.plist"
+          echo "Build fingerprint: commit=$COMMIT_HASH time=$COMPILE_TIME"
           # Package IPA
           zip -r9 BiliBili-G.ipa Payload/ -x "*.DS_Store"
           echo "IPA created: BiliBili-G.ipa"
@@ -224,27 +247,35 @@ jobs:
           gh release delete bilibili-g-latest --yes --cleanup-tag 2>/dev/null || echo "No existing release to delete"
           sleep 2
           COMPILE_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          BUILD_TAG=$(date -u '+%Y%m%d-%H%M%S')
+          COMMIT_HASH=$(git rev-parse --short HEAD)
           cat > RELEASE_NOTES.md <<NOTES_EOF
-          # BiliBili-G iOS 18 — PiliPlus 内核 + MiniBili 风格
+          # BiliBili-G iOS 18 — CLEAN MiniBili Build
+
+          **唯一标记：$BUILD_TAG | commit $COMMIT_HASH | $COMPILE_TIME**
 
           | 项目 | 值 |
           |------|-----|
+          | 版本 | $BUILD_TAG |
+          | Commit | $COMMIT_HASH |
+          | 编译时间 | $COMPILE_TIME |
           | 内核 | PiliPlus (Flutter) |
           | UI 风格 | MiniBili |
           | 架构 | arm64 |
-          | 部署目标 | iOS 18.0 |
-          | 编译时间 | $COMPILE_TIME |
+          | 最低系统 | iOS 18.0 |
           | 签名方式 | ad-hoc |
+          | 构建类型 | CLEAN (flutter clean + DerivedData 全清) |
 
           ## 功能
-          - MiniBili 简约风格界面（biliBlue 主色、浮动胶囊导航、通透卡片）
+          - MiniBili 简约风格界面（biliBlue 主色、浮动胶囊导航、通透卡片、pill 风格标签栏、无 Material 水波纹）
           - PiliPlus 完整功能：推荐、热门、直播、番剧、动态、搜索、播放、弹幕等
           - 二维码登录、观看历史、收藏、下载
 
           ## 安装
+          **请先彻底卸载旧版 BiliBili-G 再安装**，避免 iOS 覆盖安装缓存旧内核。
           使用 Sideloadly / AltStore 配合 Apple ID 重签名后安装。
           NOTES_EOF
           gh release create bilibili-g-latest BiliBili-G.ipa \
-            --title "BiliBili-G Latest Build (PiliPlus + MiniBili)" \
+            --title "BiliBili-G CLEAN MiniBili Build $BUILD_TAG ($COMMIT_HASH)" \
             --notes-file RELEASE_NOTES.md
-          gh release view bilibili-g-latest --json assets --jq '.assets[].name'
+          gh release view bilibili-g-latest --json assets,tagName,name --jq '{name:.name, tag:.tagName, assets:[.assets[].name]}'
