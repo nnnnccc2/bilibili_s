@@ -3,8 +3,16 @@ name: Build BiliBili IPA
 on:
   push:
     branches: [ main, master ]
+    # 只在本 App 的源码变化时构建。
+    # 否则 account-save 自动化推送 main 时会连带触发本工作流，用一份
+    # 不含过滤功能的源码重新构建并覆盖 latest Release —— 这正是"过滤老是失效"的原因。
+    paths:
+      - 'AccountKeeper/**'
+      - '.github/workflows/build-ipa.yml'
   pull_request:
     branches: [ main, master ]
+    paths:
+      - 'AccountKeeper/**'
   workflow_dispatch:
 
 jobs:
@@ -90,6 +98,23 @@ jobs:
           ls -la BiliBili.ipa
           echo "=== IPA contents ==="
           unzip -l BiliBili.ipa
+
+      - name: Verify filter features are compiled in
+        run: |
+          APP_PATH="${{ steps.find_app.outputs.app_path }}"
+          MISSING=0
+          for s in "通用关键词过滤" "B站分区屏蔽" "标签屏蔽 (Tag)" "一键屏蔽高频低质区"; do
+            if strings "$APP_PATH/BiliBili" | grep -q "$s"; then
+              echo "OK   $s"
+            else
+              echo "::error::missing feature string: $s"
+              MISSING=1
+            fi
+          done
+          if [ "$MISSING" -ne 0 ]; then
+            echo "构建产物缺少过滤功能，拒绝发布。"
+            exit 1
+          fi
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
