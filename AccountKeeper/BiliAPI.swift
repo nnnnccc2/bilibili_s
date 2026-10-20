@@ -241,7 +241,12 @@ final class BiliAPI {
     
     /// App-side signature: add appkey + ts, sort by key, URL-encode, append
     /// appsec, MD5 — produces the `sign` field. Mirrors PiliPlus's AppSign.
-    private static func appSign(_ params: [String: String]) -> [String: String] {
+    /// App-side signature: add appkey + ts, sort by key, URL-encode each,
+    /// append appsec, MD5 — produces the `sign` field. Mirrors PiliPlus's AppSign.
+    /// Returns **signed params + the exact query string used for signing** so
+    /// callers can build a percentEncodedQuery directly and avoid URLQueryItem
+    /// re-encoding the already-encoded values (which would break the sign).
+    private static func appSign(_ params: [String: String]) -> (params: [String: String], percentEncodedQuery: String) {
         var p = params
         p["appkey"] = appKey
         p["ts"] = String(Int(Date().timeIntervalSince1970))
@@ -253,7 +258,9 @@ final class BiliAPI {
         }.joined(separator: "&")
         let sign = (query + appSec).data(using: .utf8)?.md5() ?? ""
         p["sign"] = sign
-        return p
+        // Append sign to the percent-encoded query so callers can use it verbatim.
+        let finalQuery = query + "&sign=" + sign
+        return (p, finalQuery)
     }
 
     private func request(_ urlString: String, params: [String: String] = [:], useWBI: Bool = false, useAppUA: Bool = false, useAppSign: Bool = false, forceWBIRefresh: Bool = false, referer: String? = nil, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
@@ -267,10 +274,17 @@ final class BiliAPI {
                 var comps = URLComponents(string: urlString)
                 comps?.percentEncodedQuery = signed
                 url = comps?.url
-            } else {
-                let finalParams = useAppSign ? Self.appSign(params) : params
+            } else if useAppSign {
+                // App-signed query string is also pre-percent-encoded by appSign;
+                // use percentEncodedQuery directly to avoid URLQueryItem mangling
+                // the already-signed value (it would re-encode `+` → `%2B`, etc.).
+                let (_, percentEncodedQuery) = Self.appSign(params)
                 var comps = URLComponents(string: urlString)
-                comps?.queryItems = finalParams.map { URLQueryItem(name: $0.key, value: $0.value) }
+                comps?.percentEncodedQuery = percentEncodedQuery
+                url = comps?.url
+            } else {
+                var comps = URLComponents(string: urlString)
+                comps?.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
                 url = comps?.url
             }
             guard let finalURL = url else {
@@ -1114,7 +1128,7 @@ final class BiliAPI {
     /// triggers the web WBI risk-control (-352 / -799) that left most UP主 lists
     /// blank, returns code=0 reliably, and supports pn/ps pagination. Falls back
     /// to the web WBI endpoint when the app endpoint yields nothing.
-    func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int) -> Void) {
+    func fetchUPVideos(mid: Int, page: Int = 1, pageSize: Int = 30, completion: @escaping ([Video], Int, String?) -> Void) {
         let params: [String: String] = [
             "vmid": String(mid),
             "ps": String(pageSize),
@@ -1125,18 +1139,20 @@ final class BiliAPI {
             "build": "7540000"
         ]
         request("https://app.bilibili.com/x/v2/space/archive",
-                params: params, useAppUA: true, useAppSign: true) { [weak self] data, _, _ in
-            let (videos, total) = self?.parseUPVideosApp(data, mid: mid) ?? ([], 0)
+                params: params, useAppUA: true, useAppSign: true,
+                referer: "https://space.bilibili.com/\(mid)/video") { [weak self] data, _, _ in
+            let (videos, total, code, msg) = self?.parseUPVideosApp(data, mid: mid) ?? ([], 0, -1, "parse failed")
             if !videos.isEmpty {
-                DispatchQueue.main.async { completion(videos, total) }
+                DispatchQueue.main.async { completion(videos, total, nil) }
             } else {
-                // App endpoint gave nothing — try the web WBI endpoint as backup.
-                self?.fetchUPVideosWBI(mid: mid, page: page, pageSize: pageSize, retry: 4, completion: completion)
+                // App endpoint gave nothing or error — fallback to web WBI.
+                let appErr = "App \(code): \(msg)"
+                self?.fetchUPVideosWBI(mid: mid, page: page, pageSize: pageSize, retry: 4, priorError: appErr, completion: completion)
             }
         }
     }
 
-    private func fetchUPVideosWBI(mid: Int, page: Int, pageSize: Int, retry: Int, completion: @escaping ([Video], Int) -> Void) {
+    private func fetchUPVideosWBI(mid: Int, page: Int, pageSize: Int, retry: Int, priorError: String, completion: @escaping ([Video], Int, String?) -> Void) {
         let params: [String: String] = [
             "mid": String(mid),
             "ps": String(pageSize),
@@ -1146,17 +1162,21 @@ final class BiliAPI {
             "web_location": "1550101",
             "order_avoided": "true"
         ]
-        // On retries, force a fresh WBI key fetch in case the cached keys are stale.
         let forceRefresh = retry < 4
         request("https://api.bilibili.com/x/space/wbi/arc/search", params: params, useWBI: true, useAppUA: false, forceWBIRefresh: forceRefresh, referer: "https://space.bilibili.com/\(mid)/video") { [weak self] data, _, _ in
             let (videos, total, code, msg) = self?.parseUPVideosDebug(data) ?? ([], 0, -1, "parse failed")
             print("[BiliBili] fetchUPVideos mid=\(mid) page=\(page) retry=\(retry) code=\(code) msg=\(msg) count=\(videos.count)")
             if videos.isEmpty && retry > 0 {
                 DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
-                    self?.fetchUPVideosWBI(mid: mid, page: page, pageSize: pageSize, retry: retry - 1, completion: completion)
+                    self?.fetchUPVideosWBI(mid: mid, page: page, pageSize: pageSize, retry: retry - 1, priorError: priorError, completion: completion)
                 }
             } else {
-                DispatchQueue.main.async { completion(videos, total) }
+                // If WBI also gave nothing, surface a combined error so the UI can
+                // distinguish "this UP主 has no videos" from "network blocked us".
+                let finalErr: String? = videos.isEmpty
+                    ? "加载失败（\(priorError) / WBI \(code): \(msg)）"
+                    : nil
+                DispatchQueue.main.async { completion(videos, total, finalErr) }
             }
         }
     }
@@ -1766,10 +1786,19 @@ private extension BiliAPI {
 
     /// Parse the app endpoint /x/v2/space/archive response (data.item[]).
     /// Fields: title / cover / duration(sec) / play / danmaku / ctime / author / bvid / first_cid.
-    func parseUPVideosApp(_ data: Data?, mid: Int) -> ([Video], Int) {
-        guard let json = parseJSON(data),
+    /// Parse the app endpoint /x/v2/space/archive response (data.item[]).
+    /// Fields: title / cover / duration(sec) / play / danmaku / ctime / author / bvid / first_cid.
+    /// Returns videos + total + (code, msg) for fallback decision-making.
+    func parseUPVideosApp(_ data: Data?, mid: Int) -> ([Video], Int, Int, String) {
+        guard let json = parseJSON(data) else { return ([], 0, -1, "parseJSON nil") }
+        let code = json["code"] as? Int ?? -1
+        let msg = json["message"] as? String ?? ""
+        guard code == 0,
               let d = json["data"] as? [String: Any],
-              let items = d["item"] as? [[String: Any]] else { return ([], 0) }
+              let items = d["item"] as? [[String: Any]] else {
+            print("[BiliBili] parseUPVideosApp code=\(code) msg=\(msg)")
+            return ([], 0, code, msg)
+        }
         let total = d["count"] as? Int ?? items.count
         let videos = items.compactMap { item -> Video? in
             guard let bvid = item["bvid"] as? String,
@@ -1792,7 +1821,8 @@ private extension BiliAPI {
                 cid: item["first_cid"] as? Int ?? 0
             )
         }
-        return (videos, total > 0 ? total : videos.count)
+        print("[BiliBili] parseUPVideosApp code=0 count=\(videos.count) total=\(total)")
+        return (videos, total > 0 ? total : videos.count, code, msg)
     }
 
     func parsePlayURL(_ data: Data?) -> URL? {

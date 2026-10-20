@@ -125,3 +125,14 @@ enum BlockReason: String, Codable, CaseIterable {
         }
     }
 }
+
+// MARK: - Navigation destination for pushing to a UP主's space
+
+/// Lightweight identifier for navigating to a UP主's space via NavigationStack.
+/// Carries just enough to render the navigation title instantly; full profile
+/// data is fetched by `UPSpaceView` on appear.
+struct UPTarget: Identifiable, Hashable {
+    let mid: Int
+    let name: String
+    var id: Int { mid }
+}

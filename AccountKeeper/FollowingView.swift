@@ -15,9 +15,7 @@ struct FollowingView: View {
     @State private var rawVideos: [Video] = []
     @State private var isLoading = false
     @State private var selectedVideo: Video?
-    @State private var selectedUPMid: Int = 0
-    @State private var selectedUPName: String = ""
-    @State private var showingUPSpace = false
+    @State private var selectedUP: UPTarget?
 
     enum FollowTab: String, CaseIterable, Identifiable {
         case all = "综合"
@@ -81,14 +79,14 @@ struct FollowingView: View {
                                         onTap: { selectedVideo = video },
                                         onTapUP主: {
                                             if video.upMid > 0 {
-                                                selectedUPMid = video.upMid
-                                                selectedUPName = video.upName
-                                                showingUPSpace = true
+                                                selectedUP = UPTarget(mid: video.upMid, name: video.upName)
                                             }
                                         }
                                     )
+                                    .transition(.cardEnter)
                                 }
                             }
+                            .animation(MiniBiliAnimation.cardEnter, value: videos.count)
                             .padding(.horizontal, 8)
                             .padding(.top, 8)
                             .padding(.bottom, 20)
@@ -125,12 +123,10 @@ struct FollowingView: View {
                 .ignoresSafeArea()
                 .presentationBackground(.black)
         }
-        // UP 空间：系统全屏模态。
-        .fullScreenCover(isPresented: $showingUPSpace) {
-            if selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
-                    .environmentObject(store)
-            }
+        // UP 空间：NavigationStack push，避免嵌套模态空白。
+        .navigationDestination(item: $selectedUP) { up in
+            UPSpaceView(mid: up.mid, initialName: up.name)
+                .environmentObject(store)
         }
         .onAppear { if videos.isEmpty { load() } }
         .onChange(of: store.settings) { _, _ in

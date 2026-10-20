@@ -21,43 +21,44 @@ struct HomeView: View {
     @State private var hasMore = true
     @State private var selectedVideo: Video?
     @State private var lastRefreshDate = Date.distantPast
-    @State private var selectedUPMid: Int = 0
-    @State private var selectedUPName: String = ""
-    @State private var showingUPSpace = false
+    @State private var selectedUP: UPTarget?
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color.biliHero.ignoresSafeArea()
+        NavigationStack {
+            ZStack(alignment: .top) {
+                Color.biliHero.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                header
-                contentBoard
+                VStack(spacing: 0) {
+                    header
+                    contentBoard
+                }
             }
-        }
-        // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
-        .fullScreenCover(item: $selectedVideo) { video in
-            VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
-                .environmentObject(store)
-                .ignoresSafeArea()
-                .presentationBackground(.black)
-        }
-        // UP 空间：系统全屏模态。
-        .fullScreenCover(isPresented: $showingUPSpace) {
-            if selectedUPMid > 0 {
-                UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
+            .navigationBarBackButtonHidden(true)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            // 播放器：系统全屏模态（原生滑入 / 可下拉返回）。
+            .fullScreenCover(item: $selectedVideo) { video in
+                VideoPlayerView(video: video, onDismiss: { selectedVideo = nil })
+                    .environmentObject(store)
+                    .ignoresSafeArea()
+                    .presentationBackground(.black)
+            }
+            // UP 空间：NavigationStack push（和搜索页保持一致，避免嵌套模态空白）。
+            .navigationDestination(item: $selectedUP) { up in
+                UPSpaceView(mid: up.mid, initialName: up.name)
                     .environmentObject(store)
             }
-        }
-        .onAppear {
-            // Refresh if never loaded or stale (>30s)
-            if videos.isEmpty || Date().timeIntervalSince(lastRefreshDate) > 30 {
-                loadVideos(force: true)
+            .onAppear {
+                // Refresh if never loaded or stale (>30s)
+                if videos.isEmpty || Date().timeIntervalSince(lastRefreshDate) > 30 {
+                    loadVideos(force: true)
+                }
             }
-        }
-        .onChange(of: store.settings) { _, _ in
-            // Re-apply filter live when the user toggles a rule.
-            // countStats:false avoids double-counting already-counted blocks.
-            videos = store.applyFilter(rawVideos, countStats: false)
+            .onChange(of: store.settings) { _, _ in
+                // Re-apply filter live when the user toggles a rule.
+                // countStats:false avoids double-counting already-counted blocks.
+                videos = store.applyFilter(rawVideos, countStats: false)
+            }
         }
     }
 
@@ -154,12 +155,11 @@ struct HomeView: View {
                                 onTap: { selectedVideo = video },
                                 onTapUP主: {
                                     if video.upMid > 0 {
-                                        selectedUPMid = video.upMid
-                                        selectedUPName = video.upName
-                                        showingUPSpace = true
+                                        selectedUP = UPTarget(mid: video.upMid, name: video.upName)
                                     }
                                 }
                             )
+                            .transition(.cardEnter)
                             .onAppear {
                                 guard hasMore, !isLoadingMore else { return }
                                 // Pre-load when within the last 4 items so
@@ -172,6 +172,7 @@ struct HomeView: View {
                             }
                         }
                     }
+                    .animation(MiniBiliAnimation.cardEnter, value: videos.count)
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                     .padding(.bottom, 24)

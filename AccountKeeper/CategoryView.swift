@@ -17,9 +17,7 @@ struct CategoryView: View {
     @State private var page = 1
     @State private var hasMore = true
     @State private var selectedVideo: Video?
-    @State private var selectedUPMid: Int = 0
-    @State private var selectedUPName: String = ""
-    @State private var showingUPSpace = false
+    @State private var selectedUP: UPTarget?
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
@@ -104,9 +102,8 @@ struct CategoryView: View {
                                         onTap: { selectedVideo = video },
                                         onTapUP主: {
                                             if video.upMid > 0 {
-                                                selectedUPMid = video.upMid
-                                                selectedUPName = video.upName
-                                                showingUPSpace = true
+                                                
+                                                selectedUP = UPTarget(mid: video.upMid, name: video.upName)
                                             }
                                         }
                                     )
@@ -166,12 +163,10 @@ struct CategoryView: View {
                     .ignoresSafeArea()
                     .presentationBackground(.black)
             }
-            // UP 空间：系统全屏模态。
-            .fullScreenCover(isPresented: $showingUPSpace) {
-                if selectedUPMid > 0 {
-                    UPSpaceView(mid: selectedUPMid, initialName: selectedUPName, onDismiss: { showingUPSpace = false })
-                        .environmentObject(store)
-                }
+            // UP 空间：NavigationStack push，避免嵌套模态空白。
+            .navigationDestination(item: $selectedUP) { up in
+                UPSpaceView(mid: up.mid, initialName: up.name)
+                    .environmentObject(store)
             }
         }
     }

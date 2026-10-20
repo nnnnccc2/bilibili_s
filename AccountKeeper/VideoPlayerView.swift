@@ -29,7 +29,7 @@ struct VideoPlayerView: View {
     @State private var showDescFull = false
     @State private var isFollowing = false
     @State private var isFollowBusy = false
-    @State private var showingUPSpace = false
+    @State private var selectedUP: UPTarget?
     @State private var toast: String?
     @State private var aid: Int = 0
     @State private var isSendingComment = false
@@ -189,12 +189,15 @@ struct VideoPlayerView: View {
                 PlayerManager.shared.deactivate(p)
             }
         }
-        // UP 空间：系统全屏模态。
-        .fullScreenCover(isPresented: $showingUPSpace) {
-            if video.upMid > 0 {
-                UPSpaceView(mid: video.upMid, initialName: video.upName, onDismiss: { showingUPSpace = false })
+        // UP 空间：sheet 呈现（可全屏）。VideoPlayerView 本身是 fullScreenCover，
+        // 再 fullScreenCover 会有嵌套空白风险；sheet on fullScreenCover 是安全的。
+        .sheet(item: $selectedUP) { up in
+            NavigationStack {
+                UPSpaceView(mid: up.mid, initialName: up.name)
                     .environmentObject(store)
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.hidden)
         }
         .overlay(alignment: .bottom) {
             if let toast = toast {
@@ -607,7 +610,7 @@ struct VideoPlayerView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    if video.upMid > 0 { showingUPSpace = true }
+                    if video.upMid > 0 { selectedUP = UPTarget(mid: video.upMid, name: video.upName) }
                 } label: {
                     HStack(spacing: 10) {
                         CachedAsyncImage(

@@ -110,19 +110,37 @@ struct PressableCardStyle: ButtonStyle {
 
 // MARK: - Shared animation curves
 
-/// 全局动画曲线：统一使用苹果原生曲线，顺滑、自然、克制。
-/// 全屏页面进出统一交给系统模态动画（fullScreenCover），不再手写缩放。
+/// 全局动画曲线：全部换成弹簧 (spring)，带一点弹性/过冲感，
+/// 比之前的 .snappy / .smooth 更有"活着"的质感。
+/// 全屏页面进出交给系统模态动画（NavigationStack push / fullScreenCover）。
 enum MiniBiliAnimation {
 
-    /// 标签选中反馈：苹果原生 .snappy，干脆利落。
-    static let tabSelect: Animation = .snappy
-    /// 按压反馈：苹果原生 .snappy，响应即时。
-    static let press: Animation = .snappy
+    /// 标签选中反馈：短响应 + 强阻尼 → 干脆的弹性吸附。
+    static let tabSelect: Animation = .spring(response: 0.28, dampingFraction: 0.55, blendDuration: 0)
+    /// 按压反馈：短响应 + 中等阻尼 → 明显的"弹一下"按压感。
+    static let press: Animation = .spring(response: 0.22, dampingFraction: 0.48, blendDuration: 0)
 
-    /// 内容出现（搜索结果、列表）：苹果原生 .smooth。
-    static let contentAppear: Animation = .smooth
-    /// 界面控件显示/隐藏（播放器控制条、就绪态等）：苹果原生 .smooth。
-    static let uiReveal: Animation = .smooth
+    /// 内容出现（搜索结果、视频列表刷新）：稍长响应 + 强阻尼 → 柔和地弹入。
+    static let contentAppear: Animation = .spring(response: 0.5, dampingFraction: 0.78, blendDuration: 0)
+    /// 界面控件显示/隐藏（播放器控制条、就绪态等）：标准弹簧 → 干净、有反馈。
+    static let uiReveal: Animation = .spring(response: 0.35, dampingFraction: 0.65, blendDuration: 0)
+
+    /// 卡片进入屏幕（staggered 配合 opacity+scale transition）：响应稍长。
+    static let cardEnter: Animation = .spring(response: 0.55, dampingFraction: 0.72, blendDuration: 0.1)
+    /// 列表头出现（hero/分区标题等）：长响应 + 强阻尼 → 温柔降临。
+    static let headerDrop: Animation = .spring(response: 0.65, dampingFraction: 0.82, blendDuration: 0)
+}
+
+// MARK: - Card / list transitions
+
+extension AnyTransition {
+    /// 卡片/列表项进场：scale(0.88→1) + opacity(0→1) 组合，比纯 opacity 有更"弹"的感觉。
+    static var cardEnter: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 0.88, anchor: .top).combined(with: .opacity),
+            removal: .opacity
+        )
+    }
 }
 
 // MARK: - Immersive overlay helper
