@@ -1377,7 +1377,8 @@ final class BiliAPI {
                     views: cnt?["play"] as? Int ?? 0,
                     danmaku: cnt?["danmaku"] as? Int ?? 0,
                     publishTime: self.formatTime(item["pubtime"] as? Int ?? 0),
-                    category: "",
+                    category: item["tname"] as? String ?? "",
+                    tags: [],
                     desc: item["intro"] as? String ?? "",
                     likes: 0, coins: 0, favorites: 0, shares: 0,
                     cid: 0
@@ -1483,7 +1484,8 @@ private extension BiliAPI {
                 views: item["play"] as? Int ?? 0,
                 danmaku: item["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["pubdate"] as? Int ?? 0),
-                category: "",
+                category: item["tname"] as? String ?? "",
+                tags: [],
                 desc: "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
                 cid: item["cid"] as? Int ?? 0
@@ -1510,7 +1512,8 @@ private extension BiliAPI {
                 views: stat?["view"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["pubdate"] as? Int ?? 0),
-                category: "",
+                category: item["tname"] as? String ?? "",
+                tags: [],
                 desc: item["desc"] as? String ?? "",
                 likes: stat?["like"] as? Int ?? 0,
                 coins: stat?["coin"] as? Int ?? 0,
@@ -1535,6 +1538,7 @@ private extension BiliAPI {
                 guard (item["linktype"] as? String) == "video" else { return nil }
                 guard let shareVideo = (item["share"] as? [String: Any])?["video"] as? [String: Any],
                       let bvid = shareVideo["bvid"] as? String, !bvid.isEmpty else { return nil }
+                let tagString = item["tag"] as? String ?? ""
                 return Video(
                     id: bvid,
                     title: item["title"] as? String ?? "",
@@ -1546,7 +1550,8 @@ private extension BiliAPI {
                     views: item["play"] as? Int ?? 0,
                     danmaku: 0,
                     publishTime: formatTime(item["ptime"] as? Int ?? 0),
-                    category: "",
+                    category: item["typename"] as? String ?? "",
+                    tags: tagString.isEmpty ? [] : tagString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) },
                     desc: "",
                     likes: 0, coins: 0, favorites: 0, shares: 0,
                     cid: shareVideo["cid"] as? Int ?? 0
@@ -1572,6 +1577,7 @@ private extension BiliAPI {
                     danmaku: 0,
                     publishTime: "",
                     category: "用户",
+                    tags: [],
                     desc: item["sign"] as? String ?? "",
                     likes: 0, coins: 0, favorites: 0, shares: 0
                 )
@@ -1600,6 +1606,7 @@ private extension BiliAPI {
                     danmaku: 0,
                     publishTime: "",
                     category: "用户",
+                    tags: [],
                     desc: item["usign"] as? String ?? "",
                     likes: 0, coins: 0, favorites: 0, shares: 0
                 )
@@ -1609,6 +1616,7 @@ private extension BiliAPI {
                 guard let id = item["bvid"] as? String,
                       let title = item["title"] as? String else { return nil }
                 let cleanTitle = title.replacingOccurrences(of: "<em class=\"keyword\">", with: "").replacingOccurrences(of: "</em>", with: "")
+                let tagString = item["tag"] as? String ?? ""
                 return Video(
                     id: id,
                     title: cleanTitle,
@@ -1620,7 +1628,8 @@ private extension BiliAPI {
                     views: item["play"] as? Int ?? 0,
                     danmaku: item["video_review"] as? Int ?? 0,
                     publishTime: formatTime(item["pubdate"] as? Int ?? 0),
-                    category: "",
+                    category: item["typename"] as? String ?? "",
+                    tags: tagString.isEmpty ? [] : tagString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) },
                     desc: item["description"] as? String ?? "",
                     likes: 0, coins: 0, favorites: 0, shares: 0,
                     cid: item["cid"] as? Int ?? 0
@@ -1658,7 +1667,8 @@ private extension BiliAPI {
                 views: stat?["view"] as? Int ?? (item["play"] as? Int ?? 0),
                 danmaku: stat?["danmaku"] as? Int ?? (item["video_review"] as? Int ?? 0),
                 publishTime: formatTime(item["pubdate"] as? Int ?? (item["created"] as? Int ?? 0)),
-                category: "",
+                category: item["tname"] as? String ?? "",
+                tags: [],
                 desc: item["desc"] as? String ?? (item["description"] as? String ?? ""),
                 likes: stat?["like"] as? Int ?? 0,
                 coins: stat?["coin"] as? Int ?? 0,
@@ -1693,7 +1703,8 @@ private extension BiliAPI {
                 views: stat?["play"] as? Int ?? 0,
                 danmaku: stat?["danmaku"] as? Int ?? 0,
                 publishTime: "",
-                category: "",
+                category: archive["tname"] as? String ?? "",
+                tags: [],
                 desc: archive["desc"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
                 cid: archive["cid"] as? Int ?? 0
@@ -1770,7 +1781,8 @@ private extension BiliAPI {
                 views: item["play"] as? Int ?? 0,
                 danmaku: item["video_review"] as? Int ?? 0,
                 publishTime: formatTime(item["created"] as? Int ?? 0),
-                category: "",
+                category: item["tname"] as? String ?? "",
+                tags: [],
                 desc: item["description"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
                 cid: item["cid"] as? Int ?? 0
@@ -1804,6 +1816,7 @@ private extension BiliAPI {
             guard let bvid = item["bvid"] as? String,
                   let title = item["title"] as? String else { return nil }
             let dur = item["duration"] as? Int ?? 0
+            let tagString = item["tag"] as? String ?? ""
             return Video(
                 id: bvid,
                 title: title,
@@ -1816,6 +1829,7 @@ private extension BiliAPI {
                 danmaku: item["danmaku"] as? Int ?? 0,
                 publishTime: formatTime(item["ctime"] as? Int ?? 0),
                 category: item["tname"] as? String ?? "",
+                tags: tagString.isEmpty ? [] : tagString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) },
                 desc: "",
                 likes: 0, coins: 0, favorites: 0, shares: 0,
                 cid: item["first_cid"] as? Int ?? 0
@@ -1925,6 +1939,7 @@ private extension BiliAPI {
                 danmaku: 0,
                 publishTime: "直播中",
                 category: "直播",
+                tags: [],
                 desc: item["area_v2_name"] as? String ?? item["areaName"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0
             )
@@ -1950,6 +1965,7 @@ private extension BiliAPI {
                 danmaku: 0,
                 publishTime: item["new_ep"] as? String ?? "",
                 category: "影视",
+                tags: [],
                 desc: item["desc"] as? String ?? "",
                 likes: 0, coins: 0, favorites: 0, shares: 0
             )
@@ -2015,11 +2031,11 @@ extension Video {
     }
     init(id: String, title: String, cover: String, duration: Int, upName: String,
          upMid: Int, upAvatar: String, views: Int, danmaku: Int, publishTime: String,
-         category: String, desc: String, likes: Int, coins: Int,
+         category: String, tags: [String], desc: String, likes: Int, coins: Int,
          favorites: Int, shares: Int, cid: Int) {
         self.init(id: id, title: title, cover: cover, duration: duration,
                   upName: upName, upMid: upMid, upAvatar: upAvatar, views: views, danmaku: danmaku,
-                  publishTime: publishTime, category: category, desc: desc,
+                  publishTime: publishTime, category: category, tags: tags, desc: desc,
                   likes: likes, coins: coins, favorites: favorites, shares: shares)
         self.cid = cid
     }

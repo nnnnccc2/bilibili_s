@@ -18,7 +18,7 @@ final class FilterEngine {
     }
 
     /// Returns the block reason if the video should be filtered out, nil otherwise.
-    /// Priority order: badData (必拦) → insult → clickbait → !!连续 → japanese → duration
+    /// Priority order: badData (必拦) → insult → clickbait → exclamation → keyword → category → upBlocked → duration → japanese
     func shouldBlock(_ video: Video) -> BlockReason? {
         // 0. 空白视频硬拦截 — 没有封面/没有 bvid 的卡片肯定打不开，直接过滤
         if video.cover.trimmingCharacters(in: .whitespaces).isEmpty
@@ -63,23 +63,59 @@ final class FilterEngine {
             }
         }
 
-        // 3. Japanese characters in title
+        // 3. General keyword filtering (title + upName + desc + category + tags)
+        if settings.enableKeywordFilter {
+            let keywords = settings.activeKeywords
+            if !keywords.isEmpty {
+                let haystack = [video.title, video.upName, video.desc, video.category, video.tags.joined(separator: " ")]
+                    .joined(separator: " ")
+                    .lowercased()
+                for keyword in keywords {
+                    let lower = keyword.lowercased()
+                    if !lower.isEmpty && haystack.contains(lower) {
+                        return .keywordBlocked
+                    }
+                }
+            }
+        }
+
+        // 4. Category blacklist (case-insensitive exact match)
+        if settings.enableCategoryFilter, !settings.blockedCategories.isEmpty {
+            let category = video.category.trimmingCharacters(in: .whitespaces)
+            if !category.isEmpty {
+                let lowerCategory = category.lowercased()
+                for blocked in settings.blockedCategories {
+                    if blocked.trimmingCharacters(in: .whitespaces).lowercased() == lowerCategory {
+                        return .categoryBlocked
+                    }
+                }
+            }
+        }
+
+        // 5. UP主 mid blacklist
+        if settings.enableUPBlockFilter, !settings.blockedUPMids.isEmpty, video.upMid > 0 {
+            if settings.blockedUPMids.contains(video.upMid) {
+                return .upBlocked
+            }
+        }
+
+        // 6. Duration block (global): videos shorter than or equal to the max selected threshold
+        if let threshold = settings.effectiveDurationThreshold, video.duration > 0, video.duration <= threshold {
+            return .duration
+        }
+
+        // 7. Japanese characters in title
         if settings.enableJapaneseTitleFilter {
             if containsJapanese(video.title) {
                 return .japaneseTitle
             }
         }
 
-        // 4. Japanese characters in UP主 name
+        // 8. Japanese characters in UP主 name
         if settings.enableJapaneseUPFilter {
             if containsJapanese(video.upName) {
                 return .japaneseUP
             }
-        }
-
-        // 5. Duration block (global): videos shorter than or equal to the max selected threshold
-        if let threshold = settings.effectiveDurationThreshold, video.duration > 0, video.duration <= threshold {
-            return .duration
         }
 
         return nil

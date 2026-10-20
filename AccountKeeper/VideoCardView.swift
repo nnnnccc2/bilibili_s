@@ -15,6 +15,8 @@ struct VideoCardView: View {
     var onTap: (() -> Void)? = nil
     /// 点击 UP主头像/昵称 → 打开 UP 空间。
     var onTapUP主: (() -> Void)? = nil
+    /// 长按/上下文菜单：屏蔽该 UP 主。
+    var onBlockUP: ((Int, String) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -122,6 +124,15 @@ struct VideoCardView: View {
         .onAppear {
             // Prefetch stream URL when card becomes visible so playback starts instantly on tap
             BiliAPI.shared.prefetchStreamURL(for: video)
+        }
+        .contextMenu {
+            if video.upMid > 0 {
+                Button(role: .destructive) {
+                    onBlockUP?(video.upMid, video.upName)
+                } label: {
+                    Label("屏蔽该 UP 主", systemImage: "person.fill.xmark")
+                }
+            }
         }
     }
 

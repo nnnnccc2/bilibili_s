@@ -128,6 +128,42 @@ final class AppStore: ObservableObject {
         settings.customBlockedWords.removeAll { $0 == word }
     }
 
+    // MARK: - UP主 blacklist
+
+    func blockUP(mid: Int, name: String? = nil) {
+        guard mid > 0 else { return }
+        settings.blockedUPMids.insert(mid)
+    }
+
+    func unblockUP(mid: Int) {
+        settings.blockedUPMids.remove(mid)
+    }
+
+    // MARK: - Category blacklist
+
+    func addBlockedCategory(_ category: String) {
+        let trimmed = category.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        settings.blockedCategories.insert(trimmed)
+    }
+
+    func removeBlockedCategory(_ category: String) {
+        settings.blockedCategories.remove(category)
+    }
+
+    // MARK: - General keyword blacklist
+
+    func addBlockedKeyword(_ keyword: String) {
+        let trimmed = keyword.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        guard !settings.blockedKeywords.contains(trimmed) else { return }
+        settings.blockedKeywords.append(trimmed)
+    }
+
+    func removeBlockedKeyword(_ keyword: String) {
+        settings.blockedKeywords.removeAll { $0 == keyword }
+    }
+
     // MARK: - User / login
 
     private func loadUser() {

@@ -102,9 +102,11 @@ struct CategoryView: View {
                                         onTap: { selectedVideo = video },
                                         onTapUP主: {
                                             if video.upMid > 0 {
-                                                
                                                 selectedUP = UPTarget(mid: video.upMid, name: video.upName)
                                             }
+                                        },
+                                        onBlockUP: { mid, _ in
+                                            store.blockUP(mid: mid)
                                         }
                                     )
                                         .onAppear {

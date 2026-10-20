@@ -238,6 +238,9 @@ struct SearchView: View {
                                 if video.upMid > 0 {
                                     selectedUP = UPTarget(mid: video.upMid, name: video.upName)
                                 }
+                            },
+                            onBlockUP: { mid, _ in
+                                store.blockUP(mid: mid)
                             }
                         )
                         .transition(.cardEnter)

@@ -17,6 +17,9 @@ struct FilterStats: Codable, Hashable {
     var byInsultWord: Int = 0
     var byExclamationSpam: Int = 0
     var byBadData: Int = 0
+    var byCategory: Int = 0
+    var byUPBlocked: Int = 0
+    var byKeyword: Int = 0
 
     mutating func add(_ reason: BlockReason) {
         totalBlocked += 1
@@ -28,7 +31,26 @@ struct FilterStats: Codable, Hashable {
         case .insultWord: byInsultWord += 1
         case .exclamationSpam: byExclamationSpam += 1
         case .badData: byBadData += 1
+        case .categoryBlocked: byCategory += 1
+        case .upBlocked: byUPBlocked += 1
+        case .keywordBlocked: byKeyword += 1
         }
+    }
+
+    /// Backwards-compatible decoding so old persisted stats without new counters still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        totalBlocked = try container.decodeIfPresent(Int.self, forKey: .totalBlocked) ?? 0
+        byClickbait = try container.decodeIfPresent(Int.self, forKey: .byClickbait) ?? 0
+        byJapaneseTitle = try container.decodeIfPresent(Int.self, forKey: .byJapaneseTitle) ?? 0
+        byJapaneseUP = try container.decodeIfPresent(Int.self, forKey: .byJapaneseUP) ?? 0
+        byDuration = try container.decodeIfPresent(Int.self, forKey: .byDuration) ?? 0
+        byInsultWord = try container.decodeIfPresent(Int.self, forKey: .byInsultWord) ?? 0
+        byExclamationSpam = try container.decodeIfPresent(Int.self, forKey: .byExclamationSpam) ?? 0
+        byBadData = try container.decodeIfPresent(Int.self, forKey: .byBadData) ?? 0
+        byCategory = try container.decodeIfPresent(Int.self, forKey: .byCategory) ?? 0
+        byUPBlocked = try container.decodeIfPresent(Int.self, forKey: .byUPBlocked) ?? 0
+        byKeyword = try container.decodeIfPresent(Int.self, forKey: .byKeyword) ?? 0
     }
 }
 
@@ -56,6 +78,19 @@ struct FilterSettings: Codable, Hashable {
     // Search-specific duration filter (min duration for search results)
     var searchMinDurationSeconds: Int? = nil
 
+    // Category filtering
+    var enableCategoryFilter: Bool = false
+    var blockedCategories: Set<String> = []
+
+    // UP主 blacklist filtering
+    var enableUPBlockFilter: Bool = false
+    var blockedUPMids: Set<Int> = []
+
+    // General keyword filtering
+    var enableKeywordFilter: Bool = false
+    var blockedKeywords: [String] = []
+    var builtInKeywordsEnabled: Bool = false
+
     // UI
     var showFilteredBanner: Bool = true
 
@@ -66,7 +101,31 @@ struct FilterSettings: Codable, Hashable {
     var stats: FilterStats = FilterStats()
 
     /// Current filter-settings schema version.
-    static let currentSchemaVersion = 2
+    static let currentSchemaVersion = 3
+
+    /// Backwards-compatible decoding so new fields default safely when missing from old persisted settings.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enableClickbaitFilter = try container.decodeIfPresent(Bool.self, forKey: .enableClickbaitFilter) ?? true
+        enableExclamationFilter = try container.decodeIfPresent(Bool.self, forKey: .enableExclamationFilter) ?? false
+        enableJapaneseTitleFilter = try container.decodeIfPresent(Bool.self, forKey: .enableJapaneseTitleFilter) ?? true
+        enableJapaneseUPFilter = try container.decodeIfPresent(Bool.self, forKey: .enableJapaneseUPFilter) ?? true
+        enableInsultWordFilter = try container.decodeIfPresent(Bool.self, forKey: .enableInsultWordFilter) ?? true
+        builtInWordsEnabled = try container.decodeIfPresent(Bool.self, forKey: .builtInWordsEnabled) ?? true
+        customBlockedWords = try container.decodeIfPresent([String].self, forKey: .customBlockedWords) ?? []
+        blockedDurationSeconds = try container.decodeIfPresent(Set<Int>.self, forKey: .blockedDurationSeconds) ?? [10]
+        searchMinDurationSeconds = try container.decodeIfPresent(Int.self, forKey: .searchMinDurationSeconds)
+        enableCategoryFilter = try container.decodeIfPresent(Bool.self, forKey: .enableCategoryFilter) ?? false
+        blockedCategories = try container.decodeIfPresent(Set<String>.self, forKey: .blockedCategories) ?? []
+        enableUPBlockFilter = try container.decodeIfPresent(Bool.self, forKey: .enableUPBlockFilter) ?? false
+        blockedUPMids = try container.decodeIfPresent(Set<Int>.self, forKey: .blockedUPMids) ?? []
+        enableKeywordFilter = try container.decodeIfPresent(Bool.self, forKey: .enableKeywordFilter) ?? false
+        blockedKeywords = try container.decodeIfPresent([String].self, forKey: .blockedKeywords) ?? []
+        builtInKeywordsEnabled = try container.decodeIfPresent(Bool.self, forKey: .builtInKeywordsEnabled) ?? false
+        showFilteredBanner = try container.decodeIfPresent(Bool.self, forKey: .showFilteredBanner) ?? true
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion)
+        stats = try container.decodeIfPresent(FilterStats.self, forKey: .stats) ?? FilterStats()
+    }
 }
 
 // MARK: - Built-in word lists
@@ -104,6 +163,24 @@ extension FilterSettings {
             words.append(contentsOf: FilterSettings.builtInInsultWords)
         }
         words.append(contentsOf: customBlockedWords)
+        return words
+    }
+
+    /// General built-in keyword suggestions for blocking anime / gaming / food / vlog content.
+    /// These are opt-in via `builtInKeywordsEnabled` and are not enforced by default.
+    static let builtInKeywords: [String] = [
+        "动画", "动漫", "日本动画", "二次元", "游戏", "录播",
+        "美食", "吃播", "影视", "电影", "电视剧", "综艺",
+        "Vlog", "日常", "挑战", "鬼畜", "吐槽", "reaction"
+    ]
+
+    /// All currently active general keywords (built-in if enabled + custom keywords).
+    var activeKeywords: [String] {
+        var words: [String] = []
+        if builtInKeywordsEnabled {
+            words.append(contentsOf: FilterSettings.builtInKeywords)
+        }
+        words.append(contentsOf: blockedKeywords)
         return words
     }
 }
