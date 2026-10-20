@@ -64,7 +64,7 @@ struct SMSInboxView: View {
                     NavigationLink {
                         AccountDetailView(account: account)
                     } label: {
-                        AccountRowView(account: account)
+                        AccountRowView(account: account, allAccounts: displayedAccounts)
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
@@ -170,9 +170,16 @@ struct SMSInboxView: View {
 }
 
 /// 凭证列表行：图标 + 账号名（主） + 注册手机号（次）。
-/// 同应用不同手机号注册的账号，手机号清晰可见以便区分。
+/// 同应用不同手机号注册的账号，手机号用彩色 tag 区分。
 struct AccountRowView: View {
     let account: Account
+    /// 所有账号，用于判断是否有同名账号需要靠手机号 tag 区分。
+    let allAccounts: [Account]
+
+    /// 同名字段数量 ≥ 2 时，手机号要渲染成 tag 以便区分。
+    private var needsPhoneTag: Bool {
+        allAccounts.filter { $0.name == account.name }.count >= 2
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -183,19 +190,57 @@ struct AccountRowView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .lineLimit(1)
 
-                HStack(spacing: 4) {
-                    Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                        .font(.system(size: 12, weight: .medium))
-                    Text(account.phoneNumber.isEmpty ? "未填写" : account.phoneNumber)
+                if account.phoneNumber.isEmpty {
+                    Text("未填写")
                         .font(.system(size: 14))
-                        .foregroundStyle(account.phoneNumber.isEmpty ? .tertiary : .secondary)
-                        .fontWeight(account.phoneNumber.isEmpty ? .regular : .medium)
+                        .foregroundStyle(.tertiary)
+                } else if needsPhoneTag {
+                    phoneTag
+                } else {
+                    Text(account.phoneNumber)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .fontWeight(.medium)
                 }
-                .lineLimit(1)
             }
 
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)
+    }
+
+    /// 彩色 tag：背景色从手机号稳定 hash 得到，同手机号永远同色。
+    private var phoneTag: some View {
+        let bg = PhoneTagColor.color(for: account.phoneNumber)
+        return Text(account.phoneNumber)
+            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .foregroundStyle(bg.foreground)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(bg.background, in: Capsule())
+    }
+}
+
+/// 手机号 tag 的颜色池：从手机号 hash 里稳定取色。
+enum PhoneTagColor {
+    struct Palette {
+        let background: Color
+        let foreground: Color
+    }
+
+    private static let palettes: [Palette] = [
+        Palette(background: Color(red: 0.90, green: 0.96, blue: 1.00), foreground: Color(red: 0.00, green: 0.35, blue: 0.72)),
+        Palette(background: Color(red: 0.90, green: 1.00, blue: 0.94), foreground: Color(red: 0.00, green: 0.45, blue: 0.18)),
+        Palette(background: Color(red: 1.00, green: 0.93, blue: 0.93), foreground: Color(red: 0.78, green: 0.12, blue: 0.12)),
+        Palette(background: Color(red: 0.97, green: 0.93, blue: 1.00), foreground: Color(red: 0.40, green: 0.16, blue: 0.75)),
+        Palette(background: Color(red: 1.00, green: 0.97, blue: 0.88), foreground: Color(red: 0.60, green: 0.40, blue: 0.00)),
+        Palette(background: Color(red: 0.92, green: 0.94, blue: 0.98), foreground: Color(red: 0.22, green: 0.28, blue: 0.40)),
+        Palette(background: Color(red: 0.98, green: 0.90, blue: 0.96), foreground: Color(red: 0.70, green: 0.14, blue: 0.48)),
+        Palette(background: Color(red: 0.88, green: 0.98, blue: 0.97), foreground: Color(red: 0.05, green: 0.55, blue: 0.52))
+    ]
+
+    static func color(for phone: String) -> Palette {
+        let seed = phone.unicodeScalars.reduce(0) { ($0 &* 31) &+ Int($1.value) }
+        return palettes[abs(seed) % palettes.count]
     }
 }
