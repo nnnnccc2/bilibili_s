@@ -19,7 +19,7 @@ struct FilterSettingsView: View {
     @State private var newKeyword: String = ""
     @State private var newTag: String = ""
     @State private var expandedTopZones: Set<Int> = []
-    @State private var expandedCreatorType: CreatorType? = nil
+    @State private var expandedCreatorTypes: Set<CreatorType> = []
     @State private var showWhitelist: Bool = false
     @State private var selectedCreatorMid: Int = 0
     @State private var selectedCreatorName: String = ""
@@ -813,7 +813,7 @@ struct FilterSettingsView: View {
             }
             .tint(.biliBlue)
 
-            Text("自动识别 UP 主的内容类型（数码评测 / 美食 / 游戏 / 影视剪辑等），按类型批量屏蔽。点击类型标签可展开该类型下的博主，点博主头像可跳转主页；长按博主可移入其他分类或加入黑名单。")
+            Text("自动识别 UP 主的内容类型（数码评测 / 美食 / 游戏 / 影视剪辑等），按类型批量屏蔽。点击类型标签可展开该类型下的博主，点博主头像可跳转主页；点右侧 ⋯ 可移入其他分类或加入黑名单。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -869,11 +869,6 @@ struct FilterSettingsView: View {
                     }
                 }
 
-                // 展开的博主列表：放在网格下方，用整卡宽度展示（不再挤在半个格子里的前 30 位）
-                if let type = expandedCreatorType {
-                    creatorList(for: type)
-                }
-
                 // 白名单：被「移除」的博主都在这里，点标题展开查看
                 if !store.settings.whitelistedCreators.isEmpty {
                     Divider().padding(.vertical, 4)
@@ -917,12 +912,16 @@ struct FilterSettingsView: View {
 
     private func creatorTypeChip(_ type: CreatorType, count: Int) -> some View {
         let blocked = store.settings.blockedCreatorTypes.contains(type)
-        let expanded = expandedCreatorType == type
+        let expanded = expandedCreatorTypes.contains(type)
         return VStack(alignment: .leading, spacing: 8) {
-            // 整行可点击展开/收起同一时间只展开一个类型
+            // 整行可点击展开/收起；多个类型可同时展开
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                    expandedCreatorType = expanded ? nil : type
+                    if expanded {
+                        expandedCreatorTypes.remove(type)
+                    } else {
+                        expandedCreatorTypes.insert(type)
+                    }
                 }
             } label: {
                 HStack(spacing: 6) {
@@ -958,6 +957,11 @@ struct FilterSettingsView: View {
                 .foregroundStyle(blocked ? Color.red : Color.secondary)
             }
             .buttonStyle(.plain)
+
+            // 展开的博主列表：和之前一样直接展开在类型标签下方
+            if expanded {
+                creatorList(for: type)
+            }
         }
         .padding(10)
         .background(blocked ? type.color.opacity(0.1) : Color(.systemGray5))
@@ -968,62 +972,37 @@ struct FilterSettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    /// 展开的博主列表：整卡宽度、可滚动查看全部博主。
-    /// 常规操作是右侧「×」→ 移入白名单；
-    /// 「移入其他分类 / 加入黑名单」属于额外修正操作，放在长按菜单里。
+    /// 展开在类型标签下方的博主列表。
+    /// 常规操作：点头像进主页、点 × 移入白名单；
+    /// 额外操作：点 ⋯ 可移入其他分类或加入黑名单。
     @ViewBuilder
     private func creatorList(for type: CreatorType) -> some View {
         let creators = store.settings.knownCreators.values
             .filter { $0.type == type }
             .sorted { $0.confidence > $1.confidence }
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("\(type.rawValue) · \(creators.count) 位")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                Spacer()
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        expandedCreatorType = nil
-                    }
-                } label: {
-                    Text("收起")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-
-            if creators.isEmpty {
-                Text("暂无已识别博主")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .padding(.vertical, 4)
-            } else {
-                VStack(spacing: 2) {
-                    ForEach(creators) { profile in
-                        creatorRow(profile)
-                    }
-                }
-            }
-
-            Text("点右侧 × 移入白名单；长按博主可移入其他分类或加入黑名单。")
+        if creators.isEmpty {
+            Text("暂无已识别博主")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
+                .padding(.vertical, 4)
+        } else {
+            VStack(spacing: 6) {
+                ForEach(creators) { profile in
+                    creatorRow(profile)
+                }
+            }
+            .padding(.top, 4)
         }
-        .padding(10)
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func creatorRow(_ profile: CreatorProfile) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Button {
                 selectedCreatorMid = profile.mid
                 selectedCreatorName = profile.name
                 showCreatorSheet = true
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     CachedAsyncImage(
                         url: URL(string: profile.avatar.isEmpty ? "" : profile.avatar),
                         targetSize: CGSize(width: 48, height: 48)
@@ -1032,22 +1011,22 @@ struct FilterSettingsView: View {
                     } placeholder: {
                         Circle().fill(Color.gray.opacity(0.3))
                     }
-                    .frame(width: 32, height: 32)
+                    .frame(width: 26, height: 26)
                     .clipShape(Circle())
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 3) {
                             Text(profile.name)
-                                .font(.caption)
+                                .font(.system(size: 11))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
                             if profile.manuallyTyped {
                                 Image(systemName: "lock.fill")
-                                    .font(.system(size: 8))
+                                    .font(.system(size: 7))
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        Text("置信度 \(Int(profile.confidence * 100))% · \(profile.sampleCount)条")
-                            .font(.system(size: 10))
+                        Text("\(Int(profile.confidence * 100))% · \(profile.sampleCount)条")
+                            .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -1055,33 +1034,42 @@ struct FilterSettingsView: View {
             }
             .buttonStyle(.plain)
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 2)
 
+            // 额外操作：移入其他分类 / 加入黑名单
+            Menu {
+                Button {
+                    pickerTarget = profile
+                } label: {
+                    Label("移入其他分类", systemImage: "arrow.left.arrow.right")
+                }
+                Button(role: .destructive) {
+                    blockTarget = profile
+                    showBlockConfirm = true
+                } label: {
+                    Label("加入黑名单", systemImage: "hand.raised")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("更多操作")
+
+            // 常规操作：移入白名单（不再屏蔽该博主）
             Button {
                 store.removeCreator(mid: profile.mid)
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16))
+                    .font(.system(size: 15))
                     .foregroundStyle(.red.opacity(0.7))
-                    .frame(width: 36, height: 36)
+                    .frame(width: 30, height: 30)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("移入白名单")
-        }
-        .contentShape(Rectangle())
-        .contextMenu {
-            Button {
-                pickerTarget = profile
-            } label: {
-                Label("移入其他分类", systemImage: "arrow.left.arrow.right")
-            }
-            Button(role: .destructive) {
-                blockTarget = profile
-                showBlockConfirm = true
-            } label: {
-                Label("加入黑名单", systemImage: "hand.raised")
-            }
         }
     }
 
