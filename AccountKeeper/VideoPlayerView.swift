@@ -697,6 +697,48 @@ struct VideoPlayerView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
+    // MARK: - 博主类型展示
+
+    /// 当前视频 UP 主的类型：优先用设置页缓存的识别结果，
+    /// 缓存里没有时用本条视频的 tid / tag / 标题即时推断，
+    /// 都识别不出来时按「其他」展示。
+    private var creatorTypeInfo: (type: CreatorType, confidence: Double, samples: Int) {
+        if let profile = store.settings.knownCreators[video.upMid] {
+            return (profile.type, profile.confidence, profile.sampleCount)
+        }
+        var sample = video
+        if sample.tid == 0 { sample.tid = videoTid }
+        if sample.tags.isEmpty { sample.tags = videoTags }
+        return (CreatorClassifier.classify(video: sample), 0, 0)
+    }
+
+    /// 播放页简介里的「博主类型」行。
+    private var creatorTypeRow: some View {
+        let info = creatorTypeInfo
+        return HStack(spacing: 6) {
+            Image(systemName: info.type.icon)
+                .font(.system(size: 11))
+                .foregroundStyle(info.type.color)
+            Text("博主类型")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(info.type.rawValue)
+                .font(.caption)
+                .fontWeight(.medium)
+            if info.confidence > 0 {
+                Text("置信度 \(Int(info.confidence * 100))%")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(info.type.color.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal)
+    }
+
     private var introSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(video.title)
@@ -718,6 +760,8 @@ struct VideoPlayerView: View {
             .padding(.horizontal)
 
             partitionRow
+
+            creatorTypeRow
 
             Divider().padding(.horizontal)
 
