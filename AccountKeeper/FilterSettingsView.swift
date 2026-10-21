@@ -19,11 +19,8 @@ struct FilterSettingsView: View {
     @State private var newKeyword: String = ""
     @State private var newTag: String = ""
     @State private var expandedTopZones: Set<Int> = []
-    @State private var expandedCreatorTypes: Set<CreatorType> = []
-    @State private var showWhitelist: Bool = false
-    @State private var selectedCreatorMid: Int = 0
-    @State private var selectedCreatorName: String = ""
-    @State private var showCreatorSheet: Bool = false
+    @State private var detailCreatorType: CreatorType? = nil
+    @State private var showWhitelistSheet: Bool = false
 
     private var selectedDurationCount: Int {
         store.settings.blockedDurationSeconds.count
@@ -106,11 +103,13 @@ struct FilterSettingsView: View {
                         .foregroundColor(.biliBlue)
                 }
             }
-            .sheet(isPresented: $showCreatorSheet) {
-                if selectedCreatorMid != 0 {
-                    UPSpaceView(mid: selectedCreatorMid, initialName: selectedCreatorName)
-                        .environmentObject(store)
-                }
+            .sheet(item: $detailCreatorType) { type in
+                CreatorTypeDetailView(type: type)
+                    .environmentObject(store)
+            }
+            .sheet(isPresented: $showWhitelistSheet) {
+                CreatorWhitelistView()
+                    .environmentObject(store)
             }
         }
     }
@@ -742,9 +741,11 @@ struct FilterSettingsView: View {
                 FlowLayout(spacing: 8) {
                     ForEach(Array(store.settings.blockedUPMids).sorted(), id: \.self) { mid in
                         HStack(spacing: 4) {
-                            Text("\(mid)")
+                            // 优先显示博主昵称，没有名字时退回 mid
+                            Text(store.settings.blockedUPNames[mid] ?? "\(mid)")
                                 .font(.caption)
                                 .fontWeight(.medium)
+                                .lineLimit(1)
                             Button {
                                 store.unblockUP(mid: mid)
                             } label: {
@@ -821,44 +822,48 @@ struct FilterSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // 类型 chip 网格：点击切换屏蔽，点击整行展开查看博主列表
+                // 按类型统计一次。原来每个 chip 各自扫一遍全量缓存（13 次 O(n) 过滤），
+                // 缓存里博主流多时会明显拖慢点击响应。
+                let typeCounts = Dictionary(
+                    grouping: store.settings.knownCreators.values,
+                    by: { $0.type }
+                ).mapValues { $0.count }
+
+                // 类型 chip 网格：点击整块打开该类型下的全部博主，点「已屏蔽/未屏蔽」切换屏蔽
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     ForEach(CreatorType.allCases.filter { $0 != .other }) { type in
-                        creatorTypeChip(type)
+                        creatorTypeChip(type, count: typeCounts[type] ?? 0)
                     }
                 }
 
-                // 白名单：被「移除」的博主会出现在这里，再次点删除才会彻底移除
-                if !store.settings.whitelistedCreators.isEmpty {
-                    Divider().padding(.vertical, 4)
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                            showWhitelist.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "checkmark.shield")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.green)
-                            Text("白名单")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                            Text("\(store.settings.whitelistedCreators.count)")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Image(systemName: showWhitelist ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                Divider().padding(.vertical, 4)
 
-                    if showWhitelist {
-                        whitelistSection
+                // 白名单：被「移除」的博主都在这里，点进去可逐条彻底删除
+                Button {
+                    showWhitelistSheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.shield")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.green)
+                        Text("白名单")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                        Text("\(store.settings.whitelistedCreators.count) 位")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("管理")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
+                    .contentShape(Rectangle())
+                    .frame(minHeight: 34)
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(16)
@@ -868,17 +873,12 @@ struct FilterSettingsView: View {
         .padding(.horizontal, 16)
     }
 
-    private func creatorTypeChip(_ type: CreatorType) -> some View {
+    private func creatorTypeChip(_ type: CreatorType, count: Int) -> some View {
         let blocked = store.settings.blockedCreatorTypes.contains(type)
-        let count = store.settings.knownCreators.values.filter { $0.type == type }.count
-        let expanded = expandedCreatorTypes.contains(type)
         return VStack(alignment: .leading, spacing: 8) {
-            // 整行可点击展开/收起（不再只靠右上角的小箭头）
+            // 点整块打开该类型下的全部博主列表（不再只展开前 30 位）
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                    if expanded { expandedCreatorTypes.remove(type) }
-                    else { expandedCreatorTypes.insert(type) }
-                }
+                detailCreatorType = type
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: type.icon)
@@ -892,10 +892,11 @@ struct FilterSettingsView: View {
                     Text("\(count)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.right")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
+                .frame(minHeight: 28)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -912,10 +913,6 @@ struct FilterSettingsView: View {
                 .foregroundStyle(blocked ? Color.red : Color.secondary)
             }
             .buttonStyle(.plain)
-
-            if expanded {
-                creatorList(for: type)
-            }
         }
         .padding(10)
         .background(blocked ? type.color.opacity(0.1) : Color(.systemGray5))
@@ -924,148 +921,6 @@ struct FilterSettingsView: View {
                 .stroke(blocked ? type.color.opacity(0.5) : Color.clear, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    @ViewBuilder
-    private func creatorList(for type: CreatorType) -> some View {
-        let creators = store.settings.knownCreators.values
-            .filter { $0.type == type }
-            .sorted { $0.confidence > $1.confidence }
-        if creators.isEmpty {
-            Text("暂无已识别博主")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .padding(.vertical, 4)
-        } else {
-            VStack(spacing: 6) {
-                ForEach(creators.prefix(30)) { profile in
-                    HStack(spacing: 8) {
-                        Button {
-                            selectedCreatorMid = profile.mid
-                            selectedCreatorName = profile.name
-                            showCreatorSheet = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                CachedAsyncImage(
-                                    url: URL(string: profile.avatar.isEmpty ? "" : profile.avatar),
-                                    targetSize: CGSize(width: 48, height: 48)
-                                ) { img in
-                                    img.resizable().scaledToFill()
-                                } placeholder: {
-                                    Circle().fill(Color.gray.opacity(0.3))
-                                }
-                                .frame(width: 32, height: 32)
-                                .clipShape(Circle())
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(profile.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                    Text("置信度 \(Int(profile.confidence * 100))% · \(profile.sampleCount)条")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        Spacer()
-                        Button {
-                            store.removeCreator(mid: profile.mid)
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.red.opacity(0.7))
-                                .frame(width: 32, height: 32)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("移除并加入白名单")
-                        .help("移除该博主并加入白名单，不再自动屏蔽")
-                    }
-                }
-                if creators.count > 30 {
-                    Text("还有 \(creators.count - 30) 位…")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-            }
-            .padding(.top, 4)
-        }
-    }
-
-    /// 白名单博主列表：展示被「移除」的博主，右侧垃圾桶按钮可彻底删除。
-    /// 删除后该博主下次出现在视频流中会被重新分类，可能再次进入屏蔽列表。
-    @ViewBuilder
-    private var whitelistSection: some View {
-        let creators = store.settings.whitelistedCreators.values
-            .sorted { $0.name < $1.name }
-        if creators.isEmpty {
-            Text("白名单为空")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .padding(.vertical, 4)
-        } else {
-            VStack(spacing: 6) {
-                ForEach(creators) { profile in
-                    HStack(spacing: 8) {
-                        Button {
-                            selectedCreatorMid = profile.mid
-                            selectedCreatorName = profile.name
-                            showCreatorSheet = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                CachedAsyncImage(
-                                    url: URL(string: profile.avatar.isEmpty ? "" : profile.avatar),
-                                    targetSize: CGSize(width: 48, height: 48)
-                                ) { img in
-                                    img.resizable().scaledToFill()
-                                } placeholder: {
-                                    Circle().fill(Color.gray.opacity(0.3))
-                                }
-                                .frame(width: 28, height: 28)
-                                .clipShape(Circle())
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(profile.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                    Text(profile.type.rawValue)
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        Spacer()
-                        Button {
-                            store.removeFromWhitelist(mid: profile.mid)
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 14))
-                                .foregroundStyle(.red.opacity(0.7))
-                                .frame(width: 32, height: 32)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("从白名单删除")
-                        .help("从白名单删除，该博主可能再次被自动屏蔽")
-                    }
-                }
-                HStack {
-                    Spacer()
-                    Button {
-                        store.clearCreatorWhitelist()
-                    } label: {
-                        Text("清空白名单")
-                            .font(.caption2)
-                            .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.top, 4)
-        }
     }
 
     // MARK: - General keyword filter
@@ -1340,6 +1195,321 @@ private struct BlockedEntryChip: View {
         .background(isDisabled ? Color(.systemGray6) : Color(.systemGray5))
         .opacity(isDisabled ? 0.55 : 1)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+// MARK: - 博主类型详情（查看该类型下全部博主）
+
+/// 某个博主类型下的全部已识别博主。
+/// 用独立 sheet 展示可滚动查看全部（不再是「还有 xx 位」），
+/// 每位博主可：进主页 / 移入其他分类 / 加入黑名单 / 移入白名单。
+struct CreatorTypeDetailView: View {
+    @EnvironmentObject var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let type: CreatorType
+
+    @State private var pickerTarget: CreatorProfile?
+    @State private var blockTarget: CreatorProfile?
+    @State private var showBlockConfirm = false
+    @State private var spaceMid = 0
+    @State private var spaceName = ""
+    @State private var showSpace = false
+
+    private var creators: [CreatorProfile] {
+        store.settings.knownCreators.values
+            .filter { $0.type == type }
+            .sorted { $0.confidence > $1.confidence }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if creators.isEmpty {
+                    ContentUnavailableView(
+                        "暂无已识别博主",
+                        systemImage: type.icon,
+                        description: Text("刷到该类型 UP 主的视频后会自动出现在这里")
+                    )
+                } else {
+                    List {
+                        Section {
+                            ForEach(creators) { profile in
+                                row(profile)
+                            }
+                        } header: {
+                            Text("共 \(creators.count) 位 · 按置信度排序")
+                        } footer: {
+                            Text("右侧按钮可移入其他分类、加入黑名单或移入白名单。手动指定的分类会被锁定，不再被自动识别覆盖。")
+                        }
+                    }
+                }
+            }
+            .navigationTitle(type.rawValue)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showSpace) {
+                if spaceMid != 0 {
+                    UPSpaceView(mid: spaceMid, initialName: spaceName)
+                        .environmentObject(store)
+                }
+            }
+            .sheet(item: $pickerTarget) { profile in
+                CreatorTypePickerView(profile: profile)
+                    .environmentObject(store)
+            }
+            .confirmationDialog(
+                "加入黑名单？",
+                isPresented: $showBlockConfirm,
+                presenting: blockTarget
+            ) { profile in
+                Button("屏蔽「\(profile.name)」的全部视频", role: .destructive) {
+                    store.blockCreatorPermanently(mid: profile.mid, name: profile.name)
+                }
+                Button("取消", role: .cancel) {}
+            } message: { _ in
+                Text("该 UP 主的所有视频都会被过滤，可在「UP 主黑名单」里取消。")
+            }
+        }
+    }
+
+    private func row(_ profile: CreatorProfile) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                spaceMid = profile.mid
+                spaceName = profile.name
+                showSpace = true
+            } label: {
+                HStack(spacing: 10) {
+                    avatar(profile)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 4) {
+                            Text(profile.name)
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            if profile.manuallyTyped {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Text("置信度 \(Int(profile.confidence * 100))% · \(profile.sampleCount) 条样本")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 8)
+
+            Menu {
+                Button {
+                    pickerTarget = profile
+                } label: {
+                    Label("移入其他分类", systemImage: "arrow.left.arrow.right")
+                }
+                Button(role: .destructive) {
+                    blockTarget = profile
+                    showBlockConfirm = true
+                } label: {
+                    Label("加入黑名单", systemImage: "hand.raised")
+                }
+                Button {
+                    store.removeCreator(mid: profile.mid)
+                } label: {
+                    Label("移入白名单（不屏蔽）", systemImage: "checkmark.shield")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 19))
+                    .foregroundStyle(Color.biliBlue)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+        }
+    }
+
+    private func avatar(_ profile: CreatorProfile) -> some View {
+        CachedAsyncImage(
+            url: URL(string: profile.avatar.isEmpty ? "" : profile.avatar),
+            targetSize: CGSize(width: 64, height: 64)
+        ) { img in
+            img.resizable().scaledToFill()
+        } placeholder: {
+            Circle().fill(Color.gray.opacity(0.3))
+        }
+        .frame(width: 40, height: 40)
+        .clipShape(Circle())
+    }
+}
+
+/// 把某个博主手动移入其他分类。移入后分类被锁定，自动识别不再覆盖。
+struct CreatorTypePickerView: View {
+    @EnvironmentObject var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let profile: CreatorProfile
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(CreatorType.allCases) { type in
+                        Button {
+                            store.moveCreator(mid: profile.mid, to: type)
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: type.icon)
+                                    .foregroundStyle(type.color)
+                                    .frame(width: 22)
+                                Text(type.rawValue)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if type == profile.type {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(Color.biliBlue)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("把「\(profile.name)」移入")
+                } footer: {
+                    Text("移入后该博主的分类会被锁定，不再被自动识别覆盖。")
+                }
+            }
+            .navigationTitle("移入其他分类")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+/// 博主白名单：展示被「移入白名单」的博主，可逐条删除或左滑删除；
+/// 「清空」需要二次确认，避免误触一次删掉全部。
+struct CreatorWhitelistView: View {
+    @EnvironmentObject var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var showClearConfirm = false
+    @State private var spaceMid = 0
+    @State private var spaceName = ""
+    @State private var showSpace = false
+
+    private var creators: [CreatorProfile] {
+        store.settings.whitelistedCreators.values.sorted { $0.name < $1.name }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if creators.isEmpty {
+                    ContentUnavailableView(
+                        "白名单为空",
+                        systemImage: "checkmark.shield",
+                        description: Text("在博主列表里选择「移入白名单」的博主会出现在这里")
+                    )
+                } else {
+                    List {
+                        Section {
+                            ForEach(creators) { profile in
+                                HStack(spacing: 10) {
+                                    Button {
+                                        spaceMid = profile.mid
+                                        spaceName = profile.name
+                                        showSpace = true
+                                    } label: {
+                                        HStack(spacing: 10) {
+                                            CachedAsyncImage(
+                                                url: URL(string: profile.avatar.isEmpty ? "" : profile.avatar),
+                                                targetSize: CGSize(width: 64, height: 64)
+                                            ) { img in
+                                                img.resizable().scaledToFill()
+                                            } placeholder: {
+                                                Circle().fill(Color.gray.opacity(0.3))
+                                            }
+                                            .frame(width: 40, height: 40)
+                                            .clipShape(Circle())
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(profile.name)
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(1)
+                                                Text(profile.type.rawValue)
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.borderless)
+
+                                    Spacer(minLength: 8)
+
+                                    Button(role: .destructive) {
+                                        store.removeFromWhitelist(mid: profile.mid)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 15))
+                                            .frame(width: 44, height: 44)
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                            }
+                            .onDelete { indexSet in
+                                for index in indexSet {
+                                    store.removeFromWhitelist(mid: creators[index].mid)
+                                }
+                            }
+                        } footer: {
+                            Text("删除后该博主会重新参与自动分类，可能再次被屏蔽。左滑也可删除。")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("博主白名单")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("完成") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .destructive) {
+                        showClearConfirm = true
+                    } label: {
+                        Text("清空")
+                    }
+                    .disabled(creators.isEmpty)
+                }
+            }
+            .confirmationDialog("清空白名单？", isPresented: $showClearConfirm, titleVisibility: .visible) {
+                Button("删除全部 \(creators.count) 位博主", role: .destructive) {
+                    store.clearCreatorWhitelist()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("此操作不可撤销，删除后这些博主会重新参与自动分类。")
+            }
+            .sheet(isPresented: $showSpace) {
+                if spaceMid != 0 {
+                    UPSpaceView(mid: spaceMid, initialName: spaceName)
+                        .environmentObject(store)
+                }
+            }
+        }
     }
 }
 

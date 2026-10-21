@@ -44,6 +44,8 @@ final class AppStore: ObservableObject {
     private let settingsKey = "BiliBili.filterSettings"
     private let userKey = "BiliBili.currentUser"
     private let historyKey = "BiliBili.watchHistory"
+    /// 待执行的设置写盘任务（用于合并短时间内的密集改动）。
+    private var pendingSave: DispatchWorkItem?
 
     init() {
         self.settings = FilterSettings()
@@ -108,17 +110,23 @@ final class AppStore: ObservableObject {
     func classifyAndCache(_ videos: [Video]) {
         let now = Date()
         let whitelist = settings.whitelistedCreators
+        // 先在本地副本上合并，循环结束后一次性写回 settings。
+        // 之前每条视频都写一次 settings（触发 didSet → 整份设置同步 JSON 编码），
+        // 是首页/热门/搜索列表卡顿的主要来源。
+        var cache = settings.knownCreators
         for v in videos {
             guard v.upMid != 0 else { continue }
             // 白名单博主不再重新分类，避免用户移除后又被自动加回屏蔽列表。
             guard whitelist[v.upMid] == nil else { continue }
             let detected = CreatorClassifier.classify(video: v)
-            if var existing = settings.knownCreators[v.upMid] {
+            if var existing = cache[v.upMid] {
                 existing.sampleCount += 1
                 existing.lastSeen = now
                 if !v.upName.isEmpty { existing.name = v.upName }
                 if !v.upAvatar.isEmpty { existing.avatar = v.upAvatar }
-                if existing.type == detected {
+                if existing.manuallyTyped {
+                    // 用户手动指定过分类：只更新统计信息，不再自动改写类型。
+                } else if existing.type == detected {
                     existing.confidence = min(1.0, existing.confidence + 0.15)
                 } else {
                     existing.confidence -= 0.25
@@ -127,7 +135,7 @@ final class AppStore: ObservableObject {
                         existing.confidence = detected == .other ? 0.1 : 0.4
                     }
                 }
-                settings.knownCreators[v.upMid] = existing
+                cache[v.upMid] = existing
             } else {
                 let profile = CreatorProfile(
                     mid: v.upMid,
@@ -136,15 +144,18 @@ final class AppStore: ObservableObject {
                     type: detected,
                     confidence: detected == .other ? 0.1 : 0.5
                 )
-                settings.knownCreators[v.upMid] = profile
+                cache[v.upMid] = profile
             }
         }
         // 缓存淘汰：超过 800 时按 lastSeen 降序保留前 800
-        if settings.knownCreators.count > 800 {
-            let keep = settings.knownCreators.values
+        if cache.count > 800 {
+            let keep = cache.values
                 .sorted { $0.lastSeen > $1.lastSeen }
                 .prefix(800)
-            settings.knownCreators = Dictionary(uniqueKeysWithValues: keep.map { ($0.mid, $0) })
+            cache = Dictionary(uniqueKeysWithValues: keep.map { ($0.mid, $0) })
+        }
+        if cache != settings.knownCreators {
+            settings.knownCreators = cache
         }
     }
 
@@ -220,6 +231,25 @@ final class AppStore: ObservableObject {
     }
 
     private func saveSettings() {
+        // 合并短时间内的多次改动，并在后台线程编码。
+        // 原来每次点击（包括每条视频的分类缓存写入）都会在主线程同步编码整份设置，
+        // 数百位博主缓存时点击「删除」会有明显延迟。
+        pendingSave?.cancel()
+        let snapshot = settings
+        let key = settingsKey
+        let item = DispatchWorkItem {
+            if let encoded = try? JSONEncoder().encode(snapshot) {
+                UserDefaults.standard.set(encoded, forKey: key)
+            }
+        }
+        pendingSave = item
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.35, execute: item)
+    }
+
+    /// 立即落盘。App 进入后台时调用，避免防抖窗口内的最后改动丢失。
+    func flushSettings() {
+        pendingSave?.cancel()
+        pendingSave = nil
         if let encoded = try? JSONEncoder().encode(settings) {
             UserDefaults.standard.set(encoded, forKey: settingsKey)
         }
@@ -257,10 +287,12 @@ final class AppStore: ObservableObject {
     func blockUP(mid: Int, name: String = "") {
         guard mid != 0 else { return }
         settings.blockedUPMids.insert(mid)
+        if !name.isEmpty { settings.blockedUPNames[mid] = name }
     }
 
     func unblockUP(mid: Int) {
         settings.blockedUPMids.remove(mid)
+        settings.blockedUPNames.removeValue(forKey: mid)
     }
 
     // MARK: - Creator type filter management
@@ -294,6 +326,30 @@ final class AppStore: ObservableObject {
             settings.whitelistedCreators[mid] = profile
         }
         settings.knownCreators.removeValue(forKey: mid)
+    }
+
+    /// 把归错类的博主手动移入其他分类。手动类型会锁定，分类器不再自动改写。
+    func moveCreator(mid: Int, to type: CreatorType) {
+        guard var profile = settings.knownCreators[mid] ?? settings.whitelistedCreators[mid] else { return }
+        profile.type = type
+        profile.confidence = 1.0
+        profile.isManualType = true
+        settings.knownCreators[mid] = profile
+        // 手动改类后不再属于「放行」名单，重新参与分类屏蔽判断。
+        settings.whitelistedCreators.removeValue(forKey: mid)
+    }
+
+    /// 把博主永久加入黑名单：按 mid 拦截其所有视频，并从识别缓存 / 白名单中移除。
+    func blockCreatorPermanently(mid: Int, name: String = "") {
+        guard mid != 0 else { return }
+        settings.blockedUPMids.insert(mid)
+        let displayName = name.isEmpty
+            ? (settings.knownCreators[mid]?.name ?? settings.whitelistedCreators[mid]?.name ?? "")
+            : name
+        if !displayName.isEmpty { settings.blockedUPNames[mid] = displayName }
+        settings.enableUPBlockFilter = true
+        settings.knownCreators.removeValue(forKey: mid)
+        settings.whitelistedCreators.removeValue(forKey: mid)
     }
 
     /// 把博主从白名单彻底移除（删除）。

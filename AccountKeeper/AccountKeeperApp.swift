@@ -38,6 +38,7 @@ let biliBackgroundGradient = Color.biliBackground
 @main
 struct BiliBiliApp: App {
     @StateObject private var store = AppStore()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // Large shared URL cache so cover/avatar images load instantly on
@@ -52,6 +53,10 @@ struct BiliBiliApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(store)
+                .onChange(of: scenePhase) { _, phase in
+                    // 设置写盘做了防抖，进入后台时立即落盘避免丢失最后一次修改。
+                    if phase != .active { store.flushSettings() }
+                }
         }
     }
 }

@@ -109,6 +109,8 @@ struct FilterSettings: Codable, Hashable {
     // UP主 blacklist（按 mid）
     var enableUPBlockFilter: Bool = false
     var blockedUPMids: Set<Int> = []
+    /// 黑名单 UP 主的名字，仅用于设置页展示，便于辨认与取消屏蔽。
+    var blockedUPNames: [Int: String] = [:]
 
     // Creator type filtering（按博主内容类型批量屏蔽）
     // 基于视频分区 / tag / 标题 / copyright 自动识别 UP 主类型并缓存，
@@ -180,6 +182,7 @@ struct FilterSettings: Codable, Hashable {
         blockedSubZoneTids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedSubZoneTids) ?? []
         enableUPBlockFilter = try c.decodeIfPresent(Bool.self, forKey: .enableUPBlockFilter) ?? false
         blockedUPMids = try c.decodeIfPresent(Set<Int>.self, forKey: .blockedUPMids) ?? []
+        blockedUPNames = try c.decodeIfPresent([Int: String].self, forKey: .blockedUPNames) ?? [:]
         enableCreatorTypeFilter = try c.decodeIfPresent(Bool.self, forKey: .enableCreatorTypeFilter) ?? true
         blockedCreatorTypes = try c.decodeIfPresent(Set<CreatorType>.self, forKey: .blockedCreatorTypes) ?? FilterSettings.defaultBlockedCreatorTypes
         knownCreators = try c.decodeIfPresent([Int: CreatorProfile].self, forKey: .knownCreators) ?? [:]
@@ -698,6 +701,12 @@ struct CreatorProfile: Codable, Hashable, Identifiable {
     var lastSeen: Date
     /// 已参与分类的视频样本数。
     var sampleCount: Int
+    /// 用户手动指定过类型（「移入其他分类」）。为 true 时分类器不再自动改写类型。
+    /// 用可选类型保证老版本持久化数据（无该字段）仍能正常解码。
+    var isManualType: Bool? = nil
+
+    /// 是否由用户手动锁定了分类。
+    var manuallyTyped: Bool { isManualType == true }
 
     init(mid: Int, name: String, avatar: String = "", type: CreatorType, confidence: Double = 0) {
         self.mid = mid
