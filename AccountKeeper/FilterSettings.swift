@@ -641,10 +641,13 @@ enum CreatorType: String, Codable, CaseIterable, Identifiable, Hashable {
     case gameStreamer = "游戏主播/UP"
     case foodBlogger = "美食博主"
     case travelBlogger = "旅游/出行博主"
+    case knowledge = "知识/科普博主"
     case filmEditor = "影视/剪辑博主"
     case animeBlogger = "二次元博主"
     case japaneseAnime = "日本动画博主"
     case fashionBlogger = "穿搭/时尚博主"
+    case autoReview = "汽车评测博主"
+    case news = "新闻资讯号"
     case marketing = "营销号"
     case repost = "搬运号博主"
     case official = "官方账号"
@@ -661,10 +664,13 @@ enum CreatorType: String, Codable, CaseIterable, Identifiable, Hashable {
         case .gameStreamer: return "gamecontroller"
         case .foodBlogger: return "fork.knife"
         case .travelBlogger: return "airplane"
+        case .knowledge: return "books.vertical"
         case .filmEditor: return "film"
         case .animeBlogger: return "sparkles"
         case .japaneseAnime: return "character.book.closed"
         case .fashionBlogger: return "tshirt"
+        case .autoReview: return "car"
+        case .news: return "newspaper"
         case .marketing: return "megaphone"
         case .repost: return "arrow.triangle.2.circlepath"
         case .official: return "checkmark.seal.fill"
@@ -681,10 +687,13 @@ enum CreatorType: String, Codable, CaseIterable, Identifiable, Hashable {
         case .gameStreamer: return .purple
         case .foodBlogger: return .orange
         case .travelBlogger: return .teal
+        case .knowledge: return .brown
         case .filmEditor: return .pink
         case .animeBlogger: return .purple
         case .japaneseAnime: return .red
         case .fashionBlogger: return .pink
+        case .autoReview: return .mint
+        case .news: return .gray
         case .marketing: return .red
         case .repost: return .red
         case .official: return .green
@@ -753,6 +762,58 @@ enum CreatorClassifier {
         "redmi", "realme", "iqoo", "魅族", "努比亚", "折叠屏"
     ]
 
+    /// 各博主类型对应的分区 tid（一级分区与叶子分区混排，命中即归类）。
+    /// 顺序不参与判定，tid 之间互不重叠。
+    private static let zoneTidMap: [CreatorType: Set<Int>] = [
+        .gameStreamer: [4, 17, 171, 172, 65, 173, 121, 136, 19],
+        .foodBlogger: [211, 212, 76],
+        .travelBlogger: [250, 259],
+        .filmEditor: [181, 182, 183, 85, 184],
+        .knowledge: [36, 201, 122, 124, 207, 208, 209, 228, 229],
+        .animeBlogger: [1, 24, 25, 47, 119, 253, 27, 86, 257, 210, 13, 167],
+        .fashionBlogger: [155, 157, 158],
+        .autoReview: [223, 227, 247, 258, 176, 245, 246, 248, 240],
+        .news: [202, 203, 204, 205, 206],
+        .techReview: [188, 95, 230, 231, 232, 233],
+    ]
+
+    /// 无 tid 时用于 tag / 标题兜底的关键词表，顺序即优先级。
+    private static let keywordRules: [(CreatorType, [String])] = [
+        (.gameStreamer, ["游戏", "手游", "单机", "攻略", "实况", "直播切片", "电竞"]),
+        (.foodBlogger, ["美食", "探店", "菜谱", "做法", "吃播", "厨艺"]),
+        (.travelBlogger, ["旅游", "vlog", "自驾", "出行", "城市漫步"]),
+        (.filmEditor, ["影视", "电影", "解说", "盘点", "混剪", "剪辑"]),
+        (.knowledge, ["科普", "知识", "历史", "财经", "社科", "人文"]),
+        (.animeBlogger, ["动画", "动漫", "番剧", "二次元", "鬼畜", "mad"]),
+        (.fashionBlogger, ["穿搭", "ootd", "美妆", "护肤", "时尚"]),
+        (.autoReview, ["汽车", "试驾", "提车", "新能源", "买车", "车型"]),
+        (.news, ["新闻", "热点", "资讯", "时政", "突发", "通报"]),
+        (.techReview, ["数码", "评测", "开箱", "硬件"]),
+    ]
+
+    /// 分区 tid -> 博主类型。叶子分区和一级分区都走这里。
+    private static func typeForZone(_ tid: Int) -> CreatorType? {
+        for (type, tids) in zoneTidMap where tids.contains(tid) {
+            return type
+        }
+        return nil
+    }
+
+    /// 数码类命中机型关键词时细分为「手机评测」。
+    private static func refine(_ type: CreatorType, haystack: String) -> CreatorType {
+        if type == .techReview, phoneKeywords.contains(where: { haystack.contains($0) }) {
+            return .phoneReview
+        }
+        return type
+    }
+
+    private static func keywordMatch(in text: String) -> CreatorType? {
+        for (type, words) in keywordRules where words.contains(where: { text.contains($0) }) {
+            return type
+        }
+        return nil
+    }
+
     /// 推断单条视频所属的博主类型。
     static func classify(video: Video) -> CreatorType {
         let name = video.upName
@@ -788,56 +849,28 @@ enum CreatorClassifier {
             }
         }
 
-        // 4. 按一级/二级分区 tid 判断
         let leafTid = video.tid
-        if let topTid = BiliZone.topTid(forLeaf: leafTid) {
-            switch topTid {
-            case 4:  // 游戏
-                return .gameStreamer
-            case 211: // 美食
-                return .foodBlogger
-            case 181: // 影视
-                return .filmEditor
-            case 1, 13, 167: // 动画 / 番剧 / 国创
-                return .animeBlogger
-            case 155: // 时尚
-                return .fashionBlogger
-            case 160: // 生活
-                if leafTid == 250 { return .travelBlogger } // 出行
-            case 188: // 科技
-                if leafTid == 95 { // 数码
-                    // 手机评测 vs 数码评测
-                    if phoneKeywords.contains(where: { haystack.contains($0) }) {
-                        return .phoneReview
-                    }
-                    return .techReview
-                }
-            default: break
-            }
+
+        // 4. 叶子/二级分区 tid（最具体，优先命中）
+        if leafTid != 0, let type = typeForZone(leafTid) {
+            return refine(type, haystack: haystack)
         }
 
-        // 5. 无 tid 时回退到 tag + 标题关键词
-        let tagSet = Set(video.tags.map { $0.lowercased() })
-        if !tagSet.isEmpty {
-            if tagSet.contains("游戏") || tagSet.contains("手游") || tagSet.contains("单机") { return .gameStreamer }
-            if tagSet.contains("美食") || tagSet.contains("探店") || tagSet.contains("吃播") { return .foodBlogger }
-            if tagSet.contains("影视") || tagSet.contains("影视解说") || tagSet.contains("影视剪辑") { return .filmEditor }
-            if tagSet.contains("动画") || tagSet.contains("动漫") || tagSet.contains("番剧") { return .animeBlogger }
-            if tagSet.contains("穿搭") || tagSet.contains("美妆") || tagSet.contains("时尚") { return .fashionBlogger }
-            if tagSet.contains("旅游") || tagSet.contains("vlog") || tagSet.contains("出行") { return .travelBlogger }
-            if tagSet.contains("手机") || phoneKeywords.contains(where: { tagSet.contains($0) }) { return .phoneReview }
-            if tagSet.contains("数码") || tagSet.contains("评测") || tagSet.contains("开箱") { return .techReview }
+        // 5. 一级分区 tid（叶子分区表里没有时按 B 站分区树回退）
+        if let topTid = BiliZone.topTid(forLeaf: leafTid), let type = typeForZone(topTid) {
+            return refine(type, haystack: haystack)
         }
 
-        // 6. 纯标题关键词兜底（首页推荐流无 tid/tag 时唯一可用信号）
-        if haystack.contains("游戏") { return .gameStreamer }
-        if haystack.contains("美食") || haystack.contains("吃") { return .foodBlogger }
-        if haystack.contains("影视") || haystack.contains("电影") || haystack.contains("解说") { return .filmEditor }
-        if haystack.contains("动画") || haystack.contains("动漫") || haystack.contains("番剧") { return .animeBlogger }
-        if haystack.contains("穿搭") || haystack.contains("美妆") { return .fashionBlogger }
-        if haystack.contains("旅游") || haystack.contains("vlog") { return .travelBlogger }
-        if phoneKeywords.contains(where: { haystack.contains($0) }) { return .phoneReview }
-        if haystack.contains("数码") || haystack.contains("评测") || haystack.contains("开箱") { return .techReview }
+        // 6. tag 关键词
+        if !video.tags.isEmpty,
+           let type = keywordMatch(in: video.tags.joined(separator: " ").lowercased()) {
+            return refine(type, haystack: haystack)
+        }
+
+        // 7. 纯标题关键词兜底（首页推荐流无 tid/tag 时唯一可用信号）
+        if let type = keywordMatch(in: haystack) {
+            return refine(type, haystack: haystack)
+        }
 
         return .other
     }
