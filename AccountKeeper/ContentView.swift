@@ -12,6 +12,8 @@ struct ContentView: View {
     @EnvironmentObject var store: AppStore
     @State private var selectedTab = 0
     @State private var showingSearch = false
+    @State private var crashInfo: String? = nil
+    @State private var showCrashInfo = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -44,6 +46,21 @@ struct ContentView: View {
                     .immersive()
                     .zIndex(50)
             }
+        }
+        .onAppear {
+            // 上次运行若闪退，这里展示定位信息，便于反馈具体出问题的界面。
+            if let text = CrashReporter.takePending() {
+                crashInfo = text
+                showCrashInfo = true
+            }
+        }
+        .alert("上次运行异常退出", isPresented: $showCrashInfo) {
+            Button("复制") {
+                UIPasteboard.general.string = crashInfo ?? ""
+            }
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text(crashInfo ?? "")
         }
     }
 

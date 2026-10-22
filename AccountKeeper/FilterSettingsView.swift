@@ -105,43 +105,43 @@ struct FilterSettingsView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         // Purification dashboard
-                        dashboardCard
+                        dashboardCard.crashMark("设置页·净化面板")
 
                         // Clickbait filter
-                        clickbaitCard
+                        clickbaitCard.crashMark("设置页·标题党规则")
 
                         // Exclamation-mark filter (separate, default off)
-                        exclamationCard
+                        exclamationCard.crashMark("设置页·感叹号规则")
 
                         // Japanese filters
-                        japaneseCard
+                        japaneseCard.crashMark("设置页·日语规则")
 
                         // Duration filter (multi-select)
-                        durationCard
+                        durationCard.crashMark("设置页·时长规则")
 
                         // Category / partition blacklist
-                        categoryCard
+                        categoryCard.crashMark("设置页·分区黑名单")
 
                         // 一级 / 二级分区屏蔽
-                        partitionCard
+                        partitionCard.crashMark("设置页·分区屏蔽")
 
                         // UP主 blacklist
-                        upBlockCard
+                        upBlockCard.crashMark("设置页·UP黑名单")
 
                         // 博主类型过滤看板
-                        creatorTypeCard
+                        creatorTypeCard.crashMark("设置页·博主类型看板")
 
                         // General keyword filter
-                        keywordCard
+                        keywordCard.crashMark("设置页·关键词规则")
 
                         // 视频标签(Tag)屏蔽
-                        tagCard
+                        tagCard.crashMark("设置页·Tag规则")
 
                         // Insult word list
-                        insultWordCard
+                        insultWordCard.crashMark("设置页·辱骂词")
 
                         // UI toggle
-                        uiCard
+                        uiCard.crashMark("设置页·界面开关")
 
                         // Reset
                         Button(role: .destructive) {
@@ -1090,6 +1090,7 @@ struct FilterSettingsView: View {
     }
 
     private func creatorTypeChip(_ type: CreatorType, count: Int) -> some View {
+        let _ = CrashReporter.mark("设置页·类型标签·\(type.rawValue)")
         let blocked = store.settings.blockedCreatorTypes.contains(type)
         let expanded = expandedCreatorTypes.contains(type)
         return VStack(alignment: .leading, spacing: 8) {
