@@ -206,4 +206,24 @@ final class AppStore: ObservableObject {
         history.removeAll()
         saveHistory()
     }
+
+    /// 清掉图片 URLCache（封面/头像），下次进应用会重新下载。
+    func clearImageCache() {
+        URLCache.shared.removeAllCachedResponses()
+    }
+
+    /// 所有设置持久化的总大小（UserDefaults + 图片缓存估算）。
+    var storageFootprint: String {
+        let udKeys = [settingsKey, userKey, historyKey]
+        var totalBytes = 0
+        for key in udKeys {
+            if let data = UserDefaults.standard.data(forKey: key) {
+                totalBytes += data.count
+            }
+        }
+        // 图片缓存大小：直接读不到 URLCache 的 onDisk usage（iOS 没公开 API），
+        // 用 in-memory capacity 估算作参考即可。
+        let cacheBytes = URLCache.shared.memoryCapacity
+        return ByteCountFormatter.string(fromByteCount: Int64(totalBytes + cacheBytes), countStyle: .file)
+    }
 }

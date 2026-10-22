@@ -12,6 +12,7 @@ struct ProfileView: View {
     @Binding var showingSearch: Bool
     @State private var showingLogin = false
     @State private var showingSettings = false
+    @State private var showingFilterCenter = false
     @State private var showingHistory = false
     @State private var selectedVideo: Video?
     @State private var showingLogoutAlert = false
@@ -86,7 +87,15 @@ struct ProfileView: View {
         }
         .overlay {
             if showingSettings {
-                FilterSettingsView(onDismiss: { dismissImmersive { showingSettings = false } })
+                SettingsView(onDismiss: { dismissImmersive { showingSettings = false } })
+                    .environmentObject(store)
+                    .immersive()
+                    .zIndex(30)
+            }
+        }
+        .overlay {
+            if showingFilterCenter {
+                FilterSettingsView(onDismiss: { dismissImmersive { showingFilterCenter = false } })
                     .environmentObject(store)
                     .immersive()
                     .zIndex(30)
@@ -329,7 +338,7 @@ struct ProfileView: View {
                     .fontWeight(.bold)
                 Spacer()
                 Button {
-                    showingSettings = true
+                    showingFilterCenter = true
                 } label: {
                     HStack(spacing: 2) {
                         Text("管理过滤规则")
@@ -491,16 +500,16 @@ struct ProfileView: View {
             showingSettings = true
         } label: {
             HStack(spacing: 14) {
-                Image(systemName: "slider.horizontal.3")
+                Image(systemName: "gearshape.fill")
                     .font(.title3)
                     .foregroundColor(.biliBlue)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("过滤与词库配置中心")
+                    Text("全部设置")
                         .font(.headline)
                         .fontWeight(.bold)
                         .foregroundStyle(.primary)
-                    Text("16档时长多选屏蔽、日文过滤、侮辱词库管理")
+                    Text("账号 · 过滤 · 历史 · 缓存 · 关于")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
