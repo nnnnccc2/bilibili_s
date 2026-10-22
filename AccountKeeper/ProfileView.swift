@@ -84,13 +84,9 @@ struct ProfileView: View {
                     .zIndex(30)
             }
         }
-        .overlay {
-            if showingSettings {
-                FilterSettingsView(onDismiss: { dismissImmersive { showingSettings = false } })
-                    .environmentObject(store)
-                    .immersive()
-                    .zIndex(30)
-            }
+        .fullScreenCover(isPresented: $showingSettings) {
+            FilterSettingsView(onDismiss: { showingSettings = false })
+                .environmentObject(store)
         }
         .overlay {
             if let video = selectedVideo {

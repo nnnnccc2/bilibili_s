@@ -79,6 +79,8 @@ struct FilterSettingsView: View {
                 }
             }
         }
+        .onAppear { store.pushImmersive() }
+        .onDisappear { store.popImmersive() }
     }
 
     // MARK: - Dashboard
