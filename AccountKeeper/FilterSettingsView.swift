@@ -40,15 +40,12 @@ struct FilterSettingsView: View {
     @State private var applyAllConfirmAlert: Bool = false
     @State private var removeConfirmTarget: CreatorProfile?
 
-    // 导入导出（文件方式）
+    // 导入导出
     @State private var importTarget: CreatorImportTarget = .whitelist
     @State private var pendingReplace: Bool = false
     @State private var showWhitelistImportChoice: Bool = false
     @State private var showSettingsImportChoice: Bool = false
-    @State private var showFileImporter: Bool = false
-    @State private var showFileExporter: Bool = false
-    @State private var exportDocument: JSONFileDocument?
-    @State private var exportFilename: String = "bilibili-creators"
+    @State private var documentPicker = JSONDocumentPicker()
     @State private var importResult: String?
     @State private var showImportResult: Bool = false
 
@@ -58,27 +55,6 @@ struct FilterSettingsView: View {
 
     var body: some View {
         contentWithDialogs
-            .fileExporter(
-                isPresented: $showFileExporter,
-                document: exportDocument,
-                contentType: .json,
-                defaultFilename: exportFilename
-            ) { result in
-                switch result {
-                case .success(let url):
-                    importResult = "已导出到文件：\(url.lastPathComponent)"
-                case .failure(let error):
-                    importResult = "导出失败：\(error.localizedDescription)"
-                }
-                showImportResult = true
-            }
-            .fileImporter(
-                isPresented: $showFileImporter,
-                allowedContentTypes: [.json],
-                allowsMultipleSelection: false
-            ) { result in
-                handleImportedFile(result)
-            }
     }
 
     /// 各类确认弹窗（拆分出来降低 body 类型推断压力）。
@@ -1731,16 +1707,14 @@ struct FilterSettingsView: View {
 
     // MARK: - 白名单导入导出
 
-    /// 导出白名单到 JSON 文件（系统文件保存面板）。
+    /// 导出白名单到 JSON 文件（系统分享面板，可存到「文件」或发给其他设备）。
     private func exportWhitelistToFile() {
         guard let json = store.exportWhitelistJSON() else {
             importResult = "导出失败：JSON 编码异常"
             showImportResult = true
             return
         }
-        exportFilename = "bilibili-whitelist-\(Self.timestampSuffix())"
-        exportDocument = JSONFileDocument(text: json)
-        showFileExporter = true
+        shareJSONFile(text: json, filename: "bilibili-whitelist-\(Self.timestampSuffix())")
     }
 
     // MARK: - 博主分类导入导出
@@ -1753,27 +1727,52 @@ struct FilterSettingsView: View {
             showImportResult = true
             return
         }
-        exportFilename = "bilibili-creators-\(Self.timestampSuffix())"
-        exportDocument = JSONFileDocument(text: json)
-        showFileExporter = true
+        shareJSONFile(text: json, filename: "bilibili-creators-\(Self.timestampSuffix())")
     }
 
-    /// 记录导入目标与覆盖策略，待弹窗收起后再拉起文件选择器。
+    /// 写入临时文件并弹出系统分享面板（保存到「文件」/ 隔空投送 / 微信等）。
+    private func shareJSONFile(text: String, filename: String) {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(filename)
+            .appendingPathExtension("json")
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            importResult = "导出失败：\(error.localizedDescription)"
+            showImportResult = true
+            return
+        }
+        guard let top = Self.topViewController() else {
+            importResult = "导出失败：找不到可用的窗口"
+            showImportResult = true
+            return
+        }
+        let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let pop = activity.popoverPresentationController {
+            pop.sourceView = top.view
+            pop.sourceRect = CGRect(
+                x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0
+            )
+        }
+        top.present(activity, animated: true)
+    }
+
+    /// 记录导入目标与覆盖策略，待确认弹窗收起后再拉起系统文件选择器。
     private func startImport(_ target: CreatorImportTarget, replace: Bool) {
         importTarget = target
         pendingReplace = replace
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            showFileImporter = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            presentImportPicker()
         }
     }
 
-    private func handleImportedFile(_ result: Result<[URL], Error>) {
-        switch result {
-        case .failure(let error):
-            importResult = "导入失败：\(error.localizedDescription)"
+    private func presentImportPicker() {
+        guard let top = Self.topViewController() else {
+            importResult = "导入失败：找不到可用的窗口"
             showImportResult = true
-        case .success(let urls):
-            guard let url = urls.first else { return }
+            return
+        }
+        documentPicker.onPick = { url in
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
             guard let text = try? String(contentsOf: url, encoding: .utf8) else {
@@ -1783,6 +1782,10 @@ struct FilterSettingsView: View {
             }
             performImport(text: text)
         }
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.json, .plainText], asCopy: true)
+        picker.delegate = documentPicker
+        picker.allowsMultipleSelection = false
+        top.present(picker, animated: true)
     }
 
     private func performImport(text: String) {
@@ -1808,6 +1811,18 @@ struct FilterSettingsView: View {
         showImportResult = true
     }
 
+    /// 当前最上层的 ViewController，用于弹出系统分享 / 文件选择面板。
+    private static func topViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let windows = scenes.flatMap { $0.windows }
+        let keyWindow = windows.first { $0.isKeyWindow } ?? windows.first
+        guard var vc = keyWindow?.rootViewController else { return nil }
+        while let presented = vc.presentedViewController {
+            vc = presented
+        }
+        return vc
+    }
+
     private static func timestampSuffix() -> String {
         let f = DateFormatter()
         f.dateFormat = "yyyyMMdd-HHmm"
@@ -1821,26 +1836,13 @@ private enum CreatorImportTarget {
     case creatorSettings
 }
 
-/// 用 JSON 文本承载导出内容的轻量文件文档。
-struct JSONFileDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
+/// 系统文件选择器的 delegate 包装（SwiftUI 里没有直接可用的回调入口）。
+final class JSONDocumentPicker: NSObject, UIDocumentPickerDelegate {
+    var onPick: ((URL) -> Void)?
 
-    var text: String
-
-    init(text: String = "") {
-        self.text = text
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        guard let data = configuration.file.regularFileContents,
-              let str = String(data: data, encoding: .utf8) else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        text = str
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: Data(text.utf8))
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        onPick?(url)
     }
 }
 
