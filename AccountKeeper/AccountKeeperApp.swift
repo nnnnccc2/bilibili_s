@@ -71,12 +71,22 @@ struct BiliBiliApp: App {
 /// 便于在不接线的条件下定位到具体卡片。
 enum CrashReporter {
 
+    /// 构建标记：用来确认手机上运行的是哪一版。
+    static let probeTag = "PROBE8"
+
     private static let markerKey = "bili.crash.marker"
     private static let detailKey = "bili.crash.detail"
     private static let sessionKey = "bili.crash.sessionOpen"
     private static let pendingKey = "bili.crash.pending"
 
     private static var lastWritten = ""
+
+    /// 轨迹写在沙盒里并用 fsync 落盘，避免崩溃时最后几行还在系统缓冲里丢掉。
+    private static var logPath: String {
+        let dir = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first
+            ?? NSTemporaryDirectory()
+        return (dir as NSString).appendingPathComponent("bili_trace.log")
+    }
 
     static func install() {
         // C 函数指针不能捕获上下文，这里只用字面量与全局 API。
@@ -100,17 +110,18 @@ enum CrashReporter {
         let marker = UserDefaults.standard.string(forKey: markerKey) ?? ""
         if wasRunning {
             let detail = UserDefaults.standard.string(forKey: detailKey) ?? ""
-            let trace = (UserDefaults.standard.stringArray(forKey: "bili.crash.seq") ?? [])
-                .joined(separator: " → ")
-            var text = detail.isEmpty ? "上次最后位置：\(marker.isEmpty ? "-" : marker)" : detail
+            var text = "\(probeTag) · 构建 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "-")\n\n"
+            text += detail.isEmpty ? "上次最后位置：\(marker.isEmpty ? "-" : marker)" : detail
+            let trace = tailLines(limit: 40)
             if !trace.isEmpty {
                 text += "\n\n渲染轨迹：\n\(trace)"
             }
             UserDefaults.standard.set(text, forKey: pendingKey)
         }
-        // 每次启动都清空，避免展示上一次会话的旧标记。
+        // 每次启动都重置轨迹文件，避免展示上一次会话的旧记录。
+        try? "".write(toFile: logPath, atomically: false, encoding: .utf8)
         UserDefaults.standard.removeObject(forKey: markerKey)
-        UserDefaults.standard.removeObject(forKey: "bili.crash.seq")
+        UserDefaults.standard.removeObject(forKey: detailKey)
         lastWritten = ""
         UserDefaults.standard.set(true, forKey: sessionKey)
     }
@@ -120,17 +131,32 @@ enum CrashReporter {
         UserDefaults.standard.synchronize()
     }
 
-    /// 记录渲染位置（同一位置不重复写盘），并保留本次会话的最近轨迹。
+    /// 记录渲染位置（同一位置不重复写盘），并保留本次会话的轨迹。
     static func mark(_ location: String) {
         guard location != lastWritten else { return }
         lastWritten = location
         UserDefaults.standard.set(location, forKey: markerKey)
-        var seq = UserDefaults.standard.stringArray(forKey: "bili.crash.seq") ?? []
-        seq.append(location)
-        if seq.count > 40 { seq.removeFirst(seq.count - 40) }
-        UserDefaults.standard.set(seq, forKey: "bili.crash.seq")
-        // 立即落盘：崩溃时最后几条异步写入会丢，导致轨迹尾部缺失。
-        UserDefaults.standard.synchronize()
+        appendLine(location)
+    }
+
+    private static func appendLine(_ line: String) {
+        guard let data = (line + "\n").data(using: .utf8) else { return }
+        let path = logPath
+        if !FileManager.default.fileExists(atPath: path) {
+            FileManager.default.createFile(atPath: path, contents: nil)
+        }
+        guard let handle = FileHandle(forWritingAtPath: path) else { return }
+        defer { try? handle.close() }
+        handle.seekToEndOfFile()
+        handle.write(data)
+        // fsync：直接刷到内核，进程异常终止也不会丢这行。
+        fsync(handle.fileDescriptor)
+    }
+
+    private static func tailLines(limit: Int) -> String {
+        guard let content = try? String(contentsOfFile: logPath, encoding: .utf8) else { return "" }
+        let lines = content.split(separator: "\n").map(String.init).filter { !$0.isEmpty }
+        return lines.suffix(limit).joined(separator: " → ")
     }
 
     /// 取出并清空待展示的定位信息。

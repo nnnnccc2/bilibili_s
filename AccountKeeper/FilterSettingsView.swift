@@ -99,62 +99,16 @@ struct FilterSettingsView: View {
 
     /// 主视图内容（拆分出来降低 body 类型推断压力）。
     private var mainBody: some View {
-        NavigationStack {
+        let _ = CrashReporter.mark("PROBE8·展开设置页")
+        return NavigationStack {
             ZStack {
                 biliBackgroundGradient.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 16) {
-                        // Purification dashboard
-                        dashboardCard.crashMark("设置页·净化面板")
-
-                        // Clickbait filter
-                        clickbaitCard.crashMark("设置页·标题党规则")
-
-                        // Exclamation-mark filter (separate, default off)
-                        exclamationCard.crashMark("设置页·感叹号规则")
-
-                        // Japanese filters
-                        japaneseCard.crashMark("设置页·日语规则")
-
-                        // Duration filter (multi-select)
-                        durationCard.crashMark("设置页·时长规则")
-
-                        // Category / partition blacklist
-                        categoryCard.crashMark("设置页·分区黑名单")
-
-                        // 一级 / 二级分区屏蔽
-                        partitionCard.crashMark("设置页·分区屏蔽")
-
-                        // UP主 blacklist
-                        upBlockCard.crashMark("设置页·UP黑名单")
-
-                        // 博主类型过滤看板
-                        creatorTypeCard.crashMark("设置页·博主类型看板")
-
-                        // General keyword filter
-                        keywordCard.crashMark("设置页·关键词规则")
-
-                        // 视频标签(Tag)屏蔽
-                        tagCard.crashMark("设置页·Tag规则")
-
-                        // Insult word list
-                        insultWordCard.crashMark("设置页·辱骂词")
-
-                        // UI toggle
-                        uiCard.crashMark("设置页·界面开关")
-
-                        // Reset
-                        Button(role: .destructive) {
-                            store.settings.stats = FilterStats()
-                        } label: {
-                            Label("重置净化统计数据", systemImage: "arrow.counterclockwise")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.white.opacity(0.6))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 24)
+                        cardsFilterGroup
+                        cardsCreatorGroup
+                        cardsOtherGroup
+                        resetStatsButton
                     }
                     .padding(.vertical, 12)
                 }
@@ -262,6 +216,70 @@ struct FilterSettingsView: View {
                 Text("清空后这些博主会回到各自分类的博主列表，不会被屏蔽。")
             }
         }
+    }
+
+    // MARK: - 设置卡片分组（拆开构建，降低单个 body 的栈与类型推断压力）
+
+    @ViewBuilder
+    private var cardsFilterGroup: some View {
+        // Purification dashboard
+        dashboardCard.crashMark("设置页·净化面板")
+
+        // Clickbait filter
+        clickbaitCard.crashMark("设置页·标题党规则")
+
+        // Exclamation-mark filter (separate, default off)
+        exclamationCard.crashMark("设置页·感叹号规则")
+
+        // Japanese filters
+        japaneseCard.crashMark("设置页·日语规则")
+
+        // Duration filter (multi-select)
+        durationCard.crashMark("设置页·时长规则")
+
+        // Category / partition blacklist
+        categoryCard.crashMark("设置页·分区黑名单")
+
+        // 一级 / 二级分区屏蔽
+        partitionCard.crashMark("设置页·分区屏蔽")
+
+        // UP主 blacklist
+        upBlockCard.crashMark("设置页·UP黑名单")
+    }
+
+    @ViewBuilder
+    private var cardsCreatorGroup: some View {
+        // 博主类型过滤看板
+        creatorTypeCard.crashMark("设置页·博主类型看板")
+    }
+
+    @ViewBuilder
+    private var cardsOtherGroup: some View {
+        // General keyword filter
+        keywordCard.crashMark("设置页·关键词规则")
+
+        // 视频标签(Tag)屏蔽
+        tagCard.crashMark("设置页·Tag规则")
+
+        // Insult word list
+        insultWordCard.crashMark("设置页·辱骂词")
+
+        // UI toggle
+        uiCard.crashMark("设置页·界面开关")
+    }
+
+    private var resetStatsButton: some View {
+        Button(role: .destructive) {
+            store.settings.stats = FilterStats()
+        } label: {
+            Label("重置净化统计数据", systemImage: "arrow.counterclockwise")
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 24)
     }
 
     // MARK: - Dashboard
@@ -923,179 +941,12 @@ struct FilterSettingsView: View {
     // MARK: - Creator type filter
 
     private var creatorTypeCard: some View {
-        let _ = CrashReporter.mark("看板·开始")
-        return VStack(alignment: .leading, spacing: 14) {
-            let _ = CrashReporter.mark("看板·构建开关")
-            Toggle(isOn: $store.settings.enableCreatorTypeFilter) {
-                Label("博主类型过滤", systemImage: "person.2.slash")
-                    .font(.headline)
-            }
-            .tint(.biliBlue)
-            .crashMark("看板·顶部开关")
-
-            let _ = CrashReporter.mark("看板·构建说明")
-            Text("自动识别 UP 主的内容类型（数码评测 / 美食 / 游戏 / 影视剪辑等），按类型批量屏蔽。点击类型标签可展开该类型下的博主，点博主头像可跳转主页；点右侧 ⋯ 可移入其他分类或加入黑名单。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .crashMark("看板·说明文字")
-
+        VStack(alignment: .leading, spacing: 14) {
+            creatorTypeTop
             if store.settings.enableCreatorTypeFilter {
-                let _ = CrashReporter.mark("看板·构建按钮行")
-                HStack(spacing: 10) {
-                    Button {
-                        store.resetBlockedCreatorTypes()
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "arrow.counterclockwise")
-                            Text("恢复默认屏蔽")
-                        }
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.biliBlue)
-                        .clipShape(Capsule())
-                    }
-                    Button {
-                        store.clearKnownCreators()
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "trash")
-                            Text("清空识别缓存")
-                        }
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(Capsule())
-                    }
-                    Button {
-                        exportCreatorSettingsToFile()
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("导出")
-                        }
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.biliBlue)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.biliBlue.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                    Button {
-                        showSettingsImportChoice = true
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "square.and.arrow.down")
-                            Text("导入")
-                        }
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.biliBlue)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.biliBlue.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                    Spacer()
-                    Text("已识别 \(store.settings.knownCreators.count) 位博主")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .crashMark("看板·操作按钮")
-
-                // 按类型统计一次。原来每个 chip 各自扫一遍全量缓存（13 次 O(n) 过滤），
-                // 缓存里博主流多时会明显拖慢点击响应。
-                let _ = CrashReporter.mark("看板·构建统计")
-                let typeCounts = Dictionary(
-                    grouping: store.settings.knownCreators.values,
-                    by: { $0.type }
-                ).mapValues { $0.count }
-                let _ = CrashReporter.mark("看板·类型统计 \(typeCounts.count) 类")
-
-                // 类型 chip 网格：点击整块展开该类型下的博主，点「已屏蔽/未屏蔽」切换屏蔽
-                let _ = CrashReporter.mark("看板·构建网格")
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    ForEach(CreatorType.allCases.filter { $0 != .other }) { type in
-                        creatorTypeChip(type, count: typeCounts[type] ?? 0)
-                    }
-                }
-                .crashMark("看板·类型网格")
-
-                // 白名单：被「移除」的博主都在这里，点标题展开查看
-                if !store.settings.whitelistedCreators.isEmpty {
-                    let _ = CrashReporter.mark("看板·构建白名单头")
-                    Divider().padding(.vertical, 4)
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                            showWhitelist.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.shield")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.green)
-                            Text("白名单")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                            Text("\(store.settings.whitelistedCreators.count)")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Image(systemName: showWhitelist ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-                        .contentShape(Rectangle())
-                        .frame(minHeight: 34)
-                    }
-                    .buttonStyle(.plain)
-
-                    if showWhitelist {
-                        let _ = CrashReporter.mark("看板·展开白名单")
-                        whitelistSection
-                    }
-                }
-
-                // 待确认屏蔽清单：从某类型一键转入，尚未正式生效。
-                if !store.settings.confirmBlockedCreators.isEmpty {
-                    let _ = CrashReporter.mark("看板·构建待确认头")
-                    Divider().padding(.vertical, 4)
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                            showConfirmBlocked.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.orange)
-                            Text("待确认屏蔽")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                            Text("\(store.settings.confirmBlockedCreators.count)")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Image(systemName: showConfirmBlocked ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-                        .contentShape(Rectangle())
-                        .frame(minHeight: 34)
-                    }
-                    .buttonStyle(.plain)
-
-                    if showConfirmBlocked {
-                        let _ = CrashReporter.mark("看板·展开待确认")
-                        confirmBlockedSection
-                    }
-                }
+                creatorTypeActions
+                creatorTypeGrid
+                creatorTypeExtraLists
             }
         }
         .padding(16)
@@ -1103,6 +954,186 @@ struct FilterSettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.biliBorder, lineWidth: 1))
         .padding(.horizontal, 16)
+    }
+
+    /// 看板头部：开关与说明。
+    @ViewBuilder
+    private var creatorTypeTop: some View {
+        let _ = CrashReporter.mark("看板·开始")
+        Toggle(isOn: $store.settings.enableCreatorTypeFilter) {
+            Label("博主类型过滤", systemImage: "person.2.slash")
+                .font(.headline)
+        }
+        .tint(.biliBlue)
+
+        Text("自动识别 UP 主的内容类型（数码评测 / 美食 / 游戏 / 影视剪辑等），按类型批量屏蔽。点击类型标签可展开该类型下的博主，点博主头像可跳转主页；点右侧 ⋯ 可移入其他分类或加入黑名单。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    /// 看板操作行：恢复默认、清空缓存、导入、导出。
+    @ViewBuilder
+    private var creatorTypeActions: some View {
+        let _ = CrashReporter.mark("看板·构建按钮行")
+        HStack(spacing: 10) {
+            Button {
+                store.resetBlockedCreatorTypes()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.counterclockwise")
+                    Text("恢复默认屏蔽")
+                }
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.biliBlue)
+                .clipShape(Capsule())
+            }
+            Button {
+                store.clearKnownCreators()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "trash")
+                    Text("清空识别缓存")
+                }
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(.red)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.red.opacity(0.1))
+                .clipShape(Capsule())
+            }
+            Button {
+                exportCreatorSettingsToFile()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("导出")
+                }
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.biliBlue)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.biliBlue.opacity(0.12))
+                .clipShape(Capsule())
+            }
+            Button {
+                showSettingsImportChoice = true
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "square.and.arrow.down")
+                    Text("导入")
+                }
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.biliBlue)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.biliBlue.opacity(0.12))
+                .clipShape(Capsule())
+            }
+            Spacer()
+            Text("已识别 \(store.settings.knownCreators.count) 位博主")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 类型标签网格。
+    @ViewBuilder
+    private var creatorTypeGrid: some View {
+        // 按类型统计一次。原来每个 chip 各自扫一遍全量缓存（13 次 O(n) 过滤），
+        // 缓存里博主流多时会明显拖慢点击响应。
+        let _ = CrashReporter.mark("看板·构建统计")
+        let typeCounts = Dictionary(
+            grouping: store.settings.knownCreators.values,
+            by: { $0.type }
+        ).mapValues { $0.count }
+
+        let _ = CrashReporter.mark("看板·构建网格")
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            ForEach(CreatorType.allCases.filter { $0 != .other }) { type in
+                creatorTypeChip(type, count: typeCounts[type] ?? 0)
+            }
+        }
+    }
+
+    /// 白名单与待确认屏蔽清单的折叠入口。
+    @ViewBuilder
+    private var creatorTypeExtraLists: some View {
+        // 白名单：被「移除」的博主都在这里，点标题展开查看
+        if !store.settings.whitelistedCreators.isEmpty {
+            let _ = CrashReporter.mark("看板·构建白名单头")
+            Divider().padding(.vertical, 4)
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    showWhitelist.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.shield")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.green)
+                    Text("白名单")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                    Text("\(store.settings.whitelistedCreators.count)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Image(systemName: showWhitelist ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+                .frame(minHeight: 34)
+            }
+            .buttonStyle(.plain)
+
+            if showWhitelist {
+                let _ = CrashReporter.mark("看板·展开白名单")
+                whitelistSection
+            }
+        }
+
+        // 待确认屏蔽清单：从某类型一键转入，尚未正式生效。
+        if !store.settings.confirmBlockedCreators.isEmpty {
+            let _ = CrashReporter.mark("看板·构建待确认头")
+            Divider().padding(.vertical, 4)
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    showConfirmBlocked.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.orange)
+                    Text("待确认屏蔽")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                    Text("\(store.settings.confirmBlockedCreators.count)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Image(systemName: showConfirmBlocked ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+                .frame(minHeight: 34)
+            }
+            .buttonStyle(.plain)
+
+            if showConfirmBlocked {
+                let _ = CrashReporter.mark("看板·展开待确认")
+                confirmBlockedSection
+            }
+        }
     }
 
     private func creatorTypeChip(_ type: CreatorType, count: Int) -> some View {
