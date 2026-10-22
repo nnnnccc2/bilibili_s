@@ -328,6 +328,23 @@ final class AppStore: ObservableObject {
         settings.knownCreators.removeValue(forKey: mid)
     }
 
+    /// 从白名单中彻底删除某位博主。删除后该博主下次出现会重新参与自动分类。
+    func removeFromWhitelist(mid: Int) {
+        settings.whitelistedCreators.removeValue(forKey: mid)
+    }
+
+    /// 清空博主白名单。
+    func clearCreatorWhitelist() {
+        settings.whitelistedCreators.removeAll()
+    }
+
+    /// 清空博主识别缓存 knownCreators。
+    /// 缓存是临时识别结果（上限 800），清空后下次浏览会重新识别。
+    /// 白名单、黑名单、待确认清单不受影响。
+    func clearKnownCreators() {
+        settings.knownCreators.removeAll()
+    }
+
     /// 把归错类的博主手动移入其他分类。手动类型会锁定，分类器不再自动改写。
     func moveCreator(mid: Int, to type: CreatorType) {
         guard var profile = settings.knownCreators[mid] ?? settings.whitelistedCreators[mid] else { return }
@@ -344,28 +361,197 @@ final class AppStore: ObservableObject {
         guard mid != 0 else { return }
         settings.blockedUPMids.insert(mid)
         let displayName = name.isEmpty
-            ? (settings.knownCreators[mid]?.name ?? settings.whitelistedCreators[mid]?.name ?? "")
+            ? (settings.knownCreators[mid]?.name ?? settings.whitelistedCreators[mid]?.name
+                ?? settings.confirmBlockedCreators[mid]?.name ?? "")
             : name
         if !displayName.isEmpty { settings.blockedUPNames[mid] = displayName }
         settings.enableUPBlockFilter = true
         settings.knownCreators.removeValue(forKey: mid)
         settings.whitelistedCreators.removeValue(forKey: mid)
+        settings.confirmBlockedCreators.removeValue(forKey: mid)
     }
 
-    /// 把博主从白名单彻底移除（删除）。
-    /// 移除后该博主下次出现在视频流中时会被重新分类，可能再次进入屏蔽列表。
-    func removeFromWhitelist(mid: Int) {
-        settings.whitelistedCreators.removeValue(forKey: mid)
+    // MARK: - 待确认屏蔽清单（confirmBlockedCreators）
+
+    /// 把已知博主中某类型的全部 UP 一键加入「待确认屏蔽清单」，尚未正式生效。
+    /// 白名单、已在黑名单、或已在待确认清单里的会跳过。
+    @discardableResult
+    func confirmBlockAllCreators(ofType type: CreatorType) -> Int {
+        var added = 0
+        for (mid, profile) in settings.knownCreators
+            where profile.type == type {
+            guard settings.whitelistedCreators[mid] == nil else { continue }
+            guard !settings.blockedUPMids.contains(mid) else { continue }
+            guard settings.confirmBlockedCreators[mid] == nil else { continue }
+            settings.confirmBlockedCreators[mid] = profile
+            added += 1
+        }
+        return added
     }
 
-    /// 清空博主白名单。
-    func clearCreatorWhitelist() {
-        settings.whitelistedCreators.removeAll()
+    /// 单个把博主加入待确认屏蔽清单。
+    func confirmBlockCreator(mid: Int) {
+        guard mid != 0 else { return }
+        guard settings.whitelistedCreators[mid] == nil else { return }
+        guard !settings.blockedUPMids.contains(mid) else { return }
+        if let profile = settings.knownCreators[mid] {
+            settings.confirmBlockedCreators[mid] = profile
+        } else if settings.confirmBlockedCreators[mid] != nil {
+            // 已在待确认清单里，跳过。
+        }
     }
 
-    /// 清空已识别博主缓存。
-    func clearKnownCreators() {
-        settings.knownCreators.removeAll()
+    /// 把待确认清单里的某一位博主正式写入黑名单（生效），同时从待确认清单移除。
+    func applyConfirmBlock(mid: Int) {
+        guard let profile = settings.confirmBlockedCreators[mid] else { return }
+        blockCreatorPermanently(mid: mid, name: profile.name)
+    }
+
+    /// 把待确认清单全部正式生效（批量写入 blockedUPMids）。
+    @discardableResult
+    func applyAllConfirmBlocks() -> Int {
+        let mids = Array(settings.confirmBlockedCreators.keys)
+        for mid in mids {
+            if let profile = settings.confirmBlockedCreators[mid] {
+                blockCreatorPermanently(mid: mid, name: profile.name)
+            }
+        }
+        return mids.count
+    }
+
+    /// 从待确认清单移除某一位（回到未确认状态，不自动进白名单）。
+    func removeFromConfirmBlocked(mid: Int) {
+        settings.confirmBlockedCreators.removeValue(forKey: mid)
+    }
+
+    /// 清空待确认屏蔽清单。
+    func clearConfirmBlockedCreators() {
+        settings.confirmBlockedCreators.removeAll()
+    }
+
+    // MARK: - 白名单导入导出
+
+    /// 导出博主白名单为 JSON 字符串。
+    /// 格式：`[{"mid":123,"name":"xxx","type":"数码评测",...}, ...]`
+    func exportWhitelistJSON() -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        do {
+            let data = try encoder.encode(Array(settings.whitelistedCreators.values))
+            return String(data: data, encoding: .utf8)
+        } catch {
+            print("[BiliBili] exportWhitelistJSON failed: \(error)")
+            return nil
+        }
+    }
+
+    /// 从 JSON 字符串导入博主白名单。
+    /// 支持数组（多个 CreatorProfile）或单个 CreatorProfile 对象。
+    struct WhitelistImportError: LocalizedError {
+        let msg: String
+        var errorDescription: String? { msg }
+    }
+
+    func importWhitelistJSON(_ str: String, replace: Bool = false) throws -> Int {
+        let data = Data(str.utf8)
+        let decoder = JSONDecoder()
+        let profiles: [CreatorProfile]
+        if let arr = try? decoder.decode([CreatorProfile].self, from: data) {
+            profiles = arr
+        } else if let single = try? decoder.decode(CreatorProfile.self, from: data) {
+            profiles = [single]
+        } else {
+            throw WhitelistImportError(msg: "无法解析为 CreatorProfile 数组或对象")
+        }
+        if replace {
+            settings.whitelistedCreators.removeAll()
+        }
+        for p in profiles where p.mid != 0 {
+            settings.whitelistedCreators[p.mid] = p
+        }
+        return profiles.count
+    }
+
+    // MARK: - 分类汇总（博主相关全部设置）导入导出
+
+    /// 博主相关全部设置的导出格式。
+    struct CreatorSettingsExport: Codable {
+        var blockedCreatorTypes: [String]
+        var blockedUPMids: [Int]
+        var blockedUPNames: [Int: String]
+        var whitelist: [CreatorProfile]
+        var confirmBlocked: [CreatorProfile]
+
+        enum CodingKeys: String, CodingKey {
+            case blockedCreatorTypes, blockedUPMids, blockedUPNames
+            case whitelist, confirmBlocked
+        }
+    }
+
+    func exportAllCreatorSettingsJSON() -> String? {
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let exp = CreatorSettingsExport(
+            blockedCreatorTypes: settings.blockedCreatorTypes.map { $0.rawValue },
+            blockedUPMids: Array(settings.blockedUPMids),
+            blockedUPNames: settings.blockedUPNames,
+            whitelist: Array(settings.whitelistedCreators.values),
+            confirmBlocked: Array(settings.confirmBlockedCreators.values)
+        )
+        do {
+            let data = try enc.encode(exp)
+            return String(data: data, encoding: .utf8)
+        } catch {
+            print("[BiliBili] exportAllCreatorSettingsJSON failed: \(error)")
+            return nil
+        }
+    }
+
+    /// 导入博主相关全部设置。replace=true 时覆盖，false 时合并。
+    @discardableResult
+    func importAllCreatorSettingsJSON(_ str: String, replace: Bool = false) throws -> (
+        blockedCreatorTypes: Int, blockedUPMids: Int, whitelist: Int, confirmBlocked: Int
+    ) {
+        let data = Data(str.utf8)
+        let dec = JSONDecoder()
+        // CreatorType rawValue 是中文，自动 decode 即可。
+        let exp = try dec.decode(CreatorSettingsExport.self, from: data)
+        if replace {
+            settings.blockedCreatorTypes.removeAll()
+            settings.blockedUPMids.removeAll()
+            settings.blockedUPNames.removeAll()
+            settings.whitelistedCreators.removeAll()
+            settings.confirmBlockedCreators.removeAll()
+        }
+        var typeCount = 0
+        for name in exp.blockedCreatorTypes {
+            if let t = CreatorType(rawValue: name) {
+                settings.blockedCreatorTypes.insert(t)
+                typeCount += 1
+            }
+        }
+        var blockCount = 0
+        for mid in exp.blockedUPMids {
+            settings.blockedUPMids.insert(mid)
+            blockCount += 1
+        }
+        for (mid, name) in exp.blockedUPNames {
+            settings.blockedUPNames[mid] = name
+        }
+        var wlCount = 0
+        for p in exp.whitelist where p.mid != 0 {
+            settings.whitelistedCreators[p.mid] = p
+            wlCount += 1
+        }
+        var cbCount = 0
+        for p in exp.confirmBlocked where p.mid != 0 {
+            settings.confirmBlockedCreators[p.mid] = p
+            cbCount += 1
+        }
+        if blockCount > 0 {
+            settings.enableUPBlockFilter = true
+        }
+        return (typeCount, blockCount, wlCount, cbCount)
     }
 
     // MARK: - Category blacklist

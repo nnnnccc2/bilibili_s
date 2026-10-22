@@ -126,6 +126,11 @@ struct FilterSettings: Codable, Hashable {
     /// 在白名单里再次点「删除」才会彻底移除。存储完整 profile 便于在设置页展示。
     var whitelistedCreators: [Int: CreatorProfile] = [:]
 
+    /// 待用户确认的屏蔽清单：从某类型一键转入，尚未正式生效。
+    /// 用户可逐个「确认生效」或一键「全部确认生效」后才会批量写入 blockedUPMids。
+    /// 用于让用户在批量拉黑前再审阅一遍，避免把正常 UP 误拉黑。
+    var confirmBlockedCreators: [Int: CreatorProfile] = [:]
+
     static let defaultBlockedCreatorTypes: Set<CreatorType> = [
         .techReview, .phoneReview, .gameStreamer, .foodBlogger,
         .travelBlogger, .filmEditor, .animeBlogger, .japaneseAnime,
@@ -187,6 +192,7 @@ struct FilterSettings: Codable, Hashable {
         blockedCreatorTypes = try c.decodeIfPresent(Set<CreatorType>.self, forKey: .blockedCreatorTypes) ?? FilterSettings.defaultBlockedCreatorTypes
         knownCreators = try c.decodeIfPresent([Int: CreatorProfile].self, forKey: .knownCreators) ?? [:]
         whitelistedCreators = try c.decodeIfPresent([Int: CreatorProfile].self, forKey: .whitelistedCreators) ?? [:]
+        confirmBlockedCreators = try c.decodeIfPresent([Int: CreatorProfile].self, forKey: .confirmBlockedCreators) ?? [:]
         enableKeywordFilter = try c.decodeIfPresent(Bool.self, forKey: .enableKeywordFilter) ?? true
         builtInKeywordsEnabled = try c.decodeIfPresent(Bool.self, forKey: .builtInKeywordsEnabled) ?? true
         customBlockedKeywords = try c.decodeIfPresent([String].self, forKey: .customBlockedKeywords) ?? []

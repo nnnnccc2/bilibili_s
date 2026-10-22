@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct FilterSettingsView: View {
     @EnvironmentObject var store: AppStore
@@ -28,6 +29,20 @@ struct FilterSettingsView: View {
     @State private var blockTarget: CreatorProfile?
     @State private var showBlockConfirm: Bool = false
     @State private var showClearWhitelistConfirm: Bool = false
+
+    // 待确认屏蔽清单相关
+    @State private var showConfirmBlocked: Bool = false
+    @State private var showClearConfirmBlockedConfirm: Bool = false
+    @State private var bulkConfirmType: CreatorType?
+    @State private var showBulkConfirmSheet: Bool = false
+    @State private var applyAllConfirmAlert: Bool = false
+    @State private var removeConfirmTarget: CreatorProfile?
+
+    // 导入导出
+    @State private var showWhitelistImporter: Bool = false
+    @State private var showAllSettingsImporter: Bool = false
+    @State private var importResult: String?
+    @State private var showImportResult: Bool = false
 
     private var selectedDurationCount: Int {
         store.settings.blockedDurationSeconds.count
@@ -143,6 +158,95 @@ struct FilterSettingsView: View {
                 Button("取消", role: .cancel) {}
             } message: {
                 Text("此操作不可撤销，删除后这些博主会重新参与自动分类。")
+            }
+            .confirmationDialog(
+                "加入待确认屏蔽清单？",
+                isPresented: $showBulkConfirmSheet,
+                presenting: bulkConfirmType
+            ) { type in
+                Button("将「\(type.rawValue)」下全部已识别博主加入清单", role: .destructive) {
+                    _ = store.confirmBlockAllCreators(ofType: type)
+                }
+                Button("取消", role: .cancel) {}
+            } message: { type in
+                Text("加入清单后不会立即屏蔽。请到「待确认屏蔽」卡片里查看，确认生效后才会正式拦截。白名单和已拉黑的博主不会被加入。")
+            }
+            .confirmationDialog(
+                "从待确认清单移除？",
+                isPresented: Binding(
+                    get: { removeConfirmTarget != nil },
+                    set: { if !$0 { removeConfirmTarget = nil } }
+                ),
+                presenting: removeConfirmTarget
+            ) { profile in
+                Button("从待确认清单移除「\(profile.name)」", role: .destructive) {
+                    store.removeFromConfirmBlocked(mid: profile.mid)
+                }
+                Button("取消", role: .cancel) {}
+            } message: { _ in
+                Text("不会进白名单，只是从待确认中移除。")
+            }
+            .confirmationDialog(
+                "全部确认生效？",
+                isPresented: $applyAllConfirmAlert,
+                titleVisibility: .visible
+            ) {
+                Button("将 \(store.settings.confirmBlockedCreators.count) 位博主全部写入黑名单", role: .destructive) {
+                    _ = store.applyAllConfirmBlocks()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("确认后会把清单内全部 UP 按 mid 写入屏蔽列表，之后即使博主缓存被清理也会被拦截。")
+            }
+            .confirmationDialog(
+                "清空待确认清单？",
+                isPresented: $showClearConfirmBlockedConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("清空全部 \(store.settings.confirmBlockedCreators.count) 位", role: .destructive) {
+                    store.clearConfirmBlockedCreators()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("此操作不可撤销，清空后清单中博主不会被屏蔽，需重新识别或手动加入。")
+            }
+            // 白名单导入：让用户选择追加还是覆盖
+            .confirmationDialog(
+                "导入白名单 JSON",
+                isPresented: $showWhitelistImporter,
+                titleVisibility: .visible
+            ) {
+                Button("追加到现有白名单") {
+                    doImportWhitelist(replace: false)
+                }
+                Button("覆盖现有白名单", role: .destructive) {
+                    doImportWhitelist(replace: true)
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("请先将 JSON 复制到剪贴板。格式为 CreatorProfile 数组或单个对象。")
+            }
+            // 博主全设置导入：让用户选择追加还是覆盖
+            .confirmationDialog(
+                "导入博主相关设置",
+                isPresented: $showAllSettingsImporter,
+                titleVisibility: .visible
+            ) {
+                Button("追加到现有设置") {
+                    doImportCreatorSettings(replace: false)
+                }
+                Button("覆盖现有设置", role: .destructive) {
+                    doImportCreatorSettings(replace: true)
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将导入博主类型屏蔽、UP 黑名单、白名单、待确认屏蔽清单。请先将 JSON 复制到剪贴板。")
+            }
+            // 导入结果提示
+            .alert("导入结果", isPresented: $showImportResult) {
+                Button("好的", role: .cancel) {}
+            } message: {
+                Text(importResult ?? "完成")
             }
         }
     }
@@ -849,6 +953,36 @@ struct FilterSettingsView: View {
                         .background(Color.red.opacity(0.1))
                         .clipShape(Capsule())
                     }
+                    Button {
+                        exportCreatorSettingsToClipboard()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("导出博主设置")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.biliBlue)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.biliBlue.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                    Button {
+                        showAllSettingsImporter = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "square.and.arrow.down")
+                            Text("导入博主设置")
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.biliBlue)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.biliBlue.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
                     Spacer()
                     Text("已识别 \(store.settings.knownCreators.count) 位博主")
                         .font(.caption)
@@ -899,6 +1033,39 @@ struct FilterSettingsView: View {
 
                     if showWhitelist {
                         whitelistSection
+                    }
+                }
+
+                // 待确认屏蔽清单：从某类型一键转入，尚未正式生效。
+                if !store.settings.confirmBlockedCreators.isEmpty {
+                    Divider().padding(.vertical, 4)
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            showConfirmBlocked.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.orange)
+                            Text("待确认屏蔽")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Text("\(store.settings.confirmBlockedCreators.count)")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Image(systemName: showConfirmBlocked ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .frame(minHeight: 34)
+                    }
+                    .buttonStyle(.plain)
+
+                    if showConfirmBlocked {
+                        confirmBlockedSection
                     }
                 }
             }
@@ -980,6 +1147,7 @@ struct FilterSettingsView: View {
         let creators = store.settings.knownCreators.values
             .filter { $0.type == type }
             .sorted { $0.confidence > $1.confidence }
+        let alreadyInConfirm = store.settings.confirmBlockedCreators.keys
         if creators.isEmpty {
             Text("暂无已识别博主")
                 .font(.system(size: 10))
@@ -990,6 +1158,24 @@ struct FilterSettingsView: View {
                 ForEach(creators) { profile in
                     creatorRow(profile)
                 }
+
+                // 一键把本类型所有博主加入待确认屏蔽清单（不立即生效，用户可在清单里再审阅）。
+                Button(role: .destructive) {
+                    bulkConfirmType = type
+                    showBulkConfirmSheet = true
+                } label: {
+                    let candidateCount = creators.filter { !alreadyInConfirm.contains($0.mid) }.count
+                    Label(
+                        candidateCount == creators.count
+                            ? "将该类型全部 \(creators.count) 位博主加入待确认屏蔽"
+                            : "将未在清单中的 \(candidateCount) 位博主加入待确认屏蔽",
+                        systemImage: "hand.raised.slash"
+                    )
+                    .font(.system(size: 11))
+                }
+                .buttonStyle(.plain)
+                .disabled(candidateCount == 0)
+                .padding(.top, 2)
             }
             .padding(.top, 4)
         }
@@ -1132,6 +1318,30 @@ struct FilterSettingsView: View {
                     }
                 }
                 HStack {
+                    Button {
+                        exportWhitelistToClipboard()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("导出 JSON")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.biliBlue)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        importWhitelistFromClipboard()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.and.arrow.down")
+                            Text("导入 JSON")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.biliBlue)
+                    }
+                    .buttonStyle(.plain)
+
                     Spacer()
                     Button {
                         showClearWhitelistConfirm = true
@@ -1145,6 +1355,107 @@ struct FilterSettingsView: View {
             }
             .padding(.top, 4)
         }
+    }
+
+    /// 待确认屏蔽清单展开视图。
+    /// 每行：头像 + 昵称 + 类型，操作列「生效」、「移除」。
+    /// 顶部有「全部确认生效」按钮、底部有「清空清单」按钮。
+    private var confirmBlockedSection: some View {
+        let creators = store.settings.confirmBlockedCreators.values
+            .sorted { $0.type == $1.type ? $0.name < $1.name : $0.type.rawValue < $1.type.rawValue }
+        return VStack(spacing: 6) {
+            // 顶部：全部确认生效
+            HStack {
+                Button(role: .destructive) {
+                    applyAllConfirmAlert = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "checkmark.shield.fill")
+                        Text("全部确认生效（\(creators.count)）")
+                    }
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.red)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
+
+            ForEach(creators) { profile in
+                HStack(spacing: 8) {
+                    Button {
+                        selectedCreatorMid = profile.mid
+                        selectedCreatorName = profile.name
+                        showCreatorSheet = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            CachedAsyncImage(
+                                url: URL(string: profile.avatar.isEmpty ? "" : profile.avatar),
+                                targetSize: CGSize(width: 48, height: 48)
+                            ) { img in img.resizable().scaledToFill() } placeholder: {
+                                Circle().fill(Color.gray.opacity(0.3))
+                            }
+                            .frame(width: 28, height: 28)
+                            .clipShape(Circle())
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(profile.name)
+                                    .font(.caption)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                Text(profile.type.rawValue)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+
+                    Button {
+                        store.applyConfirmBlock(mid: profile.mid)
+                    } label: {
+                        Text("生效")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.red.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        removeConfirmTarget = profile
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.orange)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("从待确认清单移除")
+                }
+            }
+
+            // 底部：清空清单
+            HStack {
+                Spacer()
+                Button {
+                    showClearConfirmBlockedConfirm = true
+                } label: {
+                    Text("清空清单")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 4)
     }
 
     // MARK: - General keyword filter
@@ -1380,6 +1691,82 @@ struct FilterSettingsView: View {
         guard !trimmed.isEmpty else { return }
         store.addBlockedTag(trimmed)
         newTag = ""
+    }
+
+    // MARK: - 白名单导入导出
+
+    /// 导出白名单 JSON 到剪贴板。
+    private func exportWhitelistToClipboard() {
+        guard let json = store.exportWhitelistJSON() else {
+            importResult = "导出失败：JSON 编码异常"
+            showImportResult = true
+            return
+        }
+        UIPasteboard.general.string = json
+        importResult = "已导出 \(store.settings.whitelistedCreators.count) 位白名单博主到剪贴板"
+        showImportResult = true
+    }
+
+    /// 从剪贴板读取白名单 JSON 并导入。弹出 dialog 让用户选择追加还是覆盖。
+    private func importWhitelistFromClipboard() {
+        showWhitelistImporter = true
+    }
+
+    private func doImportWhitelist(replace: Bool) {
+        guard let json = UIPasteboard.general.string, !json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            importResult = "剪贴板为空，请先复制 JSON 数据"
+            showImportResult = true
+            return
+        }
+        do {
+            let count = try store.importWhitelistJSON(json, replace: replace)
+            importResult = "成功导入 \(count) 位博主到\(replace ? "新" : "现有")白名单"
+        } catch {
+            importResult = "导入失败：\(error.localizedDescription)"
+        }
+        showImportResult = true
+    }
+
+    // MARK: - 博主全设置导入导出
+
+    /// 导出博主相关全部设置到剪贴板。
+    private func exportCreatorSettingsToClipboard() {
+        guard let json = store.exportAllCreatorSettingsJSON() else {
+            importResult = "导出失败：JSON 编码异常"
+            showImportResult = true
+            return
+        }
+        UIPasteboard.general.string = json
+        let s = store.settings
+        importResult = """
+        已导出到剪贴板：
+        · 博主类型屏蔽 \(s.blockedCreatorTypes.count) 项
+        · UP 黑名单 \(s.blockedUPMids.count) 位
+        · 白名单 \(s.whitelistedCreators.count) 位
+        · 待确认屏蔽 \(s.confirmBlockedCreators.count) 位
+        """
+        showImportResult = true
+    }
+
+    private func doImportCreatorSettings(replace: Bool) {
+        guard let json = UIPasteboard.general.string, !json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            importResult = "剪贴板为空，请先复制 JSON 数据"
+            showImportResult = true
+            return
+        }
+        do {
+            let r = try store.importAllCreatorSettingsJSON(json, replace: replace)
+            importResult = """
+            导入完成：
+            · 博主类型屏蔽 \(r.blockedCreatorTypes) 项
+            · UP 黑名单 \(r.blockedUPMids) 位
+            · 白名单 \(r.whitelist) 位
+            · 待确认屏蔽 \(r.confirmBlocked) 位
+            """
+        } catch {
+            importResult = "导入失败：\(error.localizedDescription)"
+        }
+        showImportResult = true
     }
 }
 
