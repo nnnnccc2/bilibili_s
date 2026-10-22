@@ -962,7 +962,7 @@ struct FilterSettingsView: View {
                         }
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color.biliBlue.opacity(0.12))
@@ -977,7 +977,7 @@ struct FilterSettingsView: View {
                         }
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color.biliBlue.opacity(0.12))
@@ -1148,6 +1148,7 @@ struct FilterSettingsView: View {
             .filter { $0.type == type }
             .sorted { $0.confidence > $1.confidence }
         let alreadyInConfirm = store.settings.confirmBlockedCreators.keys
+        let candidateCount = creators.filter { !alreadyInConfirm.contains($0.mid) }.count
         if creators.isEmpty {
             Text("暂无已识别博主")
                 .font(.system(size: 10))
@@ -1164,7 +1165,6 @@ struct FilterSettingsView: View {
                     bulkConfirmType = type
                     showBulkConfirmSheet = true
                 } label: {
-                    let candidateCount = creators.filter { !alreadyInConfirm.contains($0.mid) }.count
                     Label(
                         candidateCount == creators.count
                             ? "将该类型全部 \(creators.count) 位博主加入待确认屏蔽"
@@ -1326,7 +1326,7 @@ struct FilterSettingsView: View {
                             Text("导出 JSON")
                         }
                         .font(.caption2)
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                     }
                     .buttonStyle(.plain)
 
@@ -1338,7 +1338,7 @@ struct FilterSettingsView: View {
                             Text("导入 JSON")
                         }
                         .font(.caption2)
-                        .foregroundStyle(.biliBlue)
+                        .foregroundColor(.biliBlue)
                     }
                     .buttonStyle(.plain)
 
