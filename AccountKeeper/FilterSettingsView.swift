@@ -219,7 +219,7 @@ struct FilterSettingsView: View {
                 }
                 Button("取消", role: .cancel) {}
             } message: { type in
-                Text("加入清单后不会立即屏蔽。请到「待确认屏蔽」卡片里查看，确认生效后才会正式拦截。白名单和已拉黑的博主不会被加入。")
+                Text("加入后这些博主会从分类列表移到待确认屏蔽清单，确认生效后才会正式拦截。白名单和已拉黑的博主不会被加入。")
             }
             .confirmationDialog(
                 "从待确认清单移除？",
@@ -234,7 +234,7 @@ struct FilterSettingsView: View {
                 }
                 Button("取消", role: .cancel) {}
             } message: { _ in
-                Text("不会进白名单，只是从待确认中移除。")
+                Text("移除后该博主会回到所在分类的博主列表，不会被屏蔽，也不会进入白名单。")
             }
             .confirmationDialog(
                 "全部确认生效？",
@@ -258,7 +258,7 @@ struct FilterSettingsView: View {
                 }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("此操作不可撤销，清空后清单中博主不会被屏蔽，需重新识别或手动加入。")
+                Text("清空后这些博主会回到各自分类的博主列表，不会被屏蔽。")
             }
         }
     }
@@ -1152,44 +1152,98 @@ struct FilterSettingsView: View {
     }
 
     /// 展开在类型标签下方的博主列表。
-    /// 常规操作：点头像进主页、点 × 移入白名单；
-    /// 额外操作：点 ⋯ 可移入其他分类或加入黑名单。
+    /// 上半部分是该分类的博主，可一键加入待确认屏蔽；下半部分列出该分类中
+    /// 已加入待确认屏蔽的博主，可直接「生效」或「移除」。
     @ViewBuilder
     private func creatorList(for type: CreatorType) -> some View {
         let creators = store.settings.knownCreators.values
             .filter { $0.type == type }
             .sorted { $0.confidence > $1.confidence }
-        let alreadyInConfirm = store.settings.confirmBlockedCreators.keys
-        let candidateCount = creators.filter { !alreadyInConfirm.contains($0.mid) }.count
-        if creators.isEmpty {
-            Text("暂无已识别博主")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .padding(.vertical, 4)
-        } else {
-            VStack(spacing: 6) {
+        let pending = store.settings.confirmBlockedCreators.values
+            .filter { $0.type == type }
+            .sorted { $0.name < $1.name }
+        VStack(spacing: 6) {
+            if creators.isEmpty {
+                Text("该分类暂无待处理博主")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 4)
+            } else {
                 ForEach(creators) { profile in
                     creatorRow(profile)
                 }
 
-                // 一键把本类型所有博主加入待确认屏蔽清单（不立即生效，用户可在清单里再审阅）。
+                // 一键把本分类所有博主加入待确认屏蔽清单（不立即生效）。
                 Button(role: .destructive) {
                     bulkConfirmType = type
                     showBulkConfirmSheet = true
                 } label: {
                     Label(
-                        candidateCount == creators.count
-                            ? "将该类型全部 \(creators.count) 位博主加入待确认屏蔽"
-                            : "将未在清单中的 \(candidateCount) 位博主加入待确认屏蔽",
+                        "将该分类 \(creators.count) 位博主加入待确认屏蔽",
                         systemImage: "hand.raised.slash"
                     )
                     .font(.system(size: 11))
                 }
                 .buttonStyle(.plain)
-                .disabled(candidateCount == 0)
                 .padding(.top, 2)
             }
-            .padding(.top, 4)
+
+            // 该分类下已加入待确认屏蔽的博主
+            if !pending.isEmpty {
+                Divider().padding(.vertical, 2)
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.orange)
+                    Text("已加入待确认屏蔽 \(pending.count) 位")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                ForEach(pending) { profile in
+                    confirmPendingRow(profile)
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    /// 分类内「待确认屏蔽」条目：可生效或移除（移除后回到分类列表）。
+    private func confirmPendingRow(_ profile: CreatorProfile) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "person.crop.circle.badge.questionmark")
+                .font(.system(size: 13))
+                .foregroundStyle(.orange)
+            Text(profile.name)
+                .font(.system(size: 11))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Button {
+                store.applyConfirmBlock(mid: profile.mid)
+            } label: {
+                Text("生效")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.red.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("确认生效")
+
+            Button {
+                removeConfirmTarget = profile
+            } label: {
+                Image(systemName: "xmark.circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 26, height: 26)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("从待确认清单移除")
         }
     }
 

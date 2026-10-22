@@ -110,6 +110,8 @@ final class AppStore: ObservableObject {
     func classifyAndCache(_ videos: [Video]) {
         let now = Date()
         let whitelist = settings.whitelistedCreators
+        let pendingBlocked = settings.confirmBlockedCreators
+        let blockedMids = settings.blockedUPMids
         // 先在本地副本上合并，循环结束后一次性写回 settings。
         // 之前每条视频都写一次 settings（触发 didSet → 整份设置同步 JSON 编码），
         // 是首页/热门/搜索列表卡顿的主要来源。
@@ -118,6 +120,9 @@ final class AppStore: ObservableObject {
             guard v.upMid != 0 else { continue }
             // 白名单博主不再重新分类，避免用户移除后又被自动加回屏蔽列表。
             guard whitelist[v.upMid] == nil else { continue }
+            // 已在待确认屏蔽清单 / 已拉黑的博主不再回到分类列表。
+            guard pendingBlocked[v.upMid] == nil else { continue }
+            guard !blockedMids.contains(v.upMid) else { continue }
             let detected = CreatorClassifier.classify(video: v)
             if var existing = cache[v.upMid] {
                 existing.sampleCount += 1
@@ -374,28 +379,31 @@ final class AppStore: ObservableObject {
     // MARK: - 待确认屏蔽清单（confirmBlockedCreators）
 
     /// 把已知博主中某类型的全部 UP 一键加入「待确认屏蔽清单」，尚未正式生效。
+    /// 加入后这些博主会从分类列表（knownCreators）里移除，避免分类列表里继续显示。
     /// 白名单、已在黑名单、或已在待确认清单里的会跳过。
     @discardableResult
     func confirmBlockAllCreators(ofType type: CreatorType) -> Int {
         var added = 0
-        for (mid, profile) in settings.knownCreators
-            where profile.type == type {
+        let candidates = settings.knownCreators.filter { $0.value.type == type }
+        for (mid, profile) in candidates {
             guard settings.whitelistedCreators[mid] == nil else { continue }
             guard !settings.blockedUPMids.contains(mid) else { continue }
             guard settings.confirmBlockedCreators[mid] == nil else { continue }
             settings.confirmBlockedCreators[mid] = profile
+            settings.knownCreators.removeValue(forKey: mid)
             added += 1
         }
         return added
     }
 
-    /// 单个把博主加入待确认屏蔽清单。
+    /// 单个把博主加入待确认屏蔽清单，同时从分类列表移除。
     func confirmBlockCreator(mid: Int) {
         guard mid != 0 else { return }
         guard settings.whitelistedCreators[mid] == nil else { return }
         guard !settings.blockedUPMids.contains(mid) else { return }
         if let profile = settings.knownCreators[mid] {
             settings.confirmBlockedCreators[mid] = profile
+            settings.knownCreators.removeValue(forKey: mid)
         } else if settings.confirmBlockedCreators[mid] != nil {
             // 已在待确认清单里，跳过。
         }
@@ -419,14 +427,19 @@ final class AppStore: ObservableObject {
         return mids.count
     }
 
-    /// 从待确认清单移除某一位（回到未确认状态，不自动进白名单）。
+    /// 从待确认清单移除某一位：回到该分类的博主列表，不会被屏蔽。
     func removeFromConfirmBlocked(mid: Int) {
-        settings.confirmBlockedCreators.removeValue(forKey: mid)
+        guard let profile = settings.confirmBlockedCreators.removeValue(forKey: mid) else { return }
+        settings.knownCreators[mid] = profile
     }
 
-    /// 清空待确认屏蔽清单。
+    /// 清空待确认屏蔽清单：全部回到分类列表。
     func clearConfirmBlockedCreators() {
+        let pending = settings.confirmBlockedCreators
         settings.confirmBlockedCreators.removeAll()
+        for (mid, profile) in pending {
+            settings.knownCreators[mid] = profile
+        }
     }
 
     // MARK: - 白名单导入导出
