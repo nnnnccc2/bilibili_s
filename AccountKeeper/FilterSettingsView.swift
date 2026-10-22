@@ -161,6 +161,7 @@ struct FilterSettingsView: View {
             }
             .navigationTitle("垃圾过滤与设置中心")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { CrashReporter.mark("设置页·已显示") }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -928,10 +929,12 @@ struct FilterSettingsView: View {
                     .font(.headline)
             }
             .tint(.biliBlue)
+            .crashMark("看板·顶部开关")
 
             Text("自动识别 UP 主的内容类型（数码评测 / 美食 / 游戏 / 影视剪辑等），按类型批量屏蔽。点击类型标签可展开该类型下的博主，点博主头像可跳转主页；点右侧 ⋯ 可移入其他分类或加入黑名单。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .crashMark("看板·说明文字")
 
             if store.settings.enableCreatorTypeFilter {
                 HStack(spacing: 10) {
@@ -1000,6 +1003,7 @@ struct FilterSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .crashMark("看板·操作按钮")
 
                 // 按类型统计一次。原来每个 chip 各自扫一遍全量缓存（13 次 O(n) 过滤），
                 // 缓存里博主流多时会明显拖慢点击响应。
@@ -1007,6 +1011,7 @@ struct FilterSettingsView: View {
                     grouping: store.settings.knownCreators.values,
                     by: { $0.type }
                 ).mapValues { $0.count }
+                let _ = CrashReporter.mark("看板·类型统计 \(typeCounts.count) 类")
 
                 // 类型 chip 网格：点击整块展开该类型下的博主，点「已屏蔽/未屏蔽」切换屏蔽
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -1014,6 +1019,7 @@ struct FilterSettingsView: View {
                         creatorTypeChip(type, count: typeCounts[type] ?? 0)
                     }
                 }
+                .crashMark("看板·类型网格")
 
                 // 白名单：被「移除」的博主都在这里，点标题展开查看
                 if !store.settings.whitelistedCreators.isEmpty {

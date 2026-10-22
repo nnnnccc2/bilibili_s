@@ -94,17 +94,24 @@ enum CrashReporter {
         }
     }
 
-    /// 启动时调用：上一次运行未正常结束则把最后位置记为待展示信息。
+    /// 启动时调用：上一次运行未正常结束则把最后位置与渲染轨迹记为待展示信息。
     static func beginSession() {
         let wasRunning = UserDefaults.standard.bool(forKey: sessionKey)
         let marker = UserDefaults.standard.string(forKey: markerKey) ?? ""
-        if wasRunning, !marker.isEmpty {
+        if wasRunning {
             let detail = UserDefaults.standard.string(forKey: detailKey) ?? ""
-            UserDefaults.standard.set(
-                detail.isEmpty ? "上次崩溃位置：\(marker)" : detail,
-                forKey: pendingKey
-            )
+            let trace = (UserDefaults.standard.stringArray(forKey: "bili.crash.seq") ?? [])
+                .joined(separator: " → ")
+            var text = detail.isEmpty ? "上次最后位置：\(marker.isEmpty ? "-" : marker)" : detail
+            if !trace.isEmpty {
+                text += "\n\n渲染轨迹：\n\(trace)"
+            }
+            UserDefaults.standard.set(text, forKey: pendingKey)
         }
+        // 每次启动都清空，避免展示上一次会话的旧标记。
+        UserDefaults.standard.removeObject(forKey: markerKey)
+        UserDefaults.standard.removeObject(forKey: "bili.crash.seq")
+        lastWritten = ""
         UserDefaults.standard.set(true, forKey: sessionKey)
     }
 
@@ -113,11 +120,15 @@ enum CrashReporter {
         UserDefaults.standard.synchronize()
     }
 
-    /// 记录渲染位置（同一位置不重复写盘）。
+    /// 记录渲染位置（同一位置不重复写盘），并保留本次会话的最近轨迹。
     static func mark(_ location: String) {
         guard location != lastWritten else { return }
         lastWritten = location
         UserDefaults.standard.set(location, forKey: markerKey)
+        var seq = UserDefaults.standard.stringArray(forKey: "bili.crash.seq") ?? []
+        seq.append(location)
+        if seq.count > 40 { seq.removeFirst(seq.count - 40) }
+        UserDefaults.standard.set(seq, forKey: "bili.crash.seq")
     }
 
     /// 取出并清空待展示的定位信息。
