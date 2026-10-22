@@ -129,6 +129,8 @@ enum CrashReporter {
         seq.append(location)
         if seq.count > 40 { seq.removeFirst(seq.count - 40) }
         UserDefaults.standard.set(seq, forKey: "bili.crash.seq")
+        // 立即落盘：崩溃时最后几条异步写入会丢，导致轨迹尾部缺失。
+        UserDefaults.standard.synchronize()
     }
 
     /// 取出并清空待展示的定位信息。

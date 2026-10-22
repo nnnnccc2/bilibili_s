@@ -923,7 +923,9 @@ struct FilterSettingsView: View {
     // MARK: - Creator type filter
 
     private var creatorTypeCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let _ = CrashReporter.mark("看板·开始")
+        return VStack(alignment: .leading, spacing: 14) {
+            let _ = CrashReporter.mark("看板·构建开关")
             Toggle(isOn: $store.settings.enableCreatorTypeFilter) {
                 Label("博主类型过滤", systemImage: "person.2.slash")
                     .font(.headline)
@@ -931,12 +933,14 @@ struct FilterSettingsView: View {
             .tint(.biliBlue)
             .crashMark("看板·顶部开关")
 
+            let _ = CrashReporter.mark("看板·构建说明")
             Text("自动识别 UP 主的内容类型（数码评测 / 美食 / 游戏 / 影视剪辑等），按类型批量屏蔽。点击类型标签可展开该类型下的博主，点博主头像可跳转主页；点右侧 ⋯ 可移入其他分类或加入黑名单。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .crashMark("看板·说明文字")
 
             if store.settings.enableCreatorTypeFilter {
+                let _ = CrashReporter.mark("看板·构建按钮行")
                 HStack(spacing: 10) {
                     Button {
                         store.resetBlockedCreatorTypes()
@@ -1007,6 +1011,7 @@ struct FilterSettingsView: View {
 
                 // 按类型统计一次。原来每个 chip 各自扫一遍全量缓存（13 次 O(n) 过滤），
                 // 缓存里博主流多时会明显拖慢点击响应。
+                let _ = CrashReporter.mark("看板·构建统计")
                 let typeCounts = Dictionary(
                     grouping: store.settings.knownCreators.values,
                     by: { $0.type }
@@ -1014,6 +1019,7 @@ struct FilterSettingsView: View {
                 let _ = CrashReporter.mark("看板·类型统计 \(typeCounts.count) 类")
 
                 // 类型 chip 网格：点击整块展开该类型下的博主，点「已屏蔽/未屏蔽」切换屏蔽
+                let _ = CrashReporter.mark("看板·构建网格")
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     ForEach(CreatorType.allCases.filter { $0 != .other }) { type in
                         creatorTypeChip(type, count: typeCounts[type] ?? 0)
@@ -1023,6 +1029,7 @@ struct FilterSettingsView: View {
 
                 // 白名单：被「移除」的博主都在这里，点标题展开查看
                 if !store.settings.whitelistedCreators.isEmpty {
+                    let _ = CrashReporter.mark("看板·构建白名单头")
                     Divider().padding(.vertical, 4)
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -1050,12 +1057,14 @@ struct FilterSettingsView: View {
                     .buttonStyle(.plain)
 
                     if showWhitelist {
+                        let _ = CrashReporter.mark("看板·展开白名单")
                         whitelistSection
                     }
                 }
 
                 // 待确认屏蔽清单：从某类型一键转入，尚未正式生效。
                 if !store.settings.confirmBlockedCreators.isEmpty {
+                    let _ = CrashReporter.mark("看板·构建待确认头")
                     Divider().padding(.vertical, 4)
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -1083,6 +1092,7 @@ struct FilterSettingsView: View {
                     .buttonStyle(.plain)
 
                     if showConfirmBlocked {
+                        let _ = CrashReporter.mark("看板·展开待确认")
                         confirmBlockedSection
                     }
                 }
