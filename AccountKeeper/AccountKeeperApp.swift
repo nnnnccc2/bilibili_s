@@ -79,8 +79,9 @@ enum CrashReporter {
     private static var lastWritten = ""
 
     static func install() {
+        // C 函数指针不能捕获上下文，这里只用字面量与全局 API。
         NSSetUncaughtExceptionHandler { exception in
-            let marker = UserDefaults.standard.string(forKey: markerKey) ?? "-"
+            let marker = UserDefaults.standard.string(forKey: "bili.crash.marker") ?? "-"
             let detail = """
             异常：\(exception.name.rawValue)
             原因：\(exception.reason ?? "-")
@@ -88,7 +89,7 @@ enum CrashReporter {
 
             \(exception.callStackSymbols.prefix(30).joined(separator: "\n"))
             """
-            UserDefaults.standard.set(detail, forKey: detailKey)
+            UserDefaults.standard.set(detail, forKey: "bili.crash.detail")
             UserDefaults.standard.synchronize()
         }
     }
