@@ -7,6 +7,8 @@
 
 import SwiftUI
 import UIKit
+import Foundation
+import UniformTypeIdentifiers
 
 struct FilterSettingsView: View {
     @EnvironmentObject var store: AppStore
@@ -38,9 +40,15 @@ struct FilterSettingsView: View {
     @State private var applyAllConfirmAlert: Bool = false
     @State private var removeConfirmTarget: CreatorProfile?
 
-    // 导入导出
-    @State private var showWhitelistImporter: Bool = false
-    @State private var showAllSettingsImporter: Bool = false
+    // 导入导出（文件方式）
+    @State private var importTarget: CreatorImportTarget = .whitelist
+    @State private var pendingReplace: Bool = false
+    @State private var showWhitelistImportChoice: Bool = false
+    @State private var showSettingsImportChoice: Bool = false
+    @State private var showFileImporter: Bool = false
+    @State private var showFileExporter: Bool = false
+    @State private var exportDocument: JSONFileDocument?
+    @State private var exportFilename: String = "bilibili-creators"
     @State private var importResult: String?
     @State private var showImportResult: Bool = false
 
@@ -49,36 +57,62 @@ struct FilterSettingsView: View {
     }
 
     var body: some View {
+        contentWithDialogs
+            .fileExporter(
+                isPresented: $showFileExporter,
+                document: exportDocument,
+                contentType: .json,
+                defaultFilename: exportFilename
+            ) { result in
+                switch result {
+                case .success(let url):
+                    importResult = "已导出到文件：\(url.lastPathComponent)"
+                case .failure(let error):
+                    importResult = "导出失败：\(error.localizedDescription)"
+                }
+                showImportResult = true
+            }
+            .fileImporter(
+                isPresented: $showFileImporter,
+                allowedContentTypes: [.json],
+                allowsMultipleSelection: false
+            ) { result in
+                handleImportedFile(result)
+            }
+    }
+
+    /// 各类确认弹窗（拆分出来降低 body 类型推断压力）。
+    private var contentWithDialogs: some View {
         mainBody
             .confirmationDialog(
-                "导入白名单 JSON",
-                isPresented: $showWhitelistImporter,
+                "导入白名单",
+                isPresented: $showWhitelistImportChoice,
                 titleVisibility: .visible
             ) {
                 Button("追加到现有白名单") {
-                    doImportWhitelist(replace: false)
+                    startImport(.whitelist, replace: false)
                 }
                 Button("覆盖现有白名单", role: .destructive) {
-                    doImportWhitelist(replace: true)
+                    startImport(.whitelist, replace: true)
                 }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("请先将 JSON 复制到剪贴板。格式为 CreatorProfile 数组或单个对象。")
+                Text("选择 JSON 文件后导入。追加保留现有条目，覆盖会先清空现有白名单。")
             }
             .confirmationDialog(
-                "导入博主相关设置",
-                isPresented: $showAllSettingsImporter,
+                "导入博主分类",
+                isPresented: $showSettingsImportChoice,
                 titleVisibility: .visible
             ) {
                 Button("追加到现有设置") {
-                    doImportCreatorSettings(replace: false)
+                    startImport(.creatorSettings, replace: false)
                 }
                 Button("覆盖现有设置", role: .destructive) {
-                    doImportCreatorSettings(replace: true)
+                    startImport(.creatorSettings, replace: true)
                 }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("将导入博主类型屏蔽、UP 黑名单、白名单、待确认屏蔽清单。请先将 JSON 复制到剪贴板。")
+                Text("选择 JSON 文件后导入，恢复各分类博主名单与待确认屏蔽名单，同时恢复博主类型屏蔽、UP 黑名单和白名单。")
             }
             .alert("导入结果", isPresented: $showImportResult) {
                 Button("好的", role: .cancel) {}
@@ -956,11 +990,11 @@ struct FilterSettingsView: View {
                         .clipShape(Capsule())
                     }
                     Button {
-                        exportCreatorSettingsToClipboard()
+                        exportCreatorSettingsToFile()
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: "square.and.arrow.up")
-                            Text("导出博主设置")
+                            Text("导出")
                         }
                         .font(.caption)
                         .fontWeight(.medium)
@@ -971,11 +1005,11 @@ struct FilterSettingsView: View {
                         .clipShape(Capsule())
                     }
                     Button {
-                        showAllSettingsImporter = true
+                        showSettingsImportChoice = true
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: "square.and.arrow.down")
-                            Text("导入博主设置")
+                            Text("导入")
                         }
                         .font(.caption)
                         .fontWeight(.medium)
@@ -1321,11 +1355,11 @@ struct FilterSettingsView: View {
                 }
                 HStack {
                     Button {
-                        exportWhitelistToClipboard()
+                        exportWhitelistToFile()
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.arrow.up")
-                            Text("导出 JSON")
+                            Text("导出")
                         }
                         .font(.caption2)
                         .foregroundColor(.biliBlue)
@@ -1333,11 +1367,11 @@ struct FilterSettingsView: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        importWhitelistFromClipboard()
+                        showWhitelistImportChoice = true
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.arrow.down")
-                            Text("导入 JSON")
+                            Text("导入")
                         }
                         .font(.caption2)
                         .foregroundColor(.biliBlue)
@@ -1697,78 +1731,116 @@ struct FilterSettingsView: View {
 
     // MARK: - 白名单导入导出
 
-    /// 导出白名单 JSON 到剪贴板。
-    private func exportWhitelistToClipboard() {
+    /// 导出白名单到 JSON 文件（系统文件保存面板）。
+    private func exportWhitelistToFile() {
         guard let json = store.exportWhitelistJSON() else {
             importResult = "导出失败：JSON 编码异常"
             showImportResult = true
             return
         }
-        UIPasteboard.general.string = json
-        importResult = "已导出 \(store.settings.whitelistedCreators.count) 位白名单博主到剪贴板"
-        showImportResult = true
+        exportFilename = "bilibili-whitelist-\(Self.timestampSuffix())"
+        exportDocument = JSONFileDocument(text: json)
+        showFileExporter = true
     }
 
-    /// 从剪贴板读取白名单 JSON 并导入。弹出 dialog 让用户选择追加还是覆盖。
-    private func importWhitelistFromClipboard() {
-        showWhitelistImporter = true
-    }
+    // MARK: - 博主分类导入导出
 
-    private func doImportWhitelist(replace: Bool) {
-        guard let json = UIPasteboard.general.string, !json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            importResult = "剪贴板为空，请先复制 JSON 数据"
-            showImportResult = true
-            return
-        }
-        do {
-            let count = try store.importWhitelistJSON(json, replace: replace)
-            importResult = "成功导入 \(count) 位博主到\(replace ? "新" : "现有")白名单"
-        } catch {
-            importResult = "导入失败：\(error.localizedDescription)"
-        }
-        showImportResult = true
-    }
-
-    // MARK: - 博主全设置导入导出
-
-    /// 导出博主相关全部设置到剪贴板。
-    private func exportCreatorSettingsToClipboard() {
+    /// 导出全部博主分类设置到 JSON 文件：各分类下的博主名单 + 待确认屏蔽名单 +
+    /// 类型屏蔽 / UP 黑名单 / 白名单。
+    private func exportCreatorSettingsToFile() {
         guard let json = store.exportAllCreatorSettingsJSON() else {
             importResult = "导出失败：JSON 编码异常"
             showImportResult = true
             return
         }
-        UIPasteboard.general.string = json
-        let s = store.settings
-        importResult = """
-        已导出到剪贴板：
-        · 博主类型屏蔽 \(s.blockedCreatorTypes.count) 项
-        · UP 黑名单 \(s.blockedUPMids.count) 位
-        · 白名单 \(s.whitelistedCreators.count) 位
-        · 待确认屏蔽 \(s.confirmBlockedCreators.count) 位
-        """
-        showImportResult = true
+        exportFilename = "bilibili-creators-\(Self.timestampSuffix())"
+        exportDocument = JSONFileDocument(text: json)
+        showFileExporter = true
     }
 
-    private func doImportCreatorSettings(replace: Bool) {
-        guard let json = UIPasteboard.general.string, !json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            importResult = "剪贴板为空，请先复制 JSON 数据"
-            showImportResult = true
-            return
+    /// 记录导入目标与覆盖策略，待弹窗收起后再拉起文件选择器。
+    private func startImport(_ target: CreatorImportTarget, replace: Bool) {
+        importTarget = target
+        pendingReplace = replace
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            showFileImporter = true
         }
+    }
+
+    private func handleImportedFile(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            importResult = "导入失败：\(error.localizedDescription)"
+            showImportResult = true
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+                importResult = "导入失败：无法读取文件内容"
+                showImportResult = true
+                return
+            }
+            performImport(text: text)
+        }
+    }
+
+    private func performImport(text: String) {
         do {
-            let r = try store.importAllCreatorSettingsJSON(json, replace: replace)
-            importResult = """
-            导入完成：
-            · 博主类型屏蔽 \(r.blockedCreatorTypes) 项
-            · UP 黑名单 \(r.blockedUPMids) 位
-            · 白名单 \(r.whitelist) 位
-            · 待确认屏蔽 \(r.confirmBlocked) 位
-            """
+            switch importTarget {
+            case .whitelist:
+                let count = try store.importWhitelistJSON(text, replace: pendingReplace)
+                importResult = "成功导入 \(count) 位博主到\(pendingReplace ? "新" : "现有")白名单"
+            case .creatorSettings:
+                let r = try store.importAllCreatorSettingsJSON(text, replace: pendingReplace)
+                importResult = """
+                导入完成：
+                · 分类博主 \(r.knownCreators) 位
+                · 待确认屏蔽 \(r.confirmBlocked) 位
+                · 博主类型屏蔽 \(r.blockedCreatorTypes) 项
+                · UP 黑名单 \(r.blockedUPMids) 位
+                · 白名单 \(r.whitelist) 位
+                """
+            }
         } catch {
             importResult = "导入失败：\(error.localizedDescription)"
         }
         showImportResult = true
+    }
+
+    private static func timestampSuffix() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyyMMdd-HHmm"
+        return f.string(from: Date())
+    }
+}
+
+/// 导入导出目标类型。
+private enum CreatorImportTarget {
+    case whitelist
+    case creatorSettings
+}
+
+/// 用 JSON 文本承载导出内容的轻量文件文档。
+struct JSONFileDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+
+    var text: String
+
+    init(text: String = "") {
+        self.text = text
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents,
+              let str = String(data: data, encoding: .utf8) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        text = str
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
     }
 }
 

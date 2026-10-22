@@ -481,10 +481,39 @@ final class AppStore: ObservableObject {
         var blockedUPNames: [Int: String]
         var whitelist: [CreatorProfile]
         var confirmBlocked: [CreatorProfile]
+        /// 各分类下识别到的全部博主（含已进入待确认清单的条目）。
+        var knownCreators: [CreatorProfile]
 
         enum CodingKeys: String, CodingKey {
             case blockedCreatorTypes, blockedUPMids, blockedUPNames
-            case whitelist, confirmBlocked
+            case whitelist, confirmBlocked, knownCreators
+        }
+
+        init(
+            blockedCreatorTypes: [String],
+            blockedUPMids: [Int],
+            blockedUPNames: [Int: String],
+            whitelist: [CreatorProfile],
+            confirmBlocked: [CreatorProfile],
+            knownCreators: [CreatorProfile]
+        ) {
+            self.blockedCreatorTypes = blockedCreatorTypes
+            self.blockedUPMids = blockedUPMids
+            self.blockedUPNames = blockedUPNames
+            self.whitelist = whitelist
+            self.confirmBlocked = confirmBlocked
+            self.knownCreators = knownCreators
+        }
+
+        /// 兼容早期没有 knownCreators 字段的导出文件。
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            blockedCreatorTypes = try c.decodeIfPresent([String].self, forKey: .blockedCreatorTypes) ?? []
+            blockedUPMids = try c.decodeIfPresent([Int].self, forKey: .blockedUPMids) ?? []
+            blockedUPNames = try c.decodeIfPresent([Int: String].self, forKey: .blockedUPNames) ?? [:]
+            whitelist = try c.decodeIfPresent([CreatorProfile].self, forKey: .whitelist) ?? []
+            confirmBlocked = try c.decodeIfPresent([CreatorProfile].self, forKey: .confirmBlocked) ?? []
+            knownCreators = try c.decodeIfPresent([CreatorProfile].self, forKey: .knownCreators) ?? []
         }
     }
 
@@ -496,7 +525,8 @@ final class AppStore: ObservableObject {
             blockedUPMids: Array(settings.blockedUPMids),
             blockedUPNames: settings.blockedUPNames,
             whitelist: Array(settings.whitelistedCreators.values),
-            confirmBlocked: Array(settings.confirmBlockedCreators.values)
+            confirmBlocked: Array(settings.confirmBlockedCreators.values),
+            knownCreators: Array(settings.knownCreators.values)
         )
         do {
             let data = try enc.encode(exp)
@@ -510,7 +540,8 @@ final class AppStore: ObservableObject {
     /// 导入博主相关全部设置。replace=true 时覆盖，false 时合并。
     @discardableResult
     func importAllCreatorSettingsJSON(_ str: String, replace: Bool = false) throws -> (
-        blockedCreatorTypes: Int, blockedUPMids: Int, whitelist: Int, confirmBlocked: Int
+        blockedCreatorTypes: Int, blockedUPMids: Int, whitelist: Int,
+        confirmBlocked: Int, knownCreators: Int
     ) {
         let data = Data(str.utf8)
         let dec = JSONDecoder()
@@ -522,6 +553,7 @@ final class AppStore: ObservableObject {
             settings.blockedUPNames.removeAll()
             settings.whitelistedCreators.removeAll()
             settings.confirmBlockedCreators.removeAll()
+            settings.knownCreators.removeAll()
         }
         var typeCount = 0
         for name in exp.blockedCreatorTypes {
@@ -548,10 +580,18 @@ final class AppStore: ObservableObject {
             settings.confirmBlockedCreators[p.mid] = p
             cbCount += 1
         }
+        var knownCount = 0
+        for p in exp.knownCreators where p.mid != 0 {
+            settings.knownCreators[p.mid] = p
+            knownCount += 1
+        }
         if blockCount > 0 {
             settings.enableUPBlockFilter = true
         }
-        return (typeCount, blockCount, wlCount, cbCount)
+        if typeCount > 0 {
+            settings.enableCreatorTypeFilter = true
+        }
+        return (typeCount, blockCount, wlCount, cbCount, knownCount)
     }
 
     // MARK: - Category blacklist
