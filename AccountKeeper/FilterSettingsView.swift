@@ -49,6 +49,46 @@ struct FilterSettingsView: View {
     }
 
     var body: some View {
+        mainBody
+            .confirmationDialog(
+                "导入白名单 JSON",
+                isPresented: $showWhitelistImporter,
+                titleVisibility: .visible
+            ) {
+                Button("追加到现有白名单") {
+                    doImportWhitelist(replace: false)
+                }
+                Button("覆盖现有白名单", role: .destructive) {
+                    doImportWhitelist(replace: true)
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("请先将 JSON 复制到剪贴板。格式为 CreatorProfile 数组或单个对象。")
+            }
+            .confirmationDialog(
+                "导入博主相关设置",
+                isPresented: $showAllSettingsImporter,
+                titleVisibility: .visible
+            ) {
+                Button("追加到现有设置") {
+                    doImportCreatorSettings(replace: false)
+                }
+                Button("覆盖现有设置", role: .destructive) {
+                    doImportCreatorSettings(replace: true)
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将导入博主类型屏蔽、UP 黑名单、白名单、待确认屏蔽清单。请先将 JSON 复制到剪贴板。")
+            }
+            .alert("导入结果", isPresented: $showImportResult) {
+                Button("好的", role: .cancel) {}
+            } message: {
+                Text(importResult ?? "完成")
+            }
+    }
+
+    /// 主视图内容（拆分出来降低 body 类型推断压力）。
+    private var mainBody: some View {
         NavigationStack {
             ZStack {
                 biliBackgroundGradient.ignoresSafeArea()
@@ -209,44 +249,6 @@ struct FilterSettingsView: View {
                 Button("取消", role: .cancel) {}
             } message: {
                 Text("此操作不可撤销，清空后清单中博主不会被屏蔽，需重新识别或手动加入。")
-            }
-            // 白名单导入：让用户选择追加还是覆盖
-            .confirmationDialog(
-                "导入白名单 JSON",
-                isPresented: $showWhitelistImporter,
-                titleVisibility: .visible
-            ) {
-                Button("追加到现有白名单") {
-                    doImportWhitelist(replace: false)
-                }
-                Button("覆盖现有白名单", role: .destructive) {
-                    doImportWhitelist(replace: true)
-                }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("请先将 JSON 复制到剪贴板。格式为 CreatorProfile 数组或单个对象。")
-            }
-            // 博主全设置导入：让用户选择追加还是覆盖
-            .confirmationDialog(
-                "导入博主相关设置",
-                isPresented: $showAllSettingsImporter,
-                titleVisibility: .visible
-            ) {
-                Button("追加到现有设置") {
-                    doImportCreatorSettings(replace: false)
-                }
-                Button("覆盖现有设置", role: .destructive) {
-                    doImportCreatorSettings(replace: true)
-                }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("将导入博主类型屏蔽、UP 黑名单、白名单、待确认屏蔽清单。请先将 JSON 复制到剪贴板。")
-            }
-            // 导入结果提示
-            .alert("导入结果", isPresented: $showImportResult) {
-                Button("好的", role: .cancel) {}
-            } message: {
-                Text(importResult ?? "完成")
             }
         }
     }
