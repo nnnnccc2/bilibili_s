@@ -100,7 +100,7 @@ struct FilterSettingsView: View {
     /// 主视图内容（拆分出来降低 body 类型推断压力）。
     private var mainBody: some View {
         let _ = CrashReporter.mark("PROBE8·展开设置页")
-        return NavigationStack {
+        return NavigationView {
             ZStack {
                 biliBackgroundGradient.ignoresSafeArea()
                 ScrollView {
@@ -1994,7 +1994,7 @@ struct CreatorTypePickerView: View {
     let profile: CreatorProfile
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             List {
                 Section {
                     ForEach(CreatorType.allCases) { type in
@@ -2036,7 +2036,7 @@ struct CreatorTypePickerView: View {
 }
 
 #Preview {
-    NavigationStack {
+    NavigationView {
         FilterSettingsView()
             .environmentObject(AppStore())
     }
