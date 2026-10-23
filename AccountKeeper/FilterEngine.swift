@@ -151,6 +151,12 @@ final class FilterEngine {
     /// Resolve a video's partition against the 一级/二级分区 blacklist.
     /// Prefers the API-provided leaf `tid`; when it is missing (some feeds such
     /// as 首页推荐 return no partition), falls back to the partition name.
+    ///
+    /// Robustness fallback:
+    /// parentByLeaf 里找不到 leafTid 的父分区时，直接把 leafTid 当作一级分区 tid
+    /// 和 blockedTopZoneTids 比对 —— B 站偶尔新增分区，静态目录还没跟上时也能
+    /// 命中用户屏蔽。category 维度过滤（精确匹配）已在 shouldBlock 的第 5 步处理，
+    /// 不会走到这里再检查一遍。
     private func partitionBlockReason(for video: Video) -> BlockReason? {
         var leafTid = video.tid
         if leafTid == 0, !video.category.isEmpty {
@@ -158,9 +164,17 @@ final class FilterEngine {
         }
         guard leafTid != 0 else { return nil }
 
-        if let topTid = BiliZone.topTid(forLeaf: leafTid),
-           settings.blockedTopZoneTids.contains(topTid) {
-            return .partitionBlocked
+        if let topTid = BiliZone.topTid(forLeaf: leafTid) {
+            // 正常路径：通过 parentByLeaf 找到一级分区，比对用户的一级黑名单。
+            if settings.blockedTopZoneTids.contains(topTid) {
+                return .partitionBlocked
+            }
+        } else {
+            // 兜底：leafTid 不在静态分区目录里（B 站新增分区），
+            // 直接把它当一级分区比对 —— 用户很可能就是在设置里屏蔽了它。
+            if settings.blockedTopZoneTids.contains(leafTid) {
+                return .partitionBlocked
+            }
         }
         if settings.blockedSubZoneTids.contains(leafTid) {
             return .partitionBlocked

@@ -548,15 +548,38 @@ final class BiliAPI {
     /// 用 `/x/web-interface/view/detail`（网页视频页同款接口），一次返回 `View`（tid/desc/duration）
     /// 与 `Tags`（tag_name 列表），比 `/x/tag/archive/tags` 少一半请求，且后者在 iOS 上会被
     /// WAF 直接回 412 风控页（实测「补tag 0/20 · HTTP412」）。
+    ///
+    /// 失败时（HTTP 412 风控 / B 站 code!=0 / 网络错误）**自动用 ignoreCookies: true 重试一次**：
+    /// 登录 cookie 过期后 view/detail 会一直回 -101/-352，但游客态取公开元数据通常不受影响。
     private func fetchMeta(bvid: String, completion: @escaping ([String: Any]?, [String], Int, String, Int, String) -> Void) {
-        request("https://api.bilibili.com/x/web-interface/view/detail", params: ["bvid": bvid]) { [weak self] data, response, _ in
+        fetchMeta(bvid: bvid, ignoreCookies: false, completion: completion)
+    }
+
+    private func fetchMeta(bvid: String, ignoreCookies: Bool, completion: @escaping ([String: Any]?, [String], Int, String, Int, String) -> Void) {
+        request("https://api.bilibili.com/x/web-interface/view/detail",
+                params: ["bvid": bvid], ignoreCookies: ignoreCookies) { [weak self] data, response, _ in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let body = Self.snippet(data)
-            guard let self = self, let json = self.parseJSON(data) else {
+            guard let self = self else {
                 completion(nil, [], -1, "无响应", status, body)
                 return
             }
+            guard let json = self.parseJSON(data) else {
+                // parseJSON 失败 = 网络/DNS 错 或 B 站回了风控 HTML
+                // 第一次失败 → 无 cookie 重试（游客态风控通常宽松）
+                if !ignoreCookies {
+                    self.fetchMeta(bvid: bvid, ignoreCookies: true, completion: completion)
+                } else {
+                    completion(nil, [], -1, "无响应", status, body)
+                }
+                return
+            }
             let code = json["code"] as? Int ?? -1
+            // 失败且还没无 cookie 重试过：cookie 过期（-101/-352）/ WAF 风控 → 游客态重试
+            if (code != 0 || status == 412) && !ignoreCookies {
+                self.fetchMeta(bvid: bvid, ignoreCookies: true, completion: completion)
+                return
+            }
             guard code == 0, let d = json["data"] as? [String: Any] else {
                 completion(nil, [], code, json["message"] as? String ?? "", status, body)
                 return
@@ -572,16 +595,33 @@ final class BiliAPI {
 
     /// 兜底：按 bvid 走搜索接口拿 typeid + tag（逗号分隔）。
     /// 搜索接口在 App 内实测可用（搜索页过滤一直正常），WAF 比 tag 接口宽松。
+    /// 同样支持失败时无 cookie 自动重试一次。
     private func fetchMetaBySearch(bvid: String, completion: @escaping (Int, [String], Int, String, Int, String) -> Void) {
+        fetchMetaBySearch(bvid: bvid, ignoreCookies: false, completion: completion)
+    }
+
+    private func fetchMetaBySearch(bvid: String, ignoreCookies: Bool, completion: @escaping (Int, [String], Int, String, Int, String) -> Void) {
         request("https://api.bilibili.com/x/web-interface/search/type",
-                params: ["search_type": "video", "keyword": bvid]) { [weak self] data, response, _ in
+                params: ["search_type": "video", "keyword": bvid], ignoreCookies: ignoreCookies) { [weak self] data, response, _ in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let body = Self.snippet(data)
-            guard let self = self, let json = self.parseJSON(data) else {
+            guard let self = self else {
                 completion(0, [], -1, "无响应", status, body)
                 return
             }
+            guard let json = self.parseJSON(data) else {
+                if !ignoreCookies {
+                    self.fetchMetaBySearch(bvid: bvid, ignoreCookies: true, completion: completion)
+                } else {
+                    completion(0, [], -1, "无响应", status, body)
+                }
+                return
+            }
             let code = json["code"] as? Int ?? -1
+            if (code != 0 || status == 412) && !ignoreCookies {
+                self.fetchMetaBySearch(bvid: bvid, ignoreCookies: true, completion: completion)
+                return
+            }
             guard code == 0,
                   let d = json["data"] as? [String: Any],
                   let list = d["result"] as? [[String: Any]],
