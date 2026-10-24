@@ -102,7 +102,7 @@ struct AccountDetailView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
+        ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button {
                     isEditing = true
@@ -112,16 +112,19 @@ struct AccountDetailView: View {
                 Button {
                     exportMessages()
                 } label: {
-                    Label("导出该账号短信（CSV）", systemImage: "doc.text")
+                    Label("导出短信（CSV）", systemImage: "doc.text")
                 }
-                Divider()
-                Button(role: .destructive) {
-                    isConfirmingDelete = true
-                } label: {
-                    Label("删除凭证", systemImage: "trash")
+
+                Section {
+                    Button(role: .destructive) {
+                        isConfirmingDelete = true
+                    } label: {
+                        Label("删除凭证", systemImage: "trash")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 20))
             }
         }
     }

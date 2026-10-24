@@ -131,9 +131,10 @@
 			};
 			buildConfigurationList = B20000000000000000000011 /* Build configuration list for PBXProject "AccountSave" */;
 			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				"zh-Hans",
 				en,
 				Base,
 			);

@@ -16,6 +16,7 @@ struct SMSInboxView: View {
         NavigationStack {
             content
                 .navigationTitle("凭证存储")
+                .navigationBarTitleDisplayMode(.large)
                 .searchable(
                     text: $searchText,
                     placement: .navigationBarDrawer(displayMode: .always),
@@ -119,22 +120,24 @@ struct SMSInboxView: View {
                 Button {
                     isShowingGuide = true
                 } label: {
-                    Label("配置快捷指令", systemImage: "questionmark.circle")
+                    Label("配置快捷指令", systemImage: "lightbulb")
                 }
-                Divider()
-                Button {
-                    export(kind: .accounts)
-                } label: {
-                    Label("导出账号清单（Excel）", systemImage: "tablecells")
-                }
-                Button {
-                    export(kind: .messages)
-                } label: {
-                    Label("导出全部短信（CSV）", systemImage: "doc.text")
+
+                Section("导出") {
+                    Button {
+                        export(kind: .accounts)
+                    } label: {
+                        Label("账号清单（Excel）", systemImage: "tablecells")
+                    }
+                    Button {
+                        export(kind: .messages)
+                    } label: {
+                        Label("全部短信（CSV）", systemImage: "doc.text")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 22))
+                    .font(.system(size: 20))
             }
         }
     }
