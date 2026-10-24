@@ -37,16 +37,17 @@ struct ImportMerchantSMSIntent: AppIntent {
     }
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult {
         // 用 App 的主上下文写入，界面上的列表会同步刷新。
         let context = AppStore.container.mainContext
-        let account = try SMSSaver.save(
+        // 保存后不返回 dialog，避免快捷指令自动化运行时弹出「保存成功」提示。
+        try SMSSaver.save(
             in: context,
             accountName: accountName,
             sender: sender,
             content: content,
             recipient: recipient
         )
-        return .result(dialog: "已保存到账号「\(account.name)」")
+        return .result()
     }
 }
