@@ -260,21 +260,15 @@ struct AccountGroupDetailView: View {
         List {
             Section {
                 HStack(spacing: 14) {
-                    MerchantIconView(name: group.name, size: 60)
+                    MerchantIconView(name: group.name, size: 52)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(group.name)
-                            .font(.system(size: 21, weight: .semibold))
-                        if !group.phones.isEmpty {
-                            Text(group.phones.joined(separator: "、"))
-                                .font(.system(size: 15))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    Text(group.name)
+                        .font(.system(size: 20, weight: .semibold))
+                        .lineLimit(1)
 
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
             }
 
             Section {
@@ -282,14 +276,10 @@ struct AccountGroupDetailView: View {
                     NavigationLink {
                         AccountDetailView(account: account)
                     } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "phone")
-                                .font(.system(size: 15))
-                                .foregroundStyle(.secondary)
-                            Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                                .font(.system(size: 17))
-                        }
-                        .padding(.vertical, 6)
+                        Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
+                            .font(.system(size: 17, design: .monospaced))
+                            .foregroundStyle(account.phoneNumber.isEmpty ? Color.secondary : Color.primary)
+                            .padding(.vertical, 6)
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
@@ -302,6 +292,7 @@ struct AccountGroupDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(16)
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
         .alert(
