@@ -60,24 +60,56 @@ struct SMSInboxView: View {
             ContentUnavailableView.search(text: searchText)
         } else {
             List {
-                ForEach(displayedGroups) { group in
-                    NavigationLink {
-                        AccountGroupDetailView(group: group)
-                    } label: {
-                        AccountGroupRowView(group: group)
-                    }
-                    .listRowBackground(Color(.systemBackground))
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            groupToDelete = group
+                Section {
+                    summaryCard
+                }
+
+                Section {
+                    ForEach(displayedGroups) { group in
+                        NavigationLink {
+                            AccountGroupDetailView(group: group)
                         } label: {
-                            Label("删除", systemImage: "trash")
+                            AccountGroupRowView(group: group)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                groupToDelete = group
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                            }
                         }
                     }
                 }
             }
-            .listStyle(.plain)
+            .listStyle(.insetGrouped)
         }
+    }
+
+    /// 顶部概览：默默记下的账号与手机号总量。
+    private var summaryCard: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("已默默记下")
+                    .font(.system(size: 15, weight: .medium))
+                Text("\(accounts.count) 个账号 · \(phoneTotal) 个手机号")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// 去重后的注册手机号数量。
+    private var phoneTotal: Int {
+        Set(accounts.map(\.phoneNumber).filter { !$0.isEmpty }).count
     }
 
     @ToolbarContentBuilder
@@ -196,11 +228,23 @@ struct AccountGroup: Identifiable, Hashable {
     var accounts: [Account]
 
     var id: String { name }
+
+    /// 该账号下所有注册手机号（去空、去重）。
+    var phones: [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for account in accounts where !account.phoneNumber.isEmpty {
+            if seen.insert(account.phoneNumber).inserted {
+                result.append(account.phoneNumber)
+            }
+        }
+        return result
+    }
 }
 
 // MARK: - 主列表行（按账号名聚合）
 
-/// 聚合行：品牌图标 + 账号名。手机号进账号后查看，避免重复干扰。
+/// 聚合行：品牌图标 + 账号名 + 注册手机号（次级灰字，同行展示）。
 struct AccountGroupRowView: View {
     let group: AccountGroup
 
@@ -208,13 +252,20 @@ struct AccountGroupRowView: View {
         HStack(spacing: 12) {
             MerchantIconView(name: group.name, size: 46)
 
-            Text(group.name)
-                .font(.system(size: 17, weight: .semibold))
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(group.name)
+                    .font(.system(size: 17, weight: .semibold))
+                    .lineLimit(1)
+
+                Text(group.phones.isEmpty ? "未填写手机号" : group.phones.joined(separator: "、"))
+                    .font(.system(size: 14))
+                    .foregroundStyle(group.phones.isEmpty ? .tertiary : .secondary)
+                    .lineLimit(1)
+            }
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
     }
 }
 
@@ -231,15 +282,23 @@ struct AccountGroupDetailView: View {
         List {
             Section {
                 HStack(spacing: 14) {
-                    MerchantIconView(name: group.name, size: 52)
+                    MerchantIconView(name: group.name, size: 56)
+                        .shadow(color: Color.black.opacity(0.12), radius: 8, y: 3)
 
                     Text(group.name)
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 21, weight: .semibold))
                         .lineLimit(1)
 
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 10)
+                .padding(.vertical, 12)
+                .listRowBackground(
+                    LinearGradient(
+                        colors: [brandTint.opacity(0.14), Color(.secondarySystemGroupedBackground)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             }
 
             Section {
@@ -276,6 +335,11 @@ struct AccountGroupDetailView: View {
         } message: { account in
             Text("将删除账号 \(account.name)（\(account.phoneNumberText)）及其下所有记录。")
         }
+    }
+
+    /// 品牌色，用于顶部卡片的淡色底。
+    private var brandTint: Color {
+        MerchantIcon.brand(for: group.name)?.color ?? .accentColor
     }
 
     private var isConfirmingAccountDelete: Binding<Bool> {

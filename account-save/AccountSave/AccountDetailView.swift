@@ -70,21 +70,34 @@ struct AccountDetailView: View {
 
     private var headerCard: some View {
         HStack(spacing: 14) {
-            MerchantIconView(name: account.name, size: 62)
+            MerchantIconView(name: account.name, size: 58)
+                .shadow(color: Color.black.opacity(0.12), radius: 8, y: 3)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(account.name)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 21, weight: .semibold))
 
                 Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 16, weight: .medium, design: .monospaced))
                     .foregroundStyle(account.phoneNumber.isEmpty ? .tertiary : .secondary)
             }
 
             Spacer(minLength: 0)
         }
         .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: cardShape)
+        .background(
+            LinearGradient(
+                colors: [brandTint.opacity(0.14), Color(.secondarySystemGroupedBackground)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: cardShape
+        )
+    }
+
+    /// 品牌色，用于顶部卡片淡色底。
+    private var brandTint: Color {
+        MerchantIcon.brand(for: account.name)?.color ?? .accentColor
     }
 
     @ToolbarContentBuilder
@@ -239,11 +252,17 @@ struct MessageRowView: View {
                     copy(code)
                 } label: {
                     HStack(spacing: 6) {
-                        Text("验证码 \(code)")
-                        Image(systemName: didCopy ? "checkmark.square" : "doc.on.doc")
+                        Text(code)
+                            .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                        Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(didCopy ? "已复制" : "复制验证码")
+                            .font(.system(size: 13, weight: .medium))
                     }
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.accentColor.opacity(0.10), in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
