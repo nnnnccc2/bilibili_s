@@ -107,12 +107,12 @@ struct AccountDetailView: View {
                 Button {
                     isEditing = true
                 } label: {
-                    Label("编辑凭证信息", systemImage: "pencil")
+                    Label("编辑信息", systemImage: "pencil")
                 }
                 Button {
                     exportMessages()
                 } label: {
-                    Label("导出短信（CSV）", systemImage: "doc.text")
+                    Label("导出短信", systemImage: "doc.text")
                 }
 
                 Section {

@@ -127,12 +127,12 @@ struct SMSInboxView: View {
                     Button {
                         export(kind: .accounts)
                     } label: {
-                        Label("账号清单（Excel）", systemImage: "tablecells")
+                        Label("账号清单", systemImage: "tablecells")
                     }
                     Button {
                         export(kind: .messages)
                     } label: {
-                        Label("全部短信（CSV）", systemImage: "doc.text")
+                        Label("全部短信", systemImage: "doc.text")
                     }
                 }
             } label: {
