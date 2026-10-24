@@ -257,40 +257,51 @@ struct AccountGroupDetailView: View {
     @State private var accountToDelete: Account?
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerCard
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+        List {
+            Section {
+                HStack(spacing: 14) {
+                    MerchantIconView(name: group.name, size: 60)
 
-            List {
-                Section {
-                    ForEach(group.accounts) { account in
-                        NavigationLink {
-                            AccountDetailView(account: account)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "phone")
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(.secondary)
-                                Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                                    .font(.system(size: 17))
-                            }
-                            .padding(.vertical, 6)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(group.name)
+                            .font(.system(size: 21, weight: .semibold))
+                        if !group.phones.isEmpty {
+                            Text(group.phones.joined(separator: "、"))
+                                .font(.system(size: 15))
+                                .foregroundStyle(.secondary)
                         }
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                accountToDelete = account
-                            } label: {
-                                Label("删除", systemImage: "trash")
-                            }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 8)
+            }
+
+            Section {
+                ForEach(group.accounts) { account in
+                    NavigationLink {
+                        AccountDetailView(account: account)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "phone")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.secondary)
+                            Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
+                                .font(.system(size: 17))
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            accountToDelete = account
+                        } label: {
+                            Label("删除", systemImage: "trash")
                         }
                     }
                 }
             }
-            .listStyle(.insetGrouped)
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
         .alert(
@@ -303,29 +314,6 @@ struct AccountGroupDetailView: View {
         } message: { account in
             Text("将删除账号 \(account.name)（\(account.phoneNumberText)）及其下所有记录。")
         }
-    }
-
-    private var headerCard: some View {
-        HStack(spacing: 14) {
-            MerchantIconView(name: group.name, size: 60)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(group.name)
-                    .font(.system(size: 21, weight: .semibold))
-                if !group.phones.isEmpty {
-                    Text(group.phones.joined(separator: "、"))
-                        .font(.system(size: 15))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
     }
 
     private var isConfirmingAccountDelete: Binding<Bool> {
