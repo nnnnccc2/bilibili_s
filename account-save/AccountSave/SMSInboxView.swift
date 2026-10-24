@@ -196,54 +196,25 @@ struct AccountGroup: Identifiable, Hashable {
     var accounts: [Account]
 
     var id: String { name }
-
-    /// 所有注册手机号（去空、去重）。
-    var phones: [String] {
-        var seen = Set<String>()
-        var result: [String] = []
-        for account in accounts where !account.phoneNumber.isEmpty {
-            if seen.insert(account.phoneNumber).inserted {
-                result.append(account.phoneNumber)
-            }
-        }
-        return result
-    }
 }
 
 // MARK: - 主列表行（按账号名聚合）
 
-/// 聚合行：品牌图标 + 账号名 + 注册手机号（普通文字）。
+/// 聚合行：品牌图标 + 账号名。手机号进账号后查看，避免重复干扰。
 struct AccountGroupRowView: View {
     let group: AccountGroup
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(spacing: 12) {
             MerchantIconView(name: group.name, size: 46)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(group.name)
-                    .font(.system(size: 17, weight: .semibold))
-                    .lineLimit(1)
-
-                if group.phones.isEmpty {
-                    Text("未填写手机号")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.tertiary)
-                } else {
-                    // 同一账号下的每个注册手机号各占一行，清晰列出。
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(group.phones, id: \.self) { phone in
-                            Text(phone)
-                                .font(.system(size: 14))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
+            Text(group.name)
+                .font(.system(size: 17, weight: .semibold))
+                .lineLimit(1)
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 }
 

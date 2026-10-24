@@ -225,15 +225,10 @@ struct MessageRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(message.senderText)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                Text(DateText.absolute(message.receivedAt))
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-            }
+            Text(DateText.absolute(message.receivedAt))
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
             Text(message.content)
                 .font(.system(size: 17))
