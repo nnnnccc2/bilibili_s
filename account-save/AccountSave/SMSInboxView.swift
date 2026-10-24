@@ -277,9 +277,9 @@ struct AccountGroupDetailView: View {
                         AccountDetailView(account: account)
                     } label: {
                         Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                            .font(.system(size: 17, design: .monospaced))
+                            .font(.system(size: 20, weight: .medium, design: .monospaced))
                             .foregroundStyle(account.phoneNumber.isEmpty ? Color.secondary : Color.primary)
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 10)
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
