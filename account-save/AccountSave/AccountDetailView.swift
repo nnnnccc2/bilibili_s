@@ -104,28 +104,27 @@ struct AccountDetailView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
-                Button {
+                Button("编辑信息") {
                     isEditing = true
-                } label: {
-                    Label("编辑信息", systemImage: "pencil")
                 }
-                Button {
+                Button("导出短信") {
                     exportMessages()
-                } label: {
-                    Label("导出短信", systemImage: "doc.text")
                 }
 
                 Section {
-                    Button(role: .destructive) {
+                    Button("删除凭证", role: .destructive) {
                         isConfirmingDelete = true
-                    } label: {
-                        Label("删除凭证", systemImage: "trash")
                     }
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 18, height: 18)
             }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.circle)
+            .controlSize(.small)
+            .tint(Color.primary)
         }
     }
 

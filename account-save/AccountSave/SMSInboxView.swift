@@ -117,28 +117,27 @@ struct SMSInboxView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
-                Button {
+                Button("配置步骤") {
                     isShowingGuide = true
-                } label: {
-                    Label("配置步骤", systemImage: "lightbulb")
                 }
 
                 Section("导出") {
-                    Button {
+                    Button("账号清单") {
                         export(kind: .accounts)
-                    } label: {
-                        Label("账号清单", systemImage: "tablecells")
                     }
-                    Button {
+                    Button("全部短信") {
                         export(kind: .messages)
-                    } label: {
-                        Label("全部短信", systemImage: "doc.text")
                     }
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 18, height: 18)
             }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.circle)
+            .controlSize(.small)
+            .tint(Color.primary)
         }
     }
 
