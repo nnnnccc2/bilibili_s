@@ -13,8 +13,8 @@ struct SMSInboxView: View {
     @State private var exportError: String?
     @State private var groupToDelete: AccountGroup?
 
-    /// 右上角操作弹层的宽度。
-    private let actionsPopoverWidth: CGFloat = 196
+    /// 右上角操作卡片的宽度。
+    private let actionsMenuWidth: CGFloat = 196
 
     var body: some View {
         NavigationStack {
@@ -27,6 +27,11 @@ struct SMSInboxView: View {
                     prompt: "搜索账号、手机号或短信"
                 )
                 .toolbar { toolbarContent }
+                .overlay {
+                    if isShowingActions {
+                        actionsMenu
+                    }
+                }
         }
         .sheet(isPresented: $isShowingGuide) {
             ConfigImportView()
@@ -121,50 +126,77 @@ struct SMSInboxView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Button {
-                isShowingActions = true
+                withAnimation(.easeOut(duration: 0.16)) {
+                    isShowingActions = true
+                }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 18, height: 18)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 28, height: 28)
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.circle)
-            .controlSize(.small)
-            .tint(Color.primary)
-            .popover(isPresented: $isShowingActions, arrowEdge: .top) {
-                VStack(alignment: .leading, spacing: 0) {
-                    PopoverActionRow(icon: "lightbulb", title: "配置步骤") {
-                        dismissThen { isShowingGuide = true }
-                    }
-
-                    Divider()
-                        .padding(.leading, 42)
-
-                    Text("导出")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 8)
-                        .padding(.bottom, 2)
-
-                    PopoverActionRow(icon: "tablecells", title: "账号清单") {
-                        dismissThen { export(kind: .accounts) }
-                    }
-                    PopoverActionRow(icon: "doc.text", title: "全部短信") {
-                        dismissThen { export(kind: .messages) }
-                    }
-                }
-                .padding(.vertical, 6)
-                .frame(width: actionsPopoverWidth)
-                .presentationCompactAdaptation(.popover)
-            }
+            .buttonStyle(.plain)
         }
     }
 
-    /// 关闭弹层后再执行动作，避免与 popover 收起动画冲突。
+    /// 无箭头、无灰底的右上角操作卡片。
+    private var actionsMenu: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.opacity(0.001)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        isShowingActions = false
+                    }
+                }
+
+            VStack(alignment: .leading, spacing: 0) {
+                ActionMenuRow(icon: "lightbulb", title: "配置步骤") {
+                    dismissThen { isShowingGuide = true }
+                }
+
+                Divider()
+                    .padding(.leading, 42)
+
+                Text("导出")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 8)
+                    .padding(.bottom, 2)
+
+                ActionMenuRow(icon: "tablecells", title: "账号清单") {
+                    dismissThen { export(kind: .accounts) }
+                }
+                ActionMenuRow(icon: "doc.text", title: "全部短信") {
+                    dismissThen { export(kind: .messages) }
+                }
+            }
+            .padding(.vertical, 6)
+            .frame(width: actionsMenuWidth)
+            .background(.regularMaterial, in: actionsMenuShape)
+            .overlay(
+                actionsMenuShape
+                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.16), radius: 20, y: 8)
+            .padding(.top, 6)
+            .padding(.trailing, 14)
+        }
+        .transition(.opacity)
+    }
+
+    private var actionsMenuShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+    }
+
+    /// 关闭弹层后再执行动作，避免弹层与后续页面切换打架。
     private func dismissThen(_ action: @escaping () -> Void) {
-        isShowingActions = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: action)
+        withAnimation(.easeOut(duration: 0.15)) {
+            isShowingActions = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: action)
     }
 
     // MARK: - 按账号名聚合 + 搜索 + 排序
@@ -272,8 +304,8 @@ struct AccountGroup: Identifiable, Hashable {
 
 // MARK: - 紧凑操作弹层
 
-/// 弹层中的一行操作：图标 + 文案，紧凑对齐。
-struct PopoverActionRow: View {
+/// 操作卡片中的一行：图标 + 文案，紧凑对齐。
+struct ActionMenuRow: View {
     let icon: String
     let title: String
     var isDestructive = false
