@@ -95,6 +95,8 @@ struct SMSInboxView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .listSectionSpacing(14)
+            .contentMargins(.top, 12, for: .scrollContent)
         }
     }
 
