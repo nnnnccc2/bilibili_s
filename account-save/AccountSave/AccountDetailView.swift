@@ -22,20 +22,22 @@ struct AccountDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
+            VStack(spacing: 17.5) {
                 headerCard
 
-                if messages.isEmpty {
-                    Text("暂无短信")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
-                        .background(Color(.secondarySystemGroupedBackground), in: cardShape)
-                } else {
-                    ForEach(messages) { message in
-                        SwipeDeleteMessageRow(message: message, radius: cardRadius) {
-                            delete(message)
+                VStack(spacing: 14) {
+                    if messages.isEmpty {
+                        Text("暂无短信")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                            .background(Color(.secondarySystemGroupedBackground), in: cardShape)
+                    } else {
+                        ForEach(messages) { message in
+                            SwipeDeleteMessageRow(message: message, radius: cardRadius) {
+                                delete(message)
+                            }
                         }
                     }
                 }
