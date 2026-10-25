@@ -75,9 +75,6 @@ struct SMSInboxView: View {
             List {
                 Section {
                     summaryCard
-                        .listRowInsets(
-                            EdgeInsets(top: -18, leading: 16, bottom: 0, trailing: 16)
-                        )
                 }
 
                 Section {
