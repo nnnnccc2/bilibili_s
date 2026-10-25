@@ -16,7 +16,7 @@ struct SMSInboxView: View {
         NavigationStack {
             content
                 .navigationTitle("凭证存储")
-                .navigationBarTitleDisplayMode(.large)
+                .navigationBarTitleDisplayMode(.inline)
                 .searchable(
                     text: $searchText,
                     placement: .navigationBarDrawer(displayMode: .always),
@@ -120,7 +120,7 @@ struct SMSInboxView: View {
                 Button {
                     isShowingGuide = true
                 } label: {
-                    Label("配置快捷指令", systemImage: "lightbulb")
+                    Label("配置步骤", systemImage: "lightbulb")
                 }
 
                 Section("导出") {
@@ -136,8 +136,8 @@ struct SMSInboxView: View {
                     }
                 }
             } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 20))
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .semibold))
             }
         }
     }
@@ -252,16 +252,16 @@ struct AccountGroupRowView: View {
     let group: AccountGroup
 
     var body: some View {
-        HStack(spacing: 12) {
-            MerchantIconView(name: group.name, size: 46)
+        HStack(spacing: 10) {
+            MerchantIconView(name: group.name, size: 40)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(group.name)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .lineLimit(1)
 
-                Text(group.phones.isEmpty ? "未填写手机号" : group.phones.joined(separator: "、"))
-                    .font(.system(size: 14))
+                Text(group.phones.isEmpty ? "未填写手机号" : group.phones.joined(separator: " · "))
+                    .font(.system(size: 13))
                     .foregroundStyle(group.phones.isEmpty ? .tertiary : .secondary)
                     .lineLimit(1)
             }
@@ -285,16 +285,16 @@ struct AccountGroupDetailView: View {
         List {
             Section {
                 HStack(spacing: 14) {
-                    MerchantIconView(name: group.name, size: 56)
-                        .shadow(color: Color.black.opacity(0.12), radius: 8, y: 3)
+                    MerchantIconView(name: group.name, size: 50)
+                        .shadow(color: Color.black.opacity(0.10), radius: 6, y: 2)
 
                     Text(group.name)
-                        .font(.system(size: 21, weight: .semibold))
+                        .font(.system(size: 20, weight: .semibold))
                         .lineLimit(1)
 
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
                 .listRowBackground(
                     LinearGradient(
                         colors: [brandTint.opacity(0.14), Color(.secondarySystemGroupedBackground)],
@@ -309,10 +309,16 @@ struct AccountGroupDetailView: View {
                     NavigationLink {
                         AccountDetailView(account: account)
                     } label: {
-                        Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
-                            .font(.system(size: 20, weight: .medium, design: .monospaced))
-                            .foregroundStyle(account.phoneNumber.isEmpty ? Color.secondary : Color.primary)
-                            .padding(.vertical, 10)
+                        HStack(spacing: 10) {
+                            Image(systemName: "number")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+
+                            Text(account.phoneNumber.isEmpty ? "未填写手机号" : account.phoneNumber)
+                                .font(.system(size: 17, weight: .medium, design: .monospaced))
+                                .foregroundStyle(account.phoneNumber.isEmpty ? Color.secondary : Color.primary)
+                        }
+                        .padding(.vertical, 12)
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {

@@ -123,8 +123,8 @@ struct AccountDetailView: View {
                     }
                 }
             } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 20))
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .semibold))
             }
         }
     }
