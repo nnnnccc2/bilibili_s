@@ -11,6 +11,7 @@ struct AccountDetailView: View {
 
     @State private var isEditing = false
     @State private var isConfirmingDelete = false
+    @State private var isShowingActions = false
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
 
@@ -103,19 +104,8 @@ struct AccountDetailView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                Button("编辑信息") {
-                    isEditing = true
-                }
-                Button("导出短信") {
-                    exportMessages()
-                }
-
-                Section {
-                    Button("删除凭证", role: .destructive) {
-                        isConfirmingDelete = true
-                    }
-                }
+            Button {
+                isShowingActions = true
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 14, weight: .semibold))
@@ -125,7 +115,33 @@ struct AccountDetailView: View {
             .buttonBorderShape(.circle)
             .controlSize(.small)
             .tint(Color.primary)
+            .popover(isPresented: $isShowingActions, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 0) {
+                    PopoverActionRow(icon: "pencil", title: "编辑信息") {
+                        dismissThen { isEditing = true }
+                    }
+                    PopoverActionRow(icon: "doc.text", title: "导出短信") {
+                        dismissThen { exportMessages() }
+                    }
+
+                    Divider()
+                        .padding(.leading, 42)
+
+                    PopoverActionRow(icon: "trash", title: "删除凭证", isDestructive: true) {
+                        dismissThen { isConfirmingDelete = true }
+                    }
+                }
+                .padding(.vertical, 6)
+                .frame(width: 196)
+                .presentationCompactAdaptation(.popover)
+            }
         }
+    }
+
+    /// 关闭弹层后再执行动作，避免与 popover 收起动画冲突。
+    private func dismissThen(_ action: @escaping () -> Void) {
+        isShowingActions = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: action)
     }
 
     private var exportErrorBinding: Binding<Bool> {

@@ -8,9 +8,13 @@ struct SMSInboxView: View {
 
     @State private var searchText = ""
     @State private var isShowingGuide = false
+    @State private var isShowingActions = false
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
     @State private var groupToDelete: AccountGroup?
+
+    /// 右上角操作弹层的宽度。
+    private let actionsPopoverWidth: CGFloat = 196
 
     var body: some View {
         NavigationStack {
@@ -116,19 +120,8 @@ struct SMSInboxView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                Button("配置步骤") {
-                    isShowingGuide = true
-                }
-
-                Section("导出") {
-                    Button("账号清单") {
-                        export(kind: .accounts)
-                    }
-                    Button("全部短信") {
-                        export(kind: .messages)
-                    }
-                }
+            Button {
+                isShowingActions = true
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 14, weight: .semibold))
@@ -138,7 +131,40 @@ struct SMSInboxView: View {
             .buttonBorderShape(.circle)
             .controlSize(.small)
             .tint(Color.primary)
+            .popover(isPresented: $isShowingActions, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 0) {
+                    PopoverActionRow(icon: "lightbulb", title: "配置步骤") {
+                        dismissThen { isShowingGuide = true }
+                    }
+
+                    Divider()
+                        .padding(.leading, 42)
+
+                    Text("导出")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 8)
+                        .padding(.bottom, 2)
+
+                    PopoverActionRow(icon: "tablecells", title: "账号清单") {
+                        dismissThen { export(kind: .accounts) }
+                    }
+                    PopoverActionRow(icon: "doc.text", title: "全部短信") {
+                        dismissThen { export(kind: .messages) }
+                    }
+                }
+                .padding(.vertical, 6)
+                .frame(width: actionsPopoverWidth)
+                .presentationCompactAdaptation(.popover)
+            }
         }
+    }
+
+    /// 关闭弹层后再执行动作，避免与 popover 收起动画冲突。
+    private func dismissThen(_ action: @escaping () -> Void) {
+        isShowingActions = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: action)
     }
 
     // MARK: - 按账号名聚合 + 搜索 + 排序
@@ -241,6 +267,36 @@ struct AccountGroup: Identifiable, Hashable {
             }
         }
         return result
+    }
+}
+
+// MARK: - 紧凑操作弹层
+
+/// 弹层中的一行操作：图标 + 文案，紧凑对齐。
+struct PopoverActionRow: View {
+    let icon: String
+    let title: String
+    var isDestructive = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 20)
+
+                Text(title)
+                    .font(.system(size: 15))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isDestructive ? Color.red : Color.primary)
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
