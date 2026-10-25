@@ -35,6 +35,7 @@ struct SMSInboxView: View {
                 actionsMenu
             }
         }
+        .animation(.easeOut(duration: 0.16), value: isShowingActions)
         .sheet(isPresented: $isShowingGuide) {
             ConfigImportView()
         }
@@ -94,6 +95,8 @@ struct SMSInboxView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .listSectionSpacing(12)
+            .contentMargins(.top, 6, for: .scrollContent)
         }
     }
 
@@ -193,7 +196,7 @@ struct SMSInboxView: View {
                 .offset(x: max(12, cardX), y: cardY)
             }
         }
-        .transition(.opacity)
+        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
     }
 
     /// 关闭弹层后再执行动作，避免弹层与后续页面切换打架。
@@ -311,18 +314,6 @@ struct AccountGroup: Identifiable, Hashable {
 
 /// 菜单按钮在屏幕坐标系中的位置，用于把操作卡片贴到按钮下方。
 struct MenuAnchorKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        let next = nextValue()
-        if next != .zero {
-            value = next
-        }
-    }
-}
-
-/// 账号详情页菜单按钮的位置，与主界面分开避免互相覆盖。
-struct DetailMenuAnchorKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
 
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
