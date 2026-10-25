@@ -22,7 +22,7 @@ struct AccountDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16.7) {
+            VStack(spacing: 16.6) {
                 headerCard
 
                 VStack(spacing: 14) {
