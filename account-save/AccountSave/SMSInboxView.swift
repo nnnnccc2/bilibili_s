@@ -95,8 +95,6 @@ struct SMSInboxView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .listSectionSpacing(12)
-            .contentMargins(.top, 12, for: .scrollContent)
         }
     }
 
@@ -388,16 +386,16 @@ struct AccountGroupRowView: View {
     let group: AccountGroup
 
     var body: some View {
-        HStack(spacing: 10) {
-            MerchantIconView(name: group.name, size: 40)
+        HStack(spacing: 12) {
+            MerchantIconView(name: group.name, size: 46)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(group.name)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .lineLimit(1)
 
-                Text(group.phones.isEmpty ? "未填写手机号" : group.phones.joined(separator: " · "))
-                    .font(.system(size: 13))
+                Text(group.phones.isEmpty ? "未填写手机号" : group.phones.joined(separator: "、"))
+                    .font(.system(size: 14))
                     .foregroundStyle(group.phones.isEmpty ? .tertiary : .secondary)
                     .lineLimit(1)
             }
