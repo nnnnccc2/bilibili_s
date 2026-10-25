@@ -12,9 +12,10 @@ struct SMSInboxView: View {
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
     @State private var groupToDelete: AccountGroup?
+    @State private var menuAnchor: CGRect = .zero
 
     /// 右上角操作卡片的宽度。
-    private let actionsMenuWidth: CGFloat = 228
+    private let actionsMenuWidth: CGFloat = 220
 
     var body: some View {
         NavigationStack {
@@ -27,11 +28,12 @@ struct SMSInboxView: View {
                     prompt: "搜索账号、手机号或短信"
                 )
                 .toolbar { toolbarContent }
-                .overlay {
-                    if isShowingActions {
-                        actionsMenu
-                    }
-                }
+        }
+        .onPreferenceChange(MenuAnchorKey.self) { menuAnchor = $0 }
+        .overlay {
+            if isShowingActions {
+                actionsMenu
+            }
         }
         .sheet(isPresented: $isShowingGuide) {
             ConfigImportView()
@@ -134,47 +136,62 @@ struct SMSInboxView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.primary)
                     .frame(width: 28, height: 28)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: MenuAnchorKey.self,
+                                value: proxy.frame(in: .global)
+                            )
+                        }
+                    )
             }
             .buttonStyle(.plain)
         }
     }
 
-    /// 右上角操作卡片：白底、无箭头，带遮罩。
+    /// 右上角操作卡片：贴着按钮下方展开，无箭头。
     private var actionsMenu: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.opacity(0.18)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        isShowingActions = false
+        GeometryReader { proxy in
+            let origin = proxy.frame(in: .global).origin
+            let cardX = (menuAnchor == .zero ? proxy.size.width - 16 : menuAnchor.maxX)
+                - actionsMenuWidth - origin.x
+            let cardY = (menuAnchor == .zero ? 104 : menuAnchor.maxY + 6) - origin.y
+
+            ZStack(alignment: .topLeading) {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            isShowingActions = false
+                        }
+                    }
+
+                ActionsMenuCard(width: actionsMenuWidth) {
+                    ActionMenuRow(icon: "lightbulb", title: "配置步骤") {
+                        dismissThen { isShowingGuide = true }
+                    }
+
+                    Divider()
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 2)
+
+                    Text("导出")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 6)
+                        .padding(.bottom, 2)
+
+                    ActionMenuRow(icon: "tablecells", title: "账号清单") {
+                        dismissThen { export(kind: .accounts) }
+                    }
+                    ActionMenuRow(icon: "doc.text", title: "全部短信") {
+                        dismissThen { export(kind: .messages) }
                     }
                 }
-
-            ActionsMenuCard(width: actionsMenuWidth) {
-                ActionMenuRow(icon: "lightbulb", title: "配置步骤") {
-                    dismissThen { isShowingGuide = true }
-                }
-
-                Divider()
-                    .padding(.leading, 50)
-
-                Text("导出")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .padding(.bottom, 2)
-
-                ActionMenuRow(icon: "tablecells", title: "账号清单") {
-                    dismissThen { export(kind: .accounts) }
-                }
-                ActionMenuRow(icon: "doc.text", title: "全部短信") {
-                    dismissThen { export(kind: .messages) }
-                }
+                .offset(x: max(12, cardX), y: cardY)
             }
-            .padding(.top, 10)
-            .padding(.trailing, 16)
         }
         .transition(.opacity)
     }
@@ -292,6 +309,30 @@ struct AccountGroup: Identifiable, Hashable {
 
 // MARK: - 操作卡片
 
+/// 菜单按钮在屏幕坐标系中的位置，用于把操作卡片贴到按钮下方。
+struct MenuAnchorKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
+        }
+    }
+}
+
+/// 账号详情页菜单按钮的位置，与主界面分开避免互相覆盖。
+struct DetailMenuAnchorKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
+        }
+    }
+}
+
 /// 操作卡片容器：纯白底、大圆角、柔和阴影。
 struct ActionsMenuCard<Content: View>: View {
     let width: CGFloat
@@ -313,7 +354,7 @@ struct ActionsMenuCard<Content: View>: View {
     }
 }
 
-/// 操作卡片中的一行：图标 + 文案，紧凑对齐。
+/// 操作卡片中的一行：文字在左、图标在右。
 struct ActionMenuRow: View {
     let icon: String
     let title: String
@@ -322,22 +363,30 @@ struct ActionMenuRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 17))
-                    .frame(width: 22)
-
+            HStack(spacing: 10) {
                 Text(title)
                     .font(.system(size: 17))
 
                 Spacer(minLength: 0)
+
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .frame(width: 22)
             }
             .foregroundStyle(isDestructive ? Color.red : Color.primary)
             .padding(.horizontal, 16)
             .frame(height: 46)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(MenuRowButtonStyle())
+    }
+}
+
+/// 按下时轻微加深，反馈更接近系统菜单。
+struct MenuRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(Color.primary.opacity(configuration.isPressed ? 0.06 : 0))
     }
 }
 

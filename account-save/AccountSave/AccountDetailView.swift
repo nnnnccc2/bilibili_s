@@ -12,10 +12,12 @@ struct AccountDetailView: View {
     @State private var isEditing = false
     @State private var isConfirmingDelete = false
     @State private var isShowingActions = false
+    @State private var menuAnchor: CGRect = .zero
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
 
     private let cardRadius: CGFloat = 10
+    private let menuWidth: CGFloat = 220
 
     private var messages: [SMSMessage] { account.sortedMessages }
 
@@ -43,6 +45,7 @@ struct AccountDetailView: View {
             .padding(.vertical, 12)
         }
         .background(Color(.systemGroupedBackground))
+        .onPreferenceChange(DetailMenuAnchorKey.self) { menuAnchor = $0 }
         .overlay {
             if isShowingActions {
                 actionsMenu
@@ -118,40 +121,55 @@ struct AccountDetailView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.primary)
                     .frame(width: 28, height: 28)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: DetailMenuAnchorKey.self,
+                                value: proxy.frame(in: .global)
+                            )
+                        }
+                    )
             }
             .buttonStyle(.plain)
         }
     }
 
-    /// 右上角操作卡片：白底、无箭头，带遮罩。
+    /// 右上角操作卡片：贴着按钮下方展开，无箭头。
     private var actionsMenu: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.opacity(0.18)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        isShowingActions = false
+        GeometryReader { proxy in
+            let origin = proxy.frame(in: .global).origin
+            let cardX = (menuAnchor == .zero ? proxy.size.width - 16 : menuAnchor.maxX)
+                - menuWidth - origin.x
+            let cardY = (menuAnchor == .zero ? 8 : menuAnchor.maxY + 6) - origin.y
+
+            ZStack(alignment: .topLeading) {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            isShowingActions = false
+                        }
+                    }
+
+                ActionsMenuCard(width: menuWidth) {
+                    ActionMenuRow(icon: "pencil", title: "编辑信息") {
+                        dismissThen { isEditing = true }
+                    }
+                    ActionMenuRow(icon: "doc.text", title: "导出短信") {
+                        dismissThen { exportMessages() }
+                    }
+
+                    Divider()
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 2)
+
+                    ActionMenuRow(icon: "trash", title: "删除凭证", isDestructive: true) {
+                        dismissThen { isConfirmingDelete = true }
                     }
                 }
-
-            ActionsMenuCard(width: 228) {
-                ActionMenuRow(icon: "pencil", title: "编辑信息") {
-                    dismissThen { isEditing = true }
-                }
-                ActionMenuRow(icon: "doc.text", title: "导出短信") {
-                    dismissThen { exportMessages() }
-                }
-
-                Divider()
-                    .padding(.leading, 50)
-
-                ActionMenuRow(icon: "trash", title: "删除凭证", isDestructive: true) {
-                    dismissThen { isConfirmingDelete = true }
-                }
+                .offset(x: max(12, cardX), y: cardY)
             }
-            .padding(.top, 10)
-            .padding(.trailing, 16)
         }
         .transition(.opacity)
     }
