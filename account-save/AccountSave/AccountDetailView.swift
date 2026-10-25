@@ -123,10 +123,10 @@ struct AccountDetailView: View {
         }
     }
 
-    /// 无箭头、无灰底的右上角操作卡片。
+    /// 右上角操作卡片：白底、无箭头，带遮罩。
     private var actionsMenu: some View {
         ZStack(alignment: .topTrailing) {
-            Color.black.opacity(0.001)
+            Color.black.opacity(0.18)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {
@@ -135,7 +135,7 @@ struct AccountDetailView: View {
                     }
                 }
 
-            VStack(alignment: .leading, spacing: 0) {
+            ActionsMenuCard(width: 228) {
                 ActionMenuRow(icon: "pencil", title: "编辑信息") {
                     dismissThen { isEditing = true }
                 }
@@ -144,28 +144,16 @@ struct AccountDetailView: View {
                 }
 
                 Divider()
-                    .padding(.leading, 42)
+                    .padding(.leading, 50)
 
                 ActionMenuRow(icon: "trash", title: "删除凭证", isDestructive: true) {
                     dismissThen { isConfirmingDelete = true }
                 }
             }
-            .padding(.vertical, 6)
-            .frame(width: 196)
-            .background(.regularMaterial, in: menuShape)
-            .overlay(
-                menuShape
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-            )
-            .shadow(color: Color.black.opacity(0.16), radius: 20, y: 8)
-            .padding(.top, 6)
-            .padding(.trailing, 14)
+            .padding(.top, 10)
+            .padding(.trailing, 16)
         }
         .transition(.opacity)
-    }
-
-    private var menuShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
     }
 
     /// 关闭弹层后再执行动作，避免弹层与后续页面切换打架。

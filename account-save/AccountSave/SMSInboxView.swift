@@ -14,7 +14,7 @@ struct SMSInboxView: View {
     @State private var groupToDelete: AccountGroup?
 
     /// 右上角操作卡片的宽度。
-    private let actionsMenuWidth: CGFloat = 196
+    private let actionsMenuWidth: CGFloat = 228
 
     var body: some View {
         NavigationStack {
@@ -139,10 +139,10 @@ struct SMSInboxView: View {
         }
     }
 
-    /// 无箭头、无灰底的右上角操作卡片。
+    /// 右上角操作卡片：白底、无箭头，带遮罩。
     private var actionsMenu: some View {
         ZStack(alignment: .topTrailing) {
-            Color.black.opacity(0.001)
+            Color.black.opacity(0.18)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {
@@ -151,19 +151,19 @@ struct SMSInboxView: View {
                     }
                 }
 
-            VStack(alignment: .leading, spacing: 0) {
+            ActionsMenuCard(width: actionsMenuWidth) {
                 ActionMenuRow(icon: "lightbulb", title: "配置步骤") {
                     dismissThen { isShowingGuide = true }
                 }
 
                 Divider()
-                    .padding(.leading, 42)
+                    .padding(.leading, 50)
 
                 Text("导出")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 8)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
                     .padding(.bottom, 2)
 
                 ActionMenuRow(icon: "tablecells", title: "账号清单") {
@@ -173,22 +173,10 @@ struct SMSInboxView: View {
                     dismissThen { export(kind: .messages) }
                 }
             }
-            .padding(.vertical, 6)
-            .frame(width: actionsMenuWidth)
-            .background(.regularMaterial, in: actionsMenuShape)
-            .overlay(
-                actionsMenuShape
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-            )
-            .shadow(color: Color.black.opacity(0.16), radius: 20, y: 8)
-            .padding(.top, 6)
-            .padding(.trailing, 14)
+            .padding(.top, 10)
+            .padding(.trailing, 16)
         }
         .transition(.opacity)
-    }
-
-    private var actionsMenuShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
     }
 
     /// 关闭弹层后再执行动作，避免弹层与后续页面切换打架。
@@ -302,7 +290,28 @@ struct AccountGroup: Identifiable, Hashable {
     }
 }
 
-// MARK: - 紧凑操作弹层
+// MARK: - 操作卡片
+
+/// 操作卡片容器：纯白底、大圆角、柔和阴影。
+struct ActionsMenuCard<Content: View>: View {
+    let width: CGFloat
+    @ViewBuilder var content: Content
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content
+        }
+        .padding(.vertical, 8)
+        .frame(width: width)
+        .background(Color(.systemBackground), in: shape)
+        .overlay(shape.strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5))
+        .shadow(color: Color.black.opacity(0.18), radius: 30, y: 14)
+    }
+}
 
 /// 操作卡片中的一行：图标 + 文案，紧凑对齐。
 struct ActionMenuRow: View {
@@ -313,19 +322,19 @@ struct ActionMenuRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 20)
+                    .font(.system(size: 17))
+                    .frame(width: 22)
 
                 Text(title)
-                    .font(.system(size: 15))
+                    .font(.system(size: 17))
 
                 Spacer(minLength: 0)
             }
             .foregroundStyle(isDestructive ? Color.red : Color.primary)
-            .padding(.horizontal, 12)
-            .frame(height: 38)
+            .padding(.horizontal, 16)
+            .frame(height: 46)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
