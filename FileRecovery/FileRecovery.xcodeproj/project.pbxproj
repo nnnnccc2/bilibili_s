@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C10000000000000000000001 /* FileRecoveryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000020 /* FileRecoveryApp.swift */; };
-		C10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000021 /* ContentView.swift */; };
-		C10000000000000000000003 /* DiskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000022 /* DiskDetailView.swift */; };
-		C10000000000000000000004 /* DiskImageReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000023 /* DiskImageReader.swift */; };
-		C10000000000000000000005 /* FileSystemDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000024 /* FileSystemDetector.swift */; };
-		C10000000000000000000006 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000025 /* Models.swift */; };
-		C10000000000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000026 /* Assets.xcassets */; };
+		C10000000000000000000040 /* FileRecoveryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000020 /* FileRecoveryApp.swift */; };
+		C10000000000000000000041 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000021 /* ContentView.swift */; };
+		C10000000000000000000042 /* DiskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000022 /* DiskDetailView.swift */; };
+		C10000000000000000000043 /* DiskImageReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000023 /* DiskImageReader.swift */; };
+		C10000000000000000000044 /* FileSystemDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000024 /* FileSystemDetector.swift */; };
+		C10000000000000000000045 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000025 /* Models.swift */; };
+		C10000000000000000000046 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000026 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,7 +25,7 @@
 		C10000000000000000000025 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		C10000000000000000000026 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C10000000000000000000027 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C10000000000000000000029 /* FileRecovery.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FileRecovery.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C10000000000000000000009 /* FileRecovery.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FileRecovery.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,7 +50,7 @@
 		C10000000000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C10000000000000000000029 /* FileRecovery.app */,
+				C10000000000000000000009 /* FileRecovery.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,7 +87,7 @@
 			);
 			name = FileRecovery;
 			productName = FileRecovery;
-			productReference = C10000000000000000000029 /* FileRecovery.app */;
+			productReference = C10000000000000000000009 /* FileRecovery.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -129,7 +129,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C10000000000000000000007 /* Assets.xcassets in Resources */,
+				C10000000000000000000046 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,12 +140,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C10000000000000000000001 /* FileRecoveryApp.swift in Sources */,
-				C10000000000000000000002 /* ContentView.swift in Sources */,
-				C10000000000000000000003 /* DiskDetailView.swift in Sources */,
-				C10000000000000000000004 /* DiskImageReader.swift in Sources */,
-				C10000000000000000000005 /* FileSystemDetector.swift in Sources */,
-				C10000000000000000000006 /* Models.swift in Sources */,
+				C10000000000000000000040 /* FileRecoveryApp.swift in Sources */,
+				C10000000000000000000041 /* ContentView.swift in Sources */,
+				C10000000000000000000042 /* DiskDetailView.swift in Sources */,
+				C10000000000000000000043 /* DiskImageReader.swift in Sources */,
+				C10000000000000000000044 /* FileSystemDetector.swift in Sources */,
+				C10000000000000000000045 /* Models.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
