@@ -35,8 +35,12 @@ jobs:
         id: compile_time
         run: |
           COMPILE_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+          IPA_NAME="FileRecovery-${TIMESTAMP}.ipa"
           echo "compile_time=$COMPILE_TIME"
           echo "compile_time=$COMPILE_TIME" >> $GITHUB_OUTPUT
+          echo "ipa_name=$IPA_NAME"
+          echo "ipa_name=$IPA_NAME" >> $GITHUB_OUTPUT
 
       - name: Build for iOS Device (arm64)
         id: build
@@ -97,19 +101,20 @@ jobs:
       - name: Package into IPA
         run: |
           APP_PATH="${{ steps.find_app.outputs.app_path }}"
+          IPA_NAME="${{ steps.compile_time.outputs.ipa_name }}"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/FileRecovery.app
-          zip -r FileRecovery.ipa Payload/ -x "*.DS_Store"
-          echo "IPA created: FileRecovery.ipa"
-          ls -la FileRecovery.ipa
+          zip -r "$IPA_NAME" Payload/ -x "*.DS_Store"
+          echo "IPA created: $IPA_NAME"
+          ls -la "$IPA_NAME"
           echo "=== IPA contents ==="
-          unzip -l FileRecovery.ipa
+          unzip -l "$IPA_NAME"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: FileRecovery-iOS18-ipa
-          path: FileRecovery.ipa
+          path: ${{ steps.compile_time.outputs.ipa_name }}
           retention-days: 30
 
       - name: Publish IPA to GitHub Release
@@ -118,9 +123,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          IPA_NAME="${{ steps.compile_time.outputs.ipa_name }}"
           gh release delete file-recovery --yes --cleanup-tag 2>/dev/null || echo "No existing release to delete"
           sleep 2
-          gh release create file-recovery FileRecovery.ipa \
+          gh release create file-recovery "$IPA_NAME" \
             --title "磁盘恢复 iOS 18 Build" \
             --notes "**磁盘恢复（FileRecovery）iOS 18** — 读取 .img 分区镜像，自动识别文件系统类型并展示详情。架构 arm64 · 部署目标 iOS 18.0 · ad-hoc 签名。使用 Sideloadly / AltStore 配合 Apple ID 重签名后安装。"
           echo "Release created successfully"
