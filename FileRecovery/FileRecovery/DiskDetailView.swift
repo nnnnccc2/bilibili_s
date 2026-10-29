@@ -36,7 +36,7 @@ struct DiskDetailView: View {
                 Text(info.fileSystem.type.rawValue)
                     .font(.title2)
                     .fontWeight(.bold)
-                Text("文件大小：\(ByteCountFormatter.string(fromByteCount: Int64(info.fileSize)))")
+                Text("文件大小：\(ByteCountFormatter.string(fromByteCount: Int64(info.fileSize), countStyle: .file))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Text("加载时间：\(info.loadedAt.formatted(date: .abbreviated, time: .shortened))")
@@ -63,10 +63,10 @@ struct DiskDetailView: View {
                 row(title: "序列号", value: serial)
             }
             if let total = info.fileSystem.totalBytes {
-                row(title: "总容量", value: ByteCountFormatter.string(fromByteCount: Int64(total)))
+                row(title: "总容量", value: ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .file))
             }
             if let free = info.fileSystem.freeBytes {
-                row(title: "可用空间", value: ByteCountFormatter.string(fromByteCount: Int64(free)))
+                row(title: "可用空间", value: ByteCountFormatter.string(fromByteCount: Int64(free), countStyle: .file))
             }
             if let sector = info.fileSystem.sectorSize {
                 row(title: "扇区大小", value: "\(sector) 字节")

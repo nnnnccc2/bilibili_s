@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// 主视图：导入磁盘镜像并展示已识别的文件系统列表
 struct ContentView: View {
@@ -94,7 +95,7 @@ struct ContentView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
                     .background(Color.blue.opacity(0.15), in: Capsule())
-                Text(ByteCountFormatter.string(fromByteCount: Int64(info.fileSize)))
+                Text(ByteCountFormatter.string(fromByteCount: Int64(info.fileSize), countStyle: .file))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

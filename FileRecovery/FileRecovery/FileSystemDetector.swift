@@ -140,7 +140,6 @@ enum FileSystemDetector {
             // 根据簇数量判断
             let rootDirSectors = (UInt64(rootEntries) * 32 + UInt64(sectorSize) - 1) / UInt64(sectorSize)
             let dataSectors = totalSectors - (UInt64(reservedSectors) + UInt64(numberOfFATs) * sectorsPerFAT + rootDirSectors)
-            let clustersPerFAT = sectorsPerFAT * UInt64(sectorSize) / 2
             let totalClusters = dataSectors / UInt64(sectorsPerCluster)
             if totalClusters < 4085 {
                 fsType = .fat12
@@ -151,7 +150,7 @@ enum FileSystemDetector {
             }
         }
 
-        var rawInfo: [String: String] = [
+        let rawInfo: [String: String] = [
             "每扇区字节数": "\(sectorSize)",
             "每簇扇区数": "\(sectorsPerCluster)",
             "保留扇区数": "\(reservedSectors)",
@@ -283,8 +282,8 @@ enum FileSystemDetector {
             rawInfo["块大小"] = "\(blockSize)"
             rawInfo["总块数"] = "\(totalBlocks)"
             rawInfo["空闲块数"] = "\(freeBlocks)"
-            rawInfo["容器容量"] = ByteCountFormatter.string(fromByteCount: Int64(totalBlocks * UInt64(blockSize)))
-            rawInfo["可用空间"] = ByteCountFormatter.string(fromByteCount: Int64(freeBlocks * UInt64(blockSize)))
+            rawInfo["容器容量"] = ByteCountFormatter.string(fromByteCount: Int64(totalBlocks * UInt64(blockSize)), countStyle: .file)
+            rawInfo["可用空间"] = ByteCountFormatter.string(fromByteCount: Int64(freeBlocks * UInt64(blockSize)), countStyle: .file)
 
             return FileSystemDetails(
                 type: .apfs, volumeLabel: nil, serialNumber: nil,
